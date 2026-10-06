@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Copycats | Pass the Phone</title>
+<meta name="description" content="Everyone writes a one-word clue for the guesser. If two clues match, both get thrown out. A team game for one phone.">
+<meta name="theme-color" content="#ff7a1a">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap">
+<style>
+/* Layout: a fridge door. Clues are sticky notes slapped on in a loose cluster; everything else stays round and friendly. */
+:root{
+  color-scheme:light;
+  --tang:#ff7a1a;
+  --tang-deep:#c94f06;
+  --cream:#fff6ea;
+  --ink:#22140a;
+  --soft:#6b4a33;
+  --n1:#fff36b;
+  --n2:#ffc2dc;
+  --n3:#a8e9ff;
+  --n4:#c4f7a1;
+  --red:#e8112d;
+  --good:#11a35b;
+  --f:"Baloo 2","Trebuchet MS",system-ui,-apple-system,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--tang)}
+body{margin:0;min-height:100vh;color:var(--ink);font-family:var(--f);font-size:18px;line-height:1.45;-webkit-font-smoothing:antialiased;
+  background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(255,255,255,.28),transparent 70%),repeating-linear-gradient(135deg,rgba(255,255,255,.05) 0 18px,transparent 18px 36px),var(--tang);background-attachment:fixed}
+button{font:inherit;color:inherit}
+.wrap{max-width:720px;margin:0 auto;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.back{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:4px 16px 4px 10px;border-radius:999px;background:var(--cream);color:var(--ink);text-decoration:none;font-weight:700;font-size:16px}
+.back svg{width:16px;height:16px}
+.ptp-sound{display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:var(--cream);color:var(--ink);cursor:pointer}
+.ptp-sound svg{width:22px;height:22px}
+:is(.back,.ptp-sound,.btn,.pp-add,.pp-remove,.note-btn,.howto summary):focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+
+.title{display:flex;align-items:center;gap:.16em;margin:22px 0 0;font-weight:800;font-size:clamp(58px,15vw,112px);line-height:.95;letter-spacing:-.02em;color:var(--cream);text-shadow:0 5px 0 var(--tang-deep)}
+.title svg{width:.9em;height:.9em;flex:none}
+.tagline{margin:10px 0 0;font-size:20px;font-weight:700;color:var(--ink)}
+.box{margin-top:22px;padding:18px;border-radius:26px;background:var(--cream);box-shadow:0 10px 0 var(--tang-deep)}
+.label{display:block;margin:0 0 8px;font-weight:800;font-size:21px}
+.sec+.sec{margin-top:20px}
+.hint{margin:6px 0 0;color:var(--soft);font-size:16px}
+
+.pp-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.pp-row{display:flex;align-items:center;gap:8px}
+.pp-num{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:50%;background:var(--n1);font-weight:800}
+.pp-input{flex:1;min-width:0;height:48px;padding:0 14px;border:2px solid #e7d6c2;border-radius:14px;background:#fff;color:var(--ink);font:700 19px/1 var(--f)}
+.pp-input::placeholder{color:#b09780;font-weight:500}
+.pp-input:focus{outline:none;border-color:var(--tang)}
+.pp-remove{display:grid;place-items:center;flex:none;width:42px;height:42px;border:0;border-radius:50%;background:#f3e4d2;color:var(--ink);cursor:pointer}
+.pp-remove:disabled{opacity:.35;cursor:default}
+.pp-add{margin-top:10px;min-height:44px;padding:4px 18px;border:2px dashed #d7bfa6;border-radius:999px;background:transparent;font-weight:700;cursor:pointer}
+.pp-add:disabled{opacity:.35;cursor:default}
+.pp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg label{position:relative;cursor:pointer}
+.seg input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+.seg span{display:grid;place-items:center;min-width:64px;height:46px;padding:0 16px;border-radius:999px;background:#f3e4d2;font-weight:800;font-size:17px}
+.seg input:checked+span{background:var(--ink);color:var(--cream)}
+.seg input:focus-visible+span{outline:3px solid var(--tang);outline-offset:2px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:54px;padding:6px 26px;border:0;border-radius:999px;cursor:pointer;font-weight:800;font-size:20px;touch-action:manipulation;transition:transform .08s ease}
+.btn:active{transform:translateY(2px)}
+.btn-ink{background:var(--ink);color:var(--cream);box-shadow:0 5px 0 #000}
+.btn-cream{background:var(--cream);color:var(--ink);box-shadow:0 5px 0 var(--tang-deep)}
+.btn-line{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 2.5px var(--ink)}
+.btn-big{min-height:62px;padding-inline:34px;font-size:23px}
+.btn:disabled{opacity:.4;cursor:default;transform:none}
+.actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:22px}
+.actions.center{justify-content:center}
+.textbtn{background:none;border:0;padding:8px;font-weight:700;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+
+.center{text-align:center}
+.eyebrow{margin:26px 0 0;font-weight:800;font-size:15px;letter-spacing:.14em;text-transform:uppercase}
+.big{margin:4px 0 0;font-weight:800;font-size:clamp(38px,9.5vw,68px);line-height:1;letter-spacing:-.015em;text-wrap:balance;overflow-wrap:anywhere}
+.big.light{color:var(--cream);text-shadow:0 4px 0 var(--tang-deep)}
+.lead{margin:12px auto 0;max-width:30em;font-size:20px;font-weight:600;text-wrap:pretty}
+.status{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:20px}
+.status span{padding:4px 14px;border-radius:999px;background:rgba(255,246,234,.85);font-weight:800;font-size:16px}
+
+.secret{margin:20px auto 0;max-width:420px;padding:20px 18px 22px;border-radius:26px;background:var(--cream);box-shadow:0 10px 0 var(--tang-deep)}
+.secret small{display:block;font-weight:800;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--soft)}
+.secret b{display:block;margin-top:2px;font-size:clamp(40px,11vw,64px);line-height:1.05;overflow-wrap:anywhere}
+.field{display:grid;gap:6px;max-width:420px;margin:18px auto 0;text-align:left}
+.field label{font-weight:800}
+.field input{height:58px;padding:0 16px;border:0;border-radius:18px;background:#fff;color:var(--ink);font:800 24px/1 var(--f);box-shadow:inset 0 0 0 3px var(--ink)}
+.field input:focus{outline:none;box-shadow:inset 0 0 0 3px var(--ink),0 0 0 5px rgba(255,246,234,.8)}
+.err{min-height:1.5em;margin:6px 0 0;font-weight:800;color:var(--cream);text-shadow:0 2px 0 var(--tang-deep)}
+
+.notes{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-top:22px}
+.note,.note-btn{position:relative;display:grid;place-items:center;align-content:center;gap:2px;width:min(42vw,160px);min-height:118px;padding:14px 10px;border:0;border-radius:4px;background:var(--n);color:var(--ink);text-align:center;font-weight:800;font-size:clamp(22px,5.5vw,30px);line-height:1.1;overflow-wrap:anywhere;transform:rotate(var(--r,0deg));box-shadow:0 12px 18px -12px rgba(0,0,0,.55)}
+.note-btn{cursor:pointer;touch-action:manipulation}
+.note small,.note-btn small{display:block;font-size:14px;font-weight:700;color:var(--soft)}
+.note.out,.note-btn.out{background:#ece2d6;color:#9a8b7d}
+.note.out .w,.note-btn.out .w{text-decoration:line-through;text-decoration-color:var(--red);text-decoration-thickness:4px}
+.stamp{position:absolute;right:-8px;top:-10px;padding:0 8px;border-radius:6px;background:var(--red);color:#fff;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;transform:rotate(8deg)}
+.verdict{margin-top:22px;font-weight:800;font-size:clamp(54px,15vw,100px);line-height:1;color:var(--cream);text-shadow:0 5px 0 var(--tang-deep)}
+.verdict.bad{color:var(--ink);text-shadow:none}
+.howto{margin-top:26px}
+.howto summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-weight:800;font-size:21px}
+.howto ol{margin:4px 0 0;padding-left:1.3em;display:grid;gap:6px;font-weight:600}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="words.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const WORDS = window.COPYCAT_WORDS || ['Banana'];
+  const KEY = 'ptp.copycats';
+  const NOTES = ['var(--n1)', 'var(--n2)', 'var(--n3)', 'var(--n4)'];
+  const BACK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const CAT = '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M14 88l6-66 28 22h4l28-22 6 66z" fill="#22140a"/><circle cx="50" cy="62" r="34" fill="#22140a"/><ellipse cx="36" cy="58" rx="8" ry="10" fill="#fff6ea"/><ellipse cx="64" cy="58" rx="8" ry="10" fill="#fff6ea"/><circle cx="38" cy="60" r="4" fill="#22140a"/><circle cx="66" cy="60" r="4" fill="#22140a"/><path d="M46 72h8l-4 5z" fill="#ffc2dc"/></svg>';
+  const app = document.getElementById('app');
+  const deck = P.deck('copycats', WORDS);
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ cards: 13 }, saved.settings || {}),
+    best: saved.best || {},
+    screen: 'setup', players: [], pile: 0, score: 0, gIdx: 0, C: null
+  };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings, best: S.best }); }
+
+  /* ---------- Word matching ---------- */
+  function key(w) {
+    let s = String(w || '').toLowerCase().normalize('NFD').replace(/[^a-z0-9]/g, '');
+    if (/(ss|x|z|ch|sh)es$/.test(s)) s = s.slice(0, -2);
+    else if (s.length > 4 && /ies$/.test(s)) s = s.slice(0, -3) + 'y';
+    else if (s.length > 3 && /[^s]s$/.test(s)) s = s.slice(0, -1);
+    if (s.length > 5 && /ing$/.test(s)) s = s.slice(0, -3);
+    else if (s.length > 4 && /ed$/.test(s)) s = s.slice(0, -2);
+    if (/([b-df-hj-np-tv-z])\1$/.test(s) && s.length > 3) s = s.slice(0, -1);
+    return s;
+  }
+  function lev(a, b) {
+    const m = a.length, n = b.length;
+    if (!m || !n) return m || n;
+    let prev = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) {
+      const cur = [i];
+      for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+    return prev[n];
+  }
+  function tooClose(clue, word) {
+    const c = key(clue);
+    if (!c) return true;
+    const whole = key(word.replace(/[\s-]+/g, ''));
+    if (c === whole) return true;
+    const parts = word.toLowerCase().split(/[\s-]+/).map(key).filter(t => t.length >= 3);
+    return parts.some(t => c === t || c.includes(t) || (c.length >= 4 && t.includes(c)));
+  }
+  function sameWord(guess, word) {
+    const g = key(String(guess).trim().replace(/^(a|an|the)\s+/i, '').replace(/[\s-]+/g, ''));
+    const w = key(word.replace(/[\s-]+/g, ''));
+    if (!g) return false;
+    if (g === w) return true;
+    return Math.max(g.length, w.length) >= 5 && lev(g, w) <= 1;
+  }
+  function markCopycats(clues) {
+    const counts = {};
+    clues.forEach(c => { const k = key(c.text); counts[k] = (counts[k] || 0) + 1; });
+    clues.forEach(c => { c.out = counts[key(c.text)] > 1; c.auto = c.out; });
+  }
+
+  /* ---------- Views ---------- */
+  function header() { return `<header class="top"><a class="back" href="../">${BACK}All games</a>${P.soundToggle()}</header>`; }
+  function statusHTML() {
+    return `<div class="status"><span>Score ${S.score}</span><span>${P.plural(S.pile, 'card')} left</span></div>`;
+  }
+  function viewSetup() {
+    return header() + `
+    <h1 class="title">${CAT}Copycats</h1>
+    <p class="tagline">One guesser, a pile of clues, and no copying allowed.</p>
+    <div class="box">
+      <div class="sec"><span class="label">Players</span><div id="players"></div><p class="hint">Everyone plays on the same team. Three or more players.</p></div>
+      <div class="sec"><span class="label">Cards in the pile</span>
+        <div class="seg" role="radiogroup">${[[8, '8 cards'], [13, '13 cards']].map(([v, t]) => `<label><input type="radio" name="cards" id="cards-${v}" value="${v}"${S.settings.cards === v ? ' checked' : ''}><span>${t}</span></label>`).join('')}</div>
+      </div>
+      <div class="actions"><button class="btn btn-ink btn-big" type="button" data-act="start">Start</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>One player is the guesser and closes their eyes.</li>
+        <li>Everyone else takes the phone in turn, sees the secret word and types a one-word clue.</li>
+        <li>Matching clues cancel each other out. So do clues that are too close to the word.</li>
+        <li>The guesser sees the clues that survived and gets one guess.</li>
+        <li>Right: keep the card. Pass: lose this card. Wrong: lose this card and the next one.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    const C = S.C, giver = C.givers[C.pos];
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">Clue ${C.pos + 1} of ${C.givers.length}</p>
+      <h2 class="big light">Pass to ${esc(S.players[giver])}</h2>
+      <p class="lead">${esc(C.guesser)} is guessing this card and keeps their eyes closed.</p>
+      <div class="actions center"><button class="btn btn-ink btn-big" type="button" data-act="me">I'm ${esc(S.players[giver])}</button></div>
+      ${statusHTML()}
+    </section>`;
+  }
+  function viewClue() {
+    const C = S.C, giver = S.players[C.givers[C.pos]];
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(giver)}, your clue for ${esc(C.guesser)}</p>
+      <div class="secret"><small>The secret word</small><b>${esc(C.word)}</b></div>
+      <div class="field"><label for="clue">One word only</label><input id="clue" type="text" maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="Type your clue"></div>
+      <p class="err" id="err" aria-live="polite"></p>
+      <div class="actions center"><button class="btn btn-ink btn-big" type="button" data-act="clue">Hide it and pass</button></div>
+      ${C.pos === 0 ? '<div class="actions center"><button class="textbtn" type="button" data-act="swap">Nobody knows this word? Get a new one</button></div>' : ''}
+    </section>`;
+  }
+  function noteHTML(c, i, opts) {
+    const tag = opts && opts.button ? 'button' : 'div';
+    const attrs = tag === 'button' ? ` type="button" data-act="toggle" data-i="${i}" aria-pressed="${c.out}" aria-label="${esc(c.text)} by ${esc(c.by)}. ${c.out ? 'Thrown out' : 'Kept'}. Tap to change."` : '';
+    return `<${tag} class="${tag === 'button' ? 'note-btn' : 'note'}${c.out ? ' out' : ''}" style="--n:${NOTES[i % NOTES.length]};--r:${((i * 41) % 9) - 4}deg"${attrs}>
+      <span class="w">${esc(c.text)}</span>${opts && opts.by ? `<small>${esc(c.by)}</small>` : ''}${c.out ? `<span class="stamp">${c.auto ? 'Copycat' : 'Out'}</span>` : ''}</${tag}>`;
+  }
+  function viewCheck() {
+    const C = S.C;
+    const outN = C.clues.filter(c => c.out).length;
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">Clue givers only</p>
+      <h2 class="big light">Check the clues</h2>
+      <p class="lead">${outN ? 'Matching clues are thrown out.' : 'No copycats this time.'} Tap a clue to throw it out or bring it back, for example if two clues mean the same thing. ${esc(C.guesser)} keeps their eyes closed.</p>
+      <div class="notes">${C.clues.map((c, i) => noteHTML(c, i, { button: true, by: true })).join('')}</div>
+      <div class="actions center"><button class="btn btn-ink btn-big" type="button" data-act="checked">Give it to ${esc(C.guesser)}</button></div>
+    </section>`;
+  }
+  function viewPassGuesser() {
+    const C = S.C;
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">Your turn to guess</p>
+      <h2 class="big light">Pass to ${esc(C.guesser)}</h2>
+      <p class="lead">${esc(C.guesser)}, open your eyes. You get one guess.</p>
+      <div class="actions center"><button class="btn btn-ink btn-big" type="button" data-act="me-guess">I'm ${esc(C.guesser)}</button></div>
+    </section>`;
+  }
+  function viewGuess() {
+    const C = S.C;
+    const kept = C.clues.filter(c => !c.out);
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(C.guesser)}, what is the word?</p>
+      ${kept.length ? `<div class="notes">${kept.map((c, i) => noteHTML(c, i)).join('')}</div>` : `<h2 class="big light">Every clue was a copycat</h2><p class="lead">No clues survived. You can still take a wild guess, or pass.</p>`}
+      <div class="field"><label for="guess">Your guess</label><input id="guess" type="text" maxlength="40" autocomplete="off" enterkeyhint="go" placeholder="Type one guess"></div>
+      <div class="actions center">
+        <button class="btn btn-line" type="button" data-act="pass">Pass</button>
+        <button class="btn btn-ink btn-big" type="button" data-act="guess" id="guessBtn" disabled>Guess</button>
+      </div>
+    </section>`;
+  }
+  function viewResult() {
+    const C = S.C, r = C.result;
+    let verdict, line;
+    if (r === 'right') { verdict = 'Got it'; line = `${esc(C.guesser)} guessed ${esc(C.word)}. You keep the card.`; }
+    else if (r === 'pass') { verdict = 'Passed'; line = `The word was ${esc(C.word)}. That card is gone.`; }
+    else {
+      verdict = 'Not quite';
+      line = `${esc(C.guesser)} said ${esc(C.guess)}. The word was ${esc(C.word)}. ${C.penalty === 'score' ? 'You also lose one card you already won.' : 'You lose this card and the next one.'}`;
+    }
+    return header() + `
+    <section class="center">
+      <div class="verdict${r === 'right' ? '' : ' bad'}">${verdict}</div>
+      <p class="lead">${line}</p>
+      <div class="notes">${C.clues.map((c, i) => noteHTML(c, i, { by: true })).join('')}</div>
+      ${statusHTML()}
+      <div class="actions center">
+        ${r === 'wrong' ? '<button class="btn btn-line" type="button" data-act="override">That was right. Count it</button>' : ''}
+        <button class="btn btn-ink btn-big" type="button" data-act="next">${S.pile > 0 ? 'Next card' : 'See your score'}</button>
+      </div>
+    </section>`;
+  }
+  function viewFinal() {
+    const total = S.settings.cards, pct = S.score / total;
+    const verdict = S.score === total ? 'Perfect score' : pct >= 0.85 ? 'Basically telepathic' : pct >= 0.7 ? 'Great teamwork' : pct >= 0.5 ? 'Not bad at all' : pct >= 0.3 ? 'Room to improve' : 'Too many copycats';
+    const best = S.best[total] || 0;
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">Game over</p>
+      <div class="verdict">${S.score} / ${total}</div>
+      <h2 class="big">${verdict}</h2>
+      <p class="lead">${best && S.score < best ? 'Your best with ' + total + ' cards is ' + best + '.' : 'That is your best score with ' + total + ' cards so far.'}</p>
+      <div class="actions center">
+        <button class="btn btn-line" type="button" data-act="setup">Change setup</button>
+        <button class="btn btn-ink btn-big" type="button" data-act="again">Play again</button>
+      </div>
+    </section>`;
+  }
+
+  /* ---------- Flow ---------- */
+  function startGame() {
+    S.players = editor.get();
+    S.pile = S.settings.cards;
+    S.score = 0;
+    S.gIdx = Math.floor(Math.random() * S.players.length);
+    sfx.unlock();
+    P.stayAwake();
+    newCard();
+  }
+  function newCard() {
+    if (S.pile <= 0) { finishGame(); return; }
+    const n = S.players.length, g = S.gIdx % n;
+    const givers = [];
+    for (let k = 1; k < n; k++) givers.push((g + k) % n);
+    S.pile--;
+    S.C = { word: deck.one(), guesser: S.players[g], givers, pos: 0, clues: [], guess: '', result: null, penalty: null };
+    S.screen = 'pass';
+    render();
+  }
+  function submitClue() {
+    const C = S.C, input = document.getElementById('clue'), err = document.getElementById('err');
+    const v = (input ? input.value : '').trim();
+    let msg = '';
+    if (!v) msg = 'Type a clue first.';
+    else if (/\s/.test(v)) msg = 'One word only. No spaces.';
+    else if (tooClose(v, C.word)) msg = 'Too close to the secret word. Try another.';
+    if (msg) { if (err) err.textContent = msg; sfx.buzz(0.25); if (input) input.focus(); return; }
+    C.clues.push({ text: v, by: S.players[C.givers[C.pos]], out: false, auto: false });
+    C.pos++;
+    sfx.whoosh();
+    if (C.pos < C.givers.length) S.screen = 'pass';
+    else {
+      markCopycats(C.clues);
+      C.clues = P.shuffle(C.clues);
+      S.screen = 'check';
+      if (C.clues.some(c => c.out)) setTimeout(() => sfx.tone(220, { type: 'sawtooth', to: 110, dur: 0.35, gain: 0.08, lowpass: 900 }), 150);
+    }
+    render();
+  }
+  function judge(kind) {
+    const C = S.C;
+    if (kind === 'pass') { C.result = 'pass'; sfx.whoosh(); }
+    else {
+      const v = document.getElementById('guess').value.trim();
+      if (!v) return;
+      C.guess = v;
+      if (sameWord(v, C.word)) { C.result = 'right'; S.score++; sfx.ding(); P.confetti({ colors: ['#fff36b', '#ffc2dc', '#a8e9ff', '#c4f7a1', '#fff6ea'], count: 90 }); }
+      else {
+        C.result = 'wrong';
+        if (S.pile > 0) { S.pile--; C.penalty = 'pile'; }
+        else if (S.score > 0) { S.score--; C.penalty = 'score'; }
+        sfx.buzz(0.6);
+      }
+    }
+    S.screen = 'result';
+    render();
+  }
+  function override() {
+    const C = S.C;
+    if (C.result !== 'wrong') return;
+    if (C.penalty === 'pile') S.pile++;
+    else if (C.penalty === 'score') S.score++;
+    C.penalty = null;
+    C.result = 'right';
+    S.score++;
+    sfx.ding();
+    render();
+  }
+  function finishGame() {
+    const total = S.settings.cards;
+    if (S.score > (S.best[total] || 0)) S.best[total] = S.score;
+    persist();
+    S.screen = 'final';
+    render();
+    if (S.score / total >= 0.7) { sfx.win(); P.confetti({ colors: ['#fff36b', '#ffc2dc', '#a8e9ff', '#c4f7a1', '#22140a'] }); }
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, clue: viewClue, check: viewCheck, passGuesser: viewPassGuesser, guess: viewGuess, result: viewResult, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 3, max: 10 });
+    if (S.screen === 'clue') { const i = document.getElementById('clue'); if (i) i.focus(); }
+    if (S.screen === 'guess') { const i = document.getElementById('guess'); if (i) i.focus(); }
+    if (S.screen !== shown || S.screen === 'pass') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': startGame(); break;
+      case 'me': S.screen = 'clue'; render(); break;
+      case 'swap': S.C.word = deck.one([S.C.word]); render(); break;
+      case 'clue': submitClue(); break;
+      case 'toggle': {
+        const c = S.C.clues[Number(b.getAttribute('data-i'))];
+        if (c) { c.out = !c.out; c.auto = false; sfx.pop(); render(); }
+        break;
+      }
+      case 'checked': S.screen = 'passGuesser'; render(); break;
+      case 'me-guess': S.screen = 'guess'; render(); break;
+      case 'guess': judge('guess'); break;
+      case 'pass': judge('pass'); break;
+      case 'override': override(); break;
+      case 'next': S.gIdx++; newCard(); break;
+      case 'again': S.pile = S.settings.cards; S.score = 0; S.gIdx++; newCard(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('input', e => {
+    if (e.target.id === 'guess') document.getElementById('guessBtn').disabled = !e.target.value.trim();
+    if (e.target.id === 'clue') { const err = document.getElementById('err'); if (err) err.textContent = ''; }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    if (e.target.id === 'clue') { e.preventDefault(); submitClue(); }
+    if (e.target.id === 'guess') { e.preventDefault(); judge('guess'); }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.name === 'cards') { S.settings.cards = Number(e.target.value); persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

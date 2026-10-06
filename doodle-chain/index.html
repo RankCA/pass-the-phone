@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Doodle Chain | Pass the Phone</title>
+<meta name="description" content="Draw a prompt, guess the drawing, draw the guess. Pass one phone around, then watch how far it drifted.">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Permanent+Marker&display=swap">
+<style>
+/* Layout: a sketchbook page. Dot-grid paper, marker headlines, wobbly hand-drawn boxes; the canvas is the page itself. */
+:root{
+  color-scheme:light;
+  --paper:#ffffff;
+  --dots:#dcd6e8;
+  --ink:#1e1b2e;
+  --soft:#5d5870;
+  --pink:#ff4f9a;
+  --pink-deep:#c72a6c;
+  --sky:#2bb3ff;
+  --sun:#ffd23f;
+  --blush:#fff2f8;
+  --f-marker:"Permanent Marker","Comic Sans MS",cursive;
+  --f-hand:"Patrick Hand","Comic Sans MS","Trebuchet MS",sans-serif;
+  --wobble:255px 15px 225px 15px / 15px 225px 15px 255px;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--paper)}
+body{margin:0;min-height:100vh;color:var(--ink);font-family:var(--f-hand);font-size:20px;line-height:1.4;-webkit-font-smoothing:antialiased;background-color:var(--paper);background-image:radial-gradient(var(--dots) 1.3px,transparent 1.8px);background-size:22px 22px}
+button{font:inherit;color:inherit}
+.wrap{max-width:720px;margin:0 auto;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.back{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:4px 16px 4px 10px;border:2.5px solid var(--ink);border-radius:var(--wobble);background:var(--paper);color:var(--ink);text-decoration:none;font-size:19px}
+.back svg{width:16px;height:16px}
+.ptp-sound{display:grid;place-items:center;width:46px;height:46px;border:2.5px solid var(--ink);border-radius:50%;background:var(--paper);color:var(--ink);cursor:pointer}
+.ptp-sound svg{width:22px;height:22px}
+:is(.back,.ptp-sound,.btn,.pp-add,.pp-remove,.swatch,.tool,.howto summary):focus-visible{outline:3px solid var(--sky);outline-offset:3px}
+
+.title{margin:24px 0 0;font-family:var(--f-marker);font-weight:400;font-size:clamp(54px,14vw,104px);line-height:1;color:var(--ink);transform:rotate(-2deg)}
+.title span{color:var(--pink)}
+.squiggle{display:block;width:min(70%,360px);height:22px;margin-top:4px}
+.tagline{margin:10px 0 0;font-size:22px;color:var(--soft)}
+.card{margin-top:22px;padding:18px;border:2.5px solid var(--ink);border-radius:var(--wobble);background:var(--paper);box-shadow:5px 6px 0 rgba(30,27,46,.12)}
+.label{display:block;margin:0 0 8px;font-family:var(--f-marker);font-size:23px;color:var(--pink-deep)}
+.sec+.sec{margin-top:20px}
+.note{margin:6px 0 0;color:var(--soft);font-size:18px}
+
+.pp-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.pp-row{display:flex;align-items:center;gap:8px}
+.pp-num{width:26px;flex:none;font-family:var(--f-marker);font-size:20px;color:var(--pink);text-align:center}
+.pp-input{flex:1;min-width:0;height:48px;padding:0 12px;border:0;border-bottom:2.5px solid var(--ink);background:transparent;color:var(--ink);font:22px/1 var(--f-hand)}
+.pp-input::placeholder{color:#9a95ab}
+.pp-input:focus{outline:none;border-bottom-color:var(--pink);background:var(--blush)}
+.pp-remove{display:grid;place-items:center;flex:none;width:42px;height:42px;border:0;border-radius:50%;background:transparent;color:var(--soft);cursor:pointer}
+.pp-remove:hover{background:var(--blush)}
+.pp-remove:disabled{opacity:.3;cursor:default}
+.pp-add{margin-top:10px;min-height:44px;padding:4px 16px;border:2.5px dashed var(--ink);border-radius:var(--wobble);background:transparent;font-size:20px;cursor:pointer}
+.pp-add:disabled{opacity:.35;cursor:default}
+.pp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg label{position:relative;cursor:pointer}
+.seg input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+.seg span{display:grid;place-items:center;min-height:44px;padding:2px 16px;border:2.5px solid var(--ink);border-radius:var(--wobble);background:var(--paper);font-size:20px}
+.seg input:checked+span{background:var(--sun)}
+.seg input:focus-visible+span{outline:3px solid var(--sky);outline-offset:2px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:54px;padding:6px 26px;border:3px solid var(--ink);border-radius:var(--wobble);cursor:pointer;font-family:var(--f-marker);font-size:23px;touch-action:manipulation;transition:transform .08s ease}
+.btn:active{transform:translateY(2px) rotate(-1deg)}
+.btn-pink{background:var(--pink);color:#fff;box-shadow:4px 5px 0 var(--ink)}
+.btn-white{background:var(--paper);color:var(--ink);box-shadow:4px 5px 0 rgba(30,27,46,.25)}
+.btn-big{min-height:64px;padding-inline:34px;font-size:28px}
+.btn:disabled{opacity:.4;cursor:default;transform:none}
+.actions{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:22px}
+.actions.center{justify-content:center}
+.textbtn{background:none;border:0;padding:8px;color:var(--soft);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+
+.center{text-align:center}
+.eyebrow{margin:26px 0 0;font-size:20px;color:var(--soft)}
+.big{margin:4px 0 0;font-family:var(--f-marker);font-weight:400;font-size:clamp(38px,9vw,64px);line-height:1.08;text-wrap:balance;overflow-wrap:anywhere}
+.lead{margin:12px auto 0;max-width:30em;font-size:22px;color:var(--soft);text-wrap:pretty}
+.task{display:inline-block;margin-top:14px;padding:6px 18px;border:2.5px solid var(--ink);border-radius:var(--wobble);background:var(--sun);font-family:var(--f-marker);font-size:22px;transform:rotate(-2deg)}
+
+.drawhead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:14px}
+.drawhead small{display:block;color:var(--soft);font-size:18px}
+.drawhead b{display:block;font-family:var(--f-marker);font-weight:400;font-size:clamp(24px,6vw,36px);line-height:1.1;overflow-wrap:anywhere}
+.timer{flex:none;min-width:70px;padding:2px 12px;border:2.5px solid var(--ink);border-radius:999px;background:var(--paper);font-family:var(--f-marker);font-size:24px;text-align:center;font-variant-numeric:tabular-nums}
+.timer.low{background:var(--pink);color:#fff;animation:pulse .5s ease-in-out infinite alternate}
+@keyframes pulse{to{transform:scale(1.08)}}
+.padbox{position:relative;margin-top:12px;border:3px solid var(--ink);border-radius:14px;overflow:hidden;background:#fff;box-shadow:5px 6px 0 rgba(30,27,46,.14)}
+#pad{display:block;width:100%;height:auto;aspect-ratio:4/3;touch-action:none;cursor:crosshair}
+.tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.swatch{width:38px;height:38px;border:3px solid var(--ink);border-radius:50%;background:var(--c);cursor:pointer;padding:0}
+.swatch[aria-pressed="true"]{box-shadow:0 0 0 3px var(--paper),0 0 0 6px var(--ink)}
+.tool{display:grid;place-items:center;min-width:44px;height:44px;padding:0 10px;border:2.5px solid var(--ink);border-radius:12px;background:var(--paper);cursor:pointer;font-size:18px}
+.tool[aria-pressed="true"]{background:var(--sun)}
+.tool i{display:block;border-radius:50%;background:var(--ink)}
+.tool svg{width:22px;height:22px}
+.spacer{flex:1}
+.shot{display:block;width:100%;height:auto;margin-top:14px;border:3px solid var(--ink);border-radius:14px;background:#fff;box-shadow:5px 6px 0 rgba(30,27,46,.14)}
+.field{display:grid;gap:6px;margin-top:16px;text-align:left}
+.field input{height:58px;padding:0 16px;border:3px solid var(--ink);border-radius:14px;background:#fff;color:var(--ink);font:26px/1 var(--f-hand)}
+.field input:focus{outline:none;box-shadow:0 0 0 4px rgba(255,79,154,.3)}
+
+.feed{display:grid;gap:18px;margin-top:22px}
+.step{padding:14px;border:2.5px solid var(--ink);border-radius:var(--wobble);background:var(--paper);box-shadow:5px 6px 0 rgba(30,27,46,.12);text-align:left;animation:drop .4s cubic-bezier(.2,1.4,.4,1)}
+.step:nth-child(even){transform:rotate(.6deg)}
+.step:nth-child(odd){transform:rotate(-.6deg)}
+@keyframes drop{from{opacity:0;transform:translateY(-14px) rotate(-3deg)}}
+.step small{display:block;color:var(--soft);font-size:19px}
+.step .said{display:block;margin-top:2px;font-family:var(--f-marker);font-size:clamp(26px,6vw,38px);line-height:1.15;overflow-wrap:anywhere}
+.step img{display:block;width:100%;height:auto;margin-top:8px;border:2px solid var(--ink);border-radius:10px}
+.howto{margin-top:26px;color:var(--soft)}
+.howto summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-family:var(--f-marker);font-size:23px;color:var(--ink)}
+.howto ol{margin:4px 0 0;padding-left:1.3em;display:grid;gap:6px}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="prompts.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const PROMPTS = window.DOODLE_PROMPTS || ['A cat riding a skateboard'];
+  const KEY = 'ptp.doodle';
+  const CHAIN_KEY = 'ptp.doodle.chain';
+  const COLORS = ['#1e1b2e', '#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#0a84ff', '#af52de', '#8e5a3b', '#ff8fc2'];
+  const SIZES = [5, 12, 26];
+  const CW = 900, CH = 675;
+  const BACK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const UNDO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ERASER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3l5 5-11 11H5l-3-3z M9 10l5 5 M10 21h11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  const TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  const app = document.getElementById('app');
+  const promptDeck = P.deck('doodle', PROMPTS);
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ time: 60, start: 'secret' }, saved.settings || {}),
+    round: Number(saved.round) || 0,
+    screen: 'setup', players: [], chain: null, revealed: 0
+  };
+  const getPending = () => { const c = P.store.get(CHAIN_KEY, null); return c && c.chain && Array.isArray(c.players) && Array.isArray(c.chain.steps) ? c : null; };
+  let editor = null, pad = null, ticker = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings, round: S.round }); }
+  function saveChain() { if (S.chain) P.store.set(CHAIN_KEY, { players: S.players, chain: S.chain }); else P.store.del(CHAIN_KEY); }
+
+  /* ---------- Chain helpers ---------- */
+  const actor = () => S.players[S.chain.order[S.chain.pos]];
+  const actionAt = pos => (pos % 2 === 0 ? 'draw' : 'guess');
+  const lastStep = () => S.chain.steps[S.chain.steps.length - 1];
+  function labelOf(st) {
+    if (st.kind === 'prompt') return st.by ? st.by + ' wrote' : 'The prompt';
+    if (st.kind === 'draw') return st.by + ' drew';
+    return st.by + ' guessed';
+  }
+
+  /* ---------- Drawing pad ---------- */
+  function mountPad() {
+    const cv = document.getElementById('pad');
+    if (!cv) return;
+    cv.width = CW;
+    cv.height = CH;
+    pad = { cv, ctx: cv.getContext('2d'), strokes: [], cur: null, color: COLORS[0], size: SIZES[1], eraser: false };
+    redraw();
+    cv.addEventListener('pointerdown', down);
+    cv.addEventListener('pointermove', move);
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => cv.addEventListener(t, up));
+  }
+  function posOf(e) {
+    const r = pad.cv.getBoundingClientRect();
+    return [(e.clientX - r.left) * CW / r.width, (e.clientY - r.top) * CH / r.height];
+  }
+  function dot(s, p) {
+    const c = pad.ctx;
+    c.fillStyle = s.c;
+    c.beginPath();
+    c.arc(p[0], p[1], s.w / 2, 0, Math.PI * 2);
+    c.fill();
+  }
+  function seg(s, i) {
+    const c = pad.ctx, pts = s.pts;
+    const p0 = pts[i - 2] || pts[i - 1], p1 = pts[i - 1], p2 = pts[i];
+    c.strokeStyle = s.c;
+    c.lineWidth = s.w;
+    c.lineCap = 'round';
+    c.lineJoin = 'round';
+    c.beginPath();
+    c.moveTo((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);
+    c.quadraticCurveTo(p1[0], p1[1], (p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2);
+    c.stroke();
+  }
+  function tail(s) {
+    const pts = s.pts, n = pts.length;
+    if (n < 2) return;
+    const c = pad.ctx, a = pts[n - 2], b = pts[n - 1];
+    c.strokeStyle = s.c;
+    c.lineWidth = s.w;
+    c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    c.lineTo(b[0], b[1]);
+    c.stroke();
+  }
+  function redraw() {
+    const c = pad.ctx;
+    c.fillStyle = '#ffffff';
+    c.fillRect(0, 0, CW, CH);
+    pad.strokes.forEach(s => {
+      dot(s, s.pts[0]);
+      for (let i = 1; i < s.pts.length; i++) seg(s, i);
+      tail(s);
+    });
+  }
+  function down(e) {
+    e.preventDefault();
+    try { pad.cv.setPointerCapture(e.pointerId); } catch (x) { /* older browsers */ }
+    const p = posOf(e);
+    pad.cur = { c: pad.eraser ? '#ffffff' : pad.color, w: pad.eraser ? pad.size * 2.4 : pad.size, pts: [p] };
+    pad.strokes.push(pad.cur);
+    dot(pad.cur, p);
+    paintDone();
+  }
+  function move(e) {
+    if (!pad.cur) return;
+    const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    (list.length ? list : [e]).forEach(ev => {
+      const p = posOf(ev), pts = pad.cur.pts, last = pts[pts.length - 1];
+      if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 1.5) return;
+      pts.push(p);
+      seg(pad.cur, pts.length - 1);
+    });
+  }
+  function up() {
+    if (!pad || !pad.cur) return;
+    tail(pad.cur);
+    pad.cur = null;
+  }
+  function paintDone() {
+    const b = document.getElementById('doneBtn');
+    if (b) b.disabled = !pad.strokes.length;
+  }
+
+  /* ---------- Views ---------- */
+  function header() { return `<header class="top"><a class="back" href="../">${BACK}All games</a>${P.soundToggle()}</header>`; }
+  function seg2(name, opts) {
+    return `<div class="seg" role="radiogroup">${opts.map(([v, t]) => `<label><input type="radio" name="${name}" id="${name}-${v}" value="${v}"${String(S.settings[name]) === String(v) ? ' checked' : ''}><span>${t}</span></label>`).join('')}</div>`;
+  }
+  function viewSetup() {
+    const pending = getPending();
+    return header() + `
+    <h1 class="title">Doodle <span>Chain</span></h1>
+    <svg class="squiggle" viewBox="0 0 360 22" aria-hidden="true"><path d="M4 14C40 2 60 22 96 10s60 10 96-2 60 12 96 0 40 6 64 0" fill="none" stroke="#ff4f9a" stroke-width="5" stroke-linecap="round"/></svg>
+    <p class="tagline">Draw it, guess it, draw the guess. Then see how far it drifted.</p>
+    ${pending ? `<div class="card"><span class="label">Chain in progress</span><p class="note">A chain with ${P.plural(pending.chain.steps.length, 'step')} is waiting.</p>
+      <div class="actions"><button class="btn btn-pink" type="button" data-act="resume">Keep going</button><button class="btn btn-white" type="button" data-act="drop">Throw it out</button></div></div>` : ''}
+    <div class="card">
+      <div class="sec"><span class="label">Players</span><div id="players"></div><p class="note">Sit in a circle. The phone goes around in this order.</p></div>
+      <div class="sec"><span class="label">Drawing time</span>${seg2('time', [[45, '45 sec'], [60, '60 sec'], [90, '90 sec'], [0, 'No limit']])}</div>
+      <div class="sec"><span class="label">First prompt</span>${seg2('start', [['secret', 'Random prompt'], ['own', 'Write your own']])}</div>
+      <div class="actions"><button class="btn btn-pink btn-big" type="button" data-act="start">Start a chain</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>The first player gets a prompt and draws it.</li>
+        <li>The next player only sees the drawing and writes what they think it is.</li>
+        <li>The next player only sees that guess and draws it. Keep going around.</li>
+        <li>When everyone has had a turn, flip through the whole chain together.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    const pos = S.chain.pos, n = esc(actor());
+    const first = pos === 0;
+    const task = first && S.chain.own ? 'You write a prompt, then draw it' : actionAt(pos) === 'draw' ? 'You will draw' : 'You will guess the drawing';
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">Turn ${pos + 1} of ${S.chain.order.length}</p>
+      <h2 class="big">Pass to ${n}</h2>
+      <span class="task">${task}</span>
+      <p class="lead">Only ${n} looks at the screen.</p>
+      <div class="actions center"><button class="btn btn-pink btn-big" type="button" data-act="me">I'm ${n}</button></div>
+    </section>`;
+  }
+  function viewWrite() {
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(actor())}, write the first prompt</p>
+      <h2 class="big">What should we draw?</h2>
+      <div class="field"><label class="pp-sr" for="own">Prompt</label><input id="own" type="text" maxlength="60" autocomplete="off" placeholder="${esc(P.pick(PROMPTS))}"></div>
+      <div class="actions center"><button class="btn btn-white" type="button" data-act="random">Use a random one</button><button class="btn btn-pink btn-big" type="button" data-act="own" id="ownBtn" disabled>Draw it</button></div>
+    </section>`;
+  }
+  function viewDraw() {
+    const prev = lastStep();
+    const tools = COLORS.map((c, i) => `<button class="swatch" type="button" data-color="${c}" style="--c:${c}" aria-label="Color ${i + 1}" aria-pressed="${i === 0}"></button>`).join('')
+      + SIZES.map((s, i) => `<button class="tool" type="button" data-size="${s}" aria-label="${['Thin', 'Medium', 'Thick'][i]} brush" aria-pressed="${i === 1}"><i style="width:${Math.max(6, s * 0.9)}px;height:${Math.max(6, s * 0.9)}px"></i></button>`).join('');
+    return header() + `
+    <section>
+      <div class="drawhead"><div><small>${esc(actor())}, draw this</small><b>${esc(prev.text)}</b></div>${S.settings.time ? `<div class="timer" id="timer" role="timer">${S.settings.time}</div>` : ''}</div>
+      <div class="padbox"><canvas id="pad" aria-label="Drawing area"></canvas></div>
+      <div class="tools">${tools}
+        <button class="tool" type="button" data-tool="eraser" aria-pressed="false" aria-label="Eraser">${ERASER}</button>
+        <button class="tool" type="button" data-tool="undo" aria-label="Undo">${UNDO}</button>
+        <button class="tool" type="button" data-tool="clear" aria-label="Clear the drawing">${TRASH}</button>
+      </div>
+      <div class="actions center"><button class="btn btn-pink btn-big" type="button" data-act="drawn" id="doneBtn" disabled>Done</button></div>
+      <p class="note center">No letters or numbers. Just pictures.</p>
+    </section>`;
+  }
+  function viewGuess() {
+    const prev = lastStep();
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(actor())}, what is this?</p>
+      <img class="shot" src="${prev.img}" alt="Drawing by ${esc(prev.by)}">
+      <div class="field"><label class="pp-sr" for="guess">Your guess</label><input id="guess" type="text" maxlength="60" autocomplete="off" placeholder="I think it is..." enterkeyhint="send"></div>
+      <div class="actions center"><button class="btn btn-pink btn-big" type="button" data-act="guessed" id="guessBtn" disabled>Send it</button></div>
+    </section>`;
+  }
+  function stepHTML(st) {
+    if (st.kind === 'draw') return `<div class="step"><small>${esc(labelOf(st))}</small><img src="${st.img}" alt="Drawing by ${esc(st.by)}"></div>`;
+    return `<div class="step"><small>${esc(labelOf(st))}</small><span class="said">${esc(st.text)}</span></div>`;
+  }
+  function viewReveal() {
+    const steps = S.chain.steps, n = S.revealed, done = n >= steps.length;
+    const first = steps[0].text;
+    const lastText = [...steps].reverse().find(s => s.kind !== 'draw');
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">${done ? 'The whole chain' : 'Gather round'}</p>
+      <h2 class="big">${done ? 'Look how far it drifted' : 'The reveal'}</h2>
+      <div class="feed" id="feed">${steps.slice(0, n).map(stepHTML).join('')}</div>
+      ${done ? `<p class="lead">It started as <b>${esc(first)}</b> and ended as <b>${esc(lastText ? lastText.text : first)}</b>.</p>
+        <div class="actions center"><button class="btn btn-white" type="button" data-act="save">Save as a picture</button><button class="btn btn-pink btn-big" type="button" data-act="new">New chain</button></div>
+        <p class="note" id="saveNote" aria-live="polite"></p>`
+        : `<div class="actions center"><button class="btn btn-pink btn-big" type="button" data-act="more">${n === 0 ? 'Show the prompt' : 'Next'}</button></div>`}
+    </section>`;
+  }
+
+  /* ---------- Flow ---------- */
+  function startChain() {
+    S.players = editor.get();
+    const n = S.players.length, off = S.round % n;
+    S.round++;
+    persist();
+    const order = S.players.map((_, i) => (i + off) % n);
+    const own = S.settings.start === 'own';
+    S.chain = { order, pos: 0, own, steps: own ? [] : [{ kind: 'prompt', text: promptDeck.one(), by: null }] };
+    S.revealed = 0;
+    sfx.unlock();
+    P.stayAwake();
+    saveChain();
+    S.screen = 'pass';
+    render();
+  }
+  function beginTurn() {
+    if (S.chain.pos === 0 && S.chain.own && !S.chain.steps.length) { S.screen = 'write'; render(); return; }
+    S.screen = actionAt(S.chain.pos) === 'draw' ? 'draw' : 'guess';
+    render();
+  }
+  function startTimer() {
+    clearInterval(ticker);
+    if (!S.settings.time) return;
+    const end = performance.now() + S.settings.time * 1000;
+    let lastSec = null;
+    ticker = setInterval(() => {
+      const left = Math.max(0, Math.ceil((end - performance.now()) / 1000));
+      const t = document.getElementById('timer');
+      if (left !== lastSec) {
+        lastSec = left;
+        if (t) { t.textContent = left; t.classList.toggle('low', left <= 10); }
+        if (left > 0 && left <= 5) sfx.tick(1600);
+      }
+      if (left <= 0) { clearInterval(ticker); sfx.buzz(0.6); finishDraw(); }
+    }, 200);
+  }
+  function finishDraw() {
+    if (S.screen !== 'draw' || !pad) return;
+    clearInterval(ticker);
+    up();
+    S.chain.steps.push({ kind: 'draw', img: pad.cv.toDataURL('image/png'), by: actor() });
+    advance();
+  }
+  function finishGuess(text) {
+    S.chain.steps.push({ kind: 'guess', text, by: actor() });
+    advance();
+  }
+  function advance() {
+    S.chain.pos++;
+    sfx.whoosh();
+    if (S.chain.pos >= S.chain.order.length) { S.screen = 'reveal'; S.revealed = 0; }
+    else S.screen = 'pass';
+    saveChain();
+    render();
+  }
+  function revealMore() {
+    S.revealed++;
+    const st = S.chain.steps[S.revealed - 1];
+    if (st && st.kind === 'draw') sfx.pop(); else sfx.tone(660, { type: 'triangle', dur: 0.15, gain: 0.1 });
+    render();
+    const feed = document.getElementById('feed');
+    const lastEl = feed && feed.lastElementChild;
+    if (lastEl) lastEl.scrollIntoView({ behavior: P.reducedMotion() ? 'auto' : 'smooth', block: 'center' });
+    if (S.revealed >= S.chain.steps.length) {
+      sfx.win();
+      P.confetti({ colors: ['#ff4f9a', '#2bb3ff', '#ffd23f', '#34c759', '#1e1b2e'] });
+      P.store.del(CHAIN_KEY);
+    }
+  }
+
+  /* ---------- Saving the chain as one picture ---------- */
+  function loadImg(src) {
+    return new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+  }
+  function wrapLines(ctx, text, max) {
+    const words = String(text).split(/\s+/), lines = [];
+    let line = '';
+    words.forEach(w => {
+      const test = line ? line + ' ' + w : w;
+      if (ctx.measureText(test).width > max && line) { lines.push(line); line = w; } else line = test;
+    });
+    if (line) lines.push(line);
+    return lines;
+  }
+  async function saveImage() {
+    const note = document.getElementById('saveNote');
+    try { await Promise.all([document.fonts.load('40px "Patrick Hand"'), document.fonts.load('40px "Permanent Marker"')]); } catch (e) { /* fallback fonts */ }
+    const steps = S.chain.steps, W = 900, M = 44, inner = W - M * 2, drawH = Math.round(inner * CH / CW);
+    const imgs = await Promise.all(steps.map(s => (s.kind === 'draw' ? loadImg(s.img) : null)));
+    const meas = document.createElement('canvas').getContext('2d');
+    meas.font = '44px "Permanent Marker", cursive';
+    const blocks = steps.map(s => s.kind === 'draw' ? { h: drawH } : { lines: wrapLines(meas, s.text, inner - 40), h: 0 });
+    blocks.forEach(b => { if (b.lines) b.h = 40 + b.lines.length * 56; });
+    let H = 150;
+    blocks.forEach(b => { H += 46 + b.h + 30; });
+    H += 30;
+    const cv = document.createElement('canvas');
+    cv.width = W;
+    cv.height = H;
+    const c = cv.getContext('2d');
+    c.fillStyle = '#ffffff';
+    c.fillRect(0, 0, W, H);
+    c.fillStyle = '#dcd6e8';
+    for (let y = 11; y < H; y += 22) for (let x = 11; x < W; x += 22) { c.beginPath(); c.arc(x, y, 1.4, 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = '#ff4f9a';
+    c.font = '64px "Permanent Marker", cursive';
+    c.fillText('Doodle Chain', M, 96);
+    let y = 150;
+    steps.forEach((s, i) => {
+      c.fillStyle = '#5d5870';
+      c.font = '34px "Patrick Hand", sans-serif';
+      c.fillText(labelOf(s), M, y + 32);
+      y += 46;
+      const b = blocks[i];
+      c.lineWidth = 5;
+      c.strokeStyle = '#1e1b2e';
+      if (s.kind === 'draw') {
+        if (imgs[i]) c.drawImage(imgs[i], M, y, inner, drawH);
+        c.strokeRect(M, y, inner, drawH);
+      } else {
+        c.fillStyle = s.kind === 'prompt' ? '#fff6c2' : '#fff2f8';
+        c.fillRect(M, y, inner, b.h);
+        c.strokeRect(M, y, inner, b.h);
+        c.fillStyle = '#1e1b2e';
+        c.font = '44px "Permanent Marker", cursive';
+        b.lines.forEach((ln, k) => c.fillText(ln, M + 20, y + 62 + k * 56));
+      }
+      y += b.h + 30;
+    });
+    cv.toBlob(async blob => {
+      if (!blob) { if (note) note.textContent = 'Could not make the picture on this device.'; return; }
+      const file = new File([blob], 'doodle-chain.png', { type: 'image/png' });
+      try {
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: 'Doodle Chain' });
+          return;
+        }
+      } catch (e) { if (e && e.name === 'AbortError') return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'doodle-chain.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      if (note) note.textContent = 'Saved as doodle-chain.png.';
+    }, 'image/png');
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, write: viewWrite, draw: viewDraw, guess: viewGuess, reveal: viewReveal };
+  function render() {
+    if (S.screen !== 'draw') clearInterval(ticker);
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 3, max: 12 });
+    if (S.screen === 'draw') { mountPad(); startTimer(); }
+    if (S.screen === 'write') { const i = document.getElementById('own'); if (i) i.focus(); }
+    if (S.screen === 'guess') { const i = document.getElementById('guess'); if (i) i.focus(); }
+    if (S.screen !== shown && S.screen !== 'reveal') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  /* ---------- Events ---------- */
+  document.addEventListener('click', e => {
+    const sw = e.target.closest('[data-color]');
+    if (sw && pad) {
+      pad.color = sw.getAttribute('data-color');
+      pad.eraser = false;
+      document.querySelectorAll('[data-color]').forEach(x => x.setAttribute('aria-pressed', String(x === sw)));
+      const er = document.querySelector('[data-tool="eraser"]'); if (er) er.setAttribute('aria-pressed', 'false');
+      return;
+    }
+    const sz = e.target.closest('[data-size]');
+    if (sz && pad) {
+      pad.size = Number(sz.getAttribute('data-size'));
+      document.querySelectorAll('[data-size]').forEach(x => x.setAttribute('aria-pressed', String(x === sz)));
+      return;
+    }
+    const tool = e.target.closest('[data-tool]');
+    if (tool && pad) {
+      const t = tool.getAttribute('data-tool');
+      if (t === 'eraser') { pad.eraser = !pad.eraser; tool.setAttribute('aria-pressed', String(pad.eraser)); }
+      else if (t === 'undo') { pad.strokes.pop(); redraw(); paintDone(); }
+      else if (t === 'clear') { pad.strokes = []; redraw(); paintDone(); }
+      return;
+    }
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': startChain(); break;
+      case 'resume': {
+        const pending = getPending();
+        if (!pending) { render(); break; }
+        S.players = pending.players;
+        S.chain = pending.chain;
+        S.revealed = 0;
+        S.screen = S.chain.pos >= S.chain.order.length ? 'reveal' : 'pass';
+        render();
+        break;
+      }
+      case 'drop': P.store.del(CHAIN_KEY); render(); break;
+      case 'me': beginTurn(); break;
+      case 'random': S.chain.steps = [{ kind: 'prompt', text: promptDeck.one(), by: null }]; S.screen = 'draw'; render(); break;
+      case 'own': {
+        const v = document.getElementById('own').value.trim();
+        if (!v) return;
+        S.chain.steps = [{ kind: 'prompt', text: v.slice(0, 60), by: actor() }];
+        saveChain();
+        S.screen = 'draw';
+        render();
+        break;
+      }
+      case 'drawn': finishDraw(); break;
+      case 'guessed': {
+        const v = document.getElementById('guess').value.trim();
+        if (v) finishGuess(v.slice(0, 60));
+        break;
+      }
+      case 'more': revealMore(); break;
+      case 'save': saveImage(); break;
+      case 'new': S.chain = null; saveChain(); S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('input', e => {
+    if (e.target.id === 'guess') document.getElementById('guessBtn').disabled = !e.target.value.trim();
+    if (e.target.id === 'own') document.getElementById('ownBtn').disabled = !e.target.value.trim();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    if (e.target.id === 'guess') { e.preventDefault(); document.getElementById('guessBtn').click(); }
+    if (e.target.id === 'own') { e.preventDefault(); document.getElementById('ownBtn').click(); }
+  });
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'time') { S.settings.time = Number(t.value); persist(); }
+    else if (t.name === 'start') { S.settings.start = t.value; persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

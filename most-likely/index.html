@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Most Likely To | Pass the Phone</title>
+<meta name="description" content="Who is most likely to forget their own birthday? Point on three or vote in secret, then see everyone's yearbook titles.">
+<meta name="theme-color" content="#6b1a33">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Graduate&family=Libre+Franklin:wght@400;600;800&display=swap">
+<style>
+/* Layout: a school yearbook. Varsity lettering on a maroon jacket, prompts on cream pages, winners get a gold ribbon. */
+:root{
+  color-scheme:dark;
+  --maroon:#6b1a33;
+  --maroon-deep:#3f0c1e;
+  --cream:#fbf1dc;
+  --paper-line:#ecdcbc;
+  --gold:#f2c14e;
+  --gold-deep:#b8861b;
+  --ink:#2a0f1a;
+  --rose:#f3b5c3;
+  --muted:#e4c6ce;
+  --f-varsity:"Graduate","Rockwell","Georgia",serif;
+  --f-body:"Libre Franklin","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--maroon-deep)}
+body{margin:0;min-height:100vh;color:var(--cream);font-family:var(--f-body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  background:radial-gradient(ellipse 85% 55% at 50% 0%,rgba(255,220,180,.16),transparent 70%),repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 2px,transparent 2px 26px),linear-gradient(180deg,var(--maroon),var(--maroon-deep));background-attachment:fixed}
+button{font:inherit;color:inherit}
+.wrap{max-width:720px;margin:0 auto;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.back{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:6px 14px 6px 10px;border-radius:999px;color:var(--cream);text-decoration:none;font-weight:800;font-size:15px;box-shadow:inset 0 0 0 2px rgba(251,241,220,.3)}
+.back svg{width:16px;height:16px}
+.ptp-sound{display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:transparent;box-shadow:inset 0 0 0 2px rgba(251,241,220,.3);color:var(--cream);cursor:pointer}
+.ptp-sound svg{width:22px;height:22px}
+:is(.back,.ptp-sound,.btn,.pp-add,.pp-remove,.vote-btn,.howto summary):focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+
+.title{margin:26px 0 0;font-family:var(--f-varsity);font-weight:400;font-size:clamp(46px,12vw,92px);line-height:.95;letter-spacing:.01em;color:var(--cream);text-shadow:3px 3px 0 var(--gold-deep),6px 6px 0 rgba(0,0,0,.25);text-wrap:balance}
+.pennant{display:block;width:min(56vw,230px);height:auto;margin-top:16px}
+.tagline{margin:12px 0 0;font-size:19px;color:var(--muted)}
+.page{margin-top:24px;padding:20px;border-radius:6px;color:var(--ink);background-color:var(--cream);background-image:repeating-linear-gradient(180deg,transparent 0 31px,var(--paper-line) 31px 32px);box-shadow:0 18px 40px -18px rgba(0,0,0,.75)}
+.label{display:block;margin:0 0 10px;font-family:var(--f-varsity);font-size:20px;color:var(--maroon)}
+.sec+.sec{margin-top:20px}
+.hint{margin:6px 0 0;font-size:15px;color:#6e4a57}
+
+.pp-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.pp-row{display:flex;align-items:center;gap:8px}
+.pp-num{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:50%;background:var(--maroon);color:var(--cream);font-family:var(--f-varsity);font-size:14px}
+.pp-input{flex:1;min-width:0;height:46px;padding:0 12px;border:0;border-bottom:2px solid var(--maroon);border-radius:4px 4px 0 0;background:rgba(255,255,255,.55);color:var(--ink);font:600 18px/1 var(--f-body)}
+.pp-input::placeholder{color:#a3838e;font-weight:400}
+.pp-input:focus{outline:none;background:#fff}
+.pp-remove{display:grid;place-items:center;flex:none;width:42px;height:42px;border:0;border-radius:50%;background:transparent;color:var(--maroon);cursor:pointer}
+.pp-remove:hover{background:rgba(107,26,51,.1)}
+.pp-remove:disabled{opacity:.3;cursor:default}
+.pp-add{margin-top:10px;min-height:44px;padding:6px 16px;border:2px dashed var(--maroon);border-radius:6px;background:transparent;color:var(--maroon);font-family:var(--f-varsity);font-size:16px;cursor:pointer}
+.pp-add:disabled{opacity:.35;cursor:default}
+.pp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px}
+.opt{position:relative;display:block;cursor:pointer}
+.opt input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+.opt-box{display:block;height:100%;padding:12px 14px;border-radius:6px;background:rgba(255,255,255,.5);box-shadow:inset 0 0 0 2px rgba(107,26,51,.25)}
+.opt-box b{display:block;font-family:var(--f-varsity);font-weight:400;font-size:19px;color:var(--maroon)}
+.opt-box small{display:block;margin-top:2px;font-size:15px;line-height:1.35;color:#6e4a57}
+.opt input:checked+.opt-box{background:#fff;box-shadow:inset 0 0 0 3px var(--maroon)}
+.opt input:focus-visible+.opt-box{outline:3px solid var(--gold-deep);outline-offset:2px}
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg label{position:relative;cursor:pointer}
+.seg input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+.seg span{display:grid;place-items:center;min-width:56px;height:44px;padding:0 16px;border-radius:6px;background:rgba(255,255,255,.5);box-shadow:inset 0 0 0 2px rgba(107,26,51,.25);font-weight:800;color:var(--maroon)}
+.seg input:checked+span{background:var(--maroon);color:var(--cream);box-shadow:none}
+.seg input:focus-visible+span{outline:3px solid var(--gold-deep);outline-offset:2px}
+.check{display:flex;align-items:center;gap:10px;font-weight:600;cursor:pointer}
+.check input{width:22px;height:22px;flex:none;accent-color:var(--maroon)}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:54px;padding:8px 26px;border:0;border-radius:6px;cursor:pointer;font-family:var(--f-varsity);font-weight:400;font-size:20px;letter-spacing:.02em;touch-action:manipulation;transition:transform .08s ease}
+.btn:active{transform:translateY(2px)}
+.btn-gold{background:var(--gold);color:var(--ink);box-shadow:0 5px 0 var(--gold-deep)}
+.btn-maroon{background:var(--maroon);color:var(--cream);box-shadow:0 5px 0 var(--maroon-deep)}
+.btn-line{background:transparent;color:var(--cream);box-shadow:inset 0 0 0 2px rgba(251,241,220,.45)}
+.btn-big{min-height:62px;padding-inline:32px;font-size:23px}
+.btn:disabled{opacity:.4;cursor:default;transform:none}
+.actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:22px}
+.actions.center{justify-content:center}
+
+.center{text-align:center}
+.eyebrow{margin:28px 0 0;font-weight:800;font-size:14px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.big{margin:6px 0 0;font-family:var(--f-varsity);font-weight:400;font-size:clamp(36px,9vw,64px);line-height:1.02;text-wrap:balance;overflow-wrap:anywhere}
+.lead{margin:12px auto 0;max-width:30em;font-size:19px;color:var(--muted);text-wrap:pretty}
+.saved{display:inline-block;margin-top:22px;padding:4px 14px;border-radius:999px;background:var(--gold);color:var(--ink);font-weight:800}
+.prompt{position:relative;margin:22px auto 0;max-width:600px;padding:26px 22px 28px;border-radius:6px;color:var(--ink);background-color:var(--cream);background-image:repeating-linear-gradient(180deg,transparent 0 31px,var(--paper-line) 31px 32px);box-shadow:0 18px 40px -18px rgba(0,0,0,.75)}
+.prompt small{display:block;font-family:var(--f-varsity);font-size:18px;color:var(--maroon)}
+.prompt b{display:block;margin-top:6px;font-weight:800;font-size:clamp(28px,6.6vw,44px);line-height:1.15;text-wrap:balance;overflow-wrap:anywhere}
+.prompt .num{position:absolute;top:-14px;right:16px;padding:2px 12px;border-radius:4px;background:var(--gold);font-family:var(--f-varsity);font-size:15px;color:var(--ink)}
+.votes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px;margin-top:20px}
+.vote-btn{position:relative;min-height:64px;padding:10px 12px;border:0;border-radius:6px;background:var(--cream);color:var(--ink);font-weight:800;font-size:19px;cursor:pointer;overflow-wrap:anywhere;box-shadow:0 6px 0 #c9b38a;touch-action:manipulation}
+.vote-btn:active{transform:translateY(3px);box-shadow:0 3px 0 #c9b38a}
+.vote-btn[aria-pressed="true"]{background:var(--gold);box-shadow:0 6px 0 var(--gold-deep)}
+.vote-btn:disabled{opacity:.4;cursor:default}
+.vote-btn small{display:block;font-weight:600;font-size:13px;color:#6e4a57}
+
+.bars{display:grid;gap:10px;max-width:560px;margin:24px auto 0;text-align:left}
+.bar{display:grid;grid-template-columns:minmax(0,7.5em) minmax(0,1fr) 2.2em;align-items:center;gap:10px}
+.bar .n{font-weight:800;overflow-wrap:anywhere}
+.bar .track{height:30px;border-radius:4px;background:rgba(251,241,220,.12);overflow:hidden}
+.bar .fill{display:block;height:100%;width:var(--w);background:var(--rose);border-radius:4px;animation:grow .9s cubic-bezier(.3,1.2,.5,1) both;animation-delay:var(--d)}
+.bar.win .fill{background:var(--gold)}
+.bar .c{font-family:var(--f-varsity);font-size:20px;text-align:right}
+@keyframes grow{from{width:0}}
+.ribbons{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-top:24px}
+.ribbon{position:relative;padding:14px 26px 16px;background:var(--gold);color:var(--ink);font-family:var(--f-varsity);font-size:clamp(26px,6vw,38px);line-height:1.05;box-shadow:0 10px 18px -10px rgba(0,0,0,.6);clip-path:polygon(0 0,100% 0,96% 50%,100% 100%,0 100%,4% 50%);animation:pin .5s cubic-bezier(.2,1.6,.4,1) both;overflow-wrap:anywhere}
+@keyframes pin{from{transform:scale(.4) rotate(-8deg);opacity:0}}
+
+.book{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:14px;margin-top:24px;text-align:left}
+.entry{padding:16px;border-radius:6px;background:var(--cream);color:var(--ink);box-shadow:0 14px 26px -16px rgba(0,0,0,.75);min-width:0}
+.entry header{display:flex;align-items:center;gap:12px}
+.face{display:grid;place-items:center;flex:none;width:52px;height:52px;border:4px solid #fff;background:var(--c);font-family:var(--f-varsity);font-size:24px;color:var(--ink);box-shadow:0 4px 8px rgba(0,0,0,.2);transform:rotate(-4deg)}
+.entry h3{margin:0;font-family:var(--f-varsity);font-weight:400;font-size:22px;line-height:1.1;overflow-wrap:anywhere}
+.entry ul{margin:10px 0 0;padding-left:1.1em;display:grid;gap:4px;font-size:15px}
+.entry p{margin:10px 0 0;font-size:15px;color:#6e4a57}
+.howto{margin-top:26px;color:var(--muted)}
+.howto summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-family:var(--f-varsity);font-size:20px;color:var(--cream)}
+.howto ol{margin:4px 0 0;padding-left:1.3em;display:grid;gap:8px}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="prompts.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const PROMPTS = window.LIKELY_PROMPTS || ['become famous'];
+  const KEY = 'ptp.likely';
+  const FACES = ['#f3b5c3', '#f2c14e', '#a8dadc', '#cdb4db', '#b9e769', '#ffc8a2', '#9ad1ff', '#ffd6e0', '#e9c46a', '#c3f0ca', '#f4a261', '#bde0fe'];
+  const BACK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const app = document.getElementById('app');
+  const deck = P.deck('likely', PROMPTS);
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ mode: 'point', count: 12, self: true }, saved.settings || {}),
+    screen: 'setup', players: [], prompts: [], idx: 0,
+    votes: [], order: [], voter: 0, picked: [], winners: [], wins: {}, justVoted: false
+  };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const prompt = () => S.prompts[S.idx];
+  const secret = () => S.settings.mode === 'secret';
+  function listNames(names) { return names.length < 2 ? (names[0] || '') : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1]; }
+
+  /* ---------- Views ---------- */
+  function header() { return `<header class="top"><a class="back" href="../">${BACK}All games</a>${P.soundToggle()}</header>`; }
+  function opt(value, title, text) {
+    return `<label class="opt"><input type="radio" name="mode" id="mode-${value}" value="${value}"${S.settings.mode === value ? ' checked' : ''}><span class="opt-box"><b>${title}</b><small>${text}</small></span></label>`;
+  }
+  function promptCard() {
+    return `<div class="prompt"><span class="num">${S.idx + 1} of ${S.prompts.length}</span><small>Who is most likely to</small><b>${esc(prompt())}?</b></div>`;
+  }
+  function viewSetup() {
+    return header() + `
+    <h1 class="title">Most Likely To</h1>
+    <svg class="pennant" viewBox="0 0 230 70" aria-hidden="true"><path d="M6 6h8v60H6z" fill="#fbf1dc"/><path d="M14 8l210 27L14 62z" fill="#f2c14e"/><text x="34" y="43" font-family="Graduate, Georgia, serif" font-size="20" fill="#2a0f1a">CLASS OF NOW</text></svg>
+    <p class="tagline">Yearbook superlatives for your friends. Point on three or vote in secret.</p>
+    <div class="page">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">How do you vote?</span>
+        <div class="modes">
+          ${opt('point', 'Point on three', 'Fast and loud. Everyone points at once and you tap who got the most.')}
+          ${opt('secret', 'Secret vote', 'Pass the phone around and vote in private. Nobody sees who voted for who.')}
+        </div>
+      </div>
+      <div class="sec"${secret() ? '' : ' hidden'}><label class="check"><input type="checkbox" id="self"${S.settings.self ? ' checked' : ''}><span>Players can vote for themselves</span></label></div>
+      <div class="sec"><span class="label">Questions</span>
+        <div class="seg" role="radiogroup">${[[8, '8'], [12, '12'], [20, '20']].map(([v, t]) => `<label><input type="radio" name="count" id="count-${v}" value="${v}"${S.settings.count === v ? ' checked' : ''}><span>${t}</span></label>`).join('')}</div>
+      </div>
+      <div class="actions"><button class="btn btn-maroon btn-big" type="button" data-act="start">Open the yearbook</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Read the question out loud: who is most likely to do this?</li>
+        <li>Point on three, or pass the phone around for a secret vote.</li>
+        <li>Whoever gets the most votes wins that title. Ties share it.</li>
+        <li>At the end, the yearbook shows every title each player earned.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPrompt() {
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">${secret() ? 'Secret vote' : 'Point on three'}</p>
+      ${promptCard()}
+      <p class="lead">${secret() ? 'Read it out loud, then pass the phone so everyone can vote in private.' : 'Read it out loud. Count to three and everyone points at one person.'}</p>
+      <div class="actions center"><button class="btn btn-gold btn-big" type="button" data-act="${secret() ? 'vote-start' : 'pointed'}">${secret() ? 'Start the vote' : 'We pointed'}</button></div>
+      <div class="actions center"><button class="btn btn-line" type="button" data-act="skip">Skip this question</button></div>
+    </section>`;
+  }
+  function viewTally() {
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">Count the fingers</p>
+      <h2 class="big">Who got the most?</h2>
+      <p class="lead">Tap the winner. If it was a tie, tap everyone who tied.</p>
+      <div class="votes">${S.players.map((n, i) => `<button class="vote-btn" type="button" data-act="pick" data-i="${i}" aria-pressed="${S.picked.includes(i)}">${esc(n)}</button>`).join('')}</div>
+      <div class="actions center"><button class="btn btn-gold btn-big" type="button" data-act="crown" id="crownBtn"${S.picked.length ? '' : ' disabled'}>Give out the title</button></div>
+    </section>`;
+  }
+  function viewPass() {
+    const n = esc(S.players[S.order[S.voter]]);
+    return header() + `
+    <section class="center">
+      ${S.justVoted ? '<span class="saved">Vote saved</span>' : `<p class="eyebrow">Vote ${S.voter + 1} of ${S.order.length}</p>`}
+      <h2 class="big">Pass to ${n}</h2>
+      <p class="lead">${n}, vote where nobody can see the screen.</p>
+      <div class="actions center"><button class="btn btn-gold btn-big" type="button" data-act="me">I'm ${n}</button></div>
+    </section>`;
+  }
+  function viewVote() {
+    const me = S.order[S.voter];
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(S.players[me])}, vote in secret</p>
+      ${promptCard()}
+      <div class="votes">${S.players.map((n, i) => {
+        const blocked = !S.settings.self && i === me;
+        return `<button class="vote-btn" type="button" data-act="cast" data-i="${i}"${blocked ? ' disabled' : ''}>${esc(n)}${i === me ? '<small>you</small>' : ''}</button>`;
+      }).join('')}</div>
+    </section>`;
+  }
+  function viewResults() {
+    const names = S.winners.map(i => S.players[i]);
+    let bars = '';
+    if (secret()) {
+      const max = Math.max.apply(null, S.votes);
+      const rows = S.players.map((n, i) => ({ n, i, v: S.votes[i] })).sort((a, b) => b.v - a.v);
+      bars = `<div class="bars" aria-label="Votes">${rows.map((r, k) => `<div class="bar${S.winners.includes(r.i) ? ' win' : ''}"><span class="n">${esc(r.n)}</span><span class="track"><span class="fill" style="--w:${max ? Math.round(r.v / max * 100) : 0}%;--d:${k * 90}ms"></span></span><span class="c">${r.v}</span></div>`).join('')}</div>`;
+    }
+    const last = S.idx >= S.prompts.length - 1;
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">${names.length > 1 ? 'It is a tie' : 'And the title goes to'}</p>
+      <div class="ribbons">${names.map((n, k) => `<span class="ribbon" style="animation-delay:${400 + k * 150}ms">${esc(n)}</span>`).join('')}</div>
+      <p class="lead">Most likely to ${esc(prompt())}.</p>
+      ${bars}
+      <div class="actions center"><button class="btn btn-gold btn-big" type="button" data-act="next">${last ? 'See the yearbook' : 'Next question'}</button></div>
+    </section>`;
+  }
+  function viewFinal() {
+    const entries = S.players.map((n, i) => ({ n, i, titles: S.wins[n] || [] })).sort((a, b) => b.titles.length - a.titles.length);
+    const top = entries[0] && entries[0].titles.length ? entries.filter(e => e.titles.length === entries[0].titles.length) : [];
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">The yearbook</p>
+      <h2 class="big">Class superlatives</h2>
+      <p class="lead">${top.length ? esc(listNames(top.map(e => e.n))) + ' earned the most titles, with ' + P.plural(top[0].titles.length, 'title') + '.' : 'Nobody earned a title this time.'}</p>
+      <div class="book">${entries.map(e => `<article class="entry">
+        <header><span class="face" style="--c:${FACES[e.i % FACES.length]}" aria-hidden="true">${esc(e.n.trim()[0] || '?').toUpperCase()}</span><h3>${esc(e.n)}</h3></header>
+        ${e.titles.length ? `<ul>${e.titles.map(t => `<li>Most likely to ${esc(t)}</li>`).join('')}</ul>` : '<p>Flew under the radar.</p>'}
+      </article>`).join('')}</div>
+      <div class="actions center">
+        <button class="btn btn-line" type="button" data-act="setup">Change setup</button>
+        <button class="btn btn-gold btn-big" type="button" data-act="again">Play again</button>
+      </div>
+    </section>`;
+  }
+
+  /* ---------- Flow ---------- */
+  function startGame() {
+    S.players = editor.get();
+    S.prompts = deck.draw(S.settings.count);
+    S.idx = 0;
+    S.wins = {};
+    sfx.unlock();
+    P.stayAwake();
+    S.screen = 'prompt';
+    render();
+  }
+  function crown(winners) {
+    S.winners = winners;
+    winners.forEach(i => { const n = S.players[i]; (S.wins[n] = S.wins[n] || []).push(prompt()); });
+    S.screen = 'results';
+    render();
+    sfx.noise({ filter: 'bandpass', freq: 300, to: 900, dur: 0.5, gain: 0.18, q: 2 });
+    setTimeout(() => { sfx.win(); }, 380);
+  }
+  function startVote() {
+    const n = S.players.length, off = S.idx % n;
+    S.order = S.players.map((_, i) => (i + off) % n);
+    S.votes = S.players.map(() => 0);
+    S.voter = 0;
+    S.justVoted = false;
+    S.screen = 'pass';
+    render();
+  }
+  function cast(i) {
+    S.votes[i]++;
+    S.voter++;
+    sfx.pop();
+    P.vibrate(30);
+    if (S.voter < S.order.length) { S.justVoted = true; S.screen = 'pass'; render(); return; }
+    const max = Math.max.apply(null, S.votes);
+    crown(S.players.map((_, k) => k).filter(k => S.votes[k] === max));
+  }
+  function next() {
+    if (S.idx >= S.prompts.length - 1) { S.screen = 'final'; render(); sfx.win(); P.confetti({ colors: ['#f2c14e', '#fbf1dc', '#f3b5c3', '#6b1a33'] }); return; }
+    S.idx++;
+    S.picked = [];
+    S.screen = 'prompt';
+    render();
+  }
+
+  const VIEWS = { setup: viewSetup, prompt: viewPrompt, tally: viewTally, pass: viewPass, vote: viewVote, results: viewResults, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 3, max: 12 });
+    if (S.screen !== shown || S.screen === 'pass' || S.screen === 'prompt') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': startGame(); break;
+      case 'pointed': S.picked = []; S.screen = 'tally'; render(); break;
+      case 'pick': {
+        const i = Number(b.getAttribute('data-i'));
+        S.picked = S.picked.includes(i) ? S.picked.filter(x => x !== i) : S.picked.concat(i);
+        b.setAttribute('aria-pressed', String(S.picked.includes(i)));
+        document.getElementById('crownBtn').disabled = !S.picked.length;
+        sfx.pop();
+        break;
+      }
+      case 'crown': crown(S.picked.slice()); break;
+      case 'vote-start': startVote(); break;
+      case 'me': S.justVoted = false; S.screen = 'vote'; render(); break;
+      case 'cast': cast(Number(b.getAttribute('data-i'))); break;
+      case 'skip': {
+        const fresh = deck.one(S.prompts);
+        if (fresh) S.prompts[S.idx] = fresh;
+        render();
+        break;
+      }
+      case 'next': next(); break;
+      case 'again': S.prompts = deck.draw(S.settings.count); S.idx = 0; S.wins = {}; S.picked = []; S.screen = 'prompt'; render(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'mode') { S.settings.mode = t.value; persist(); render(); }
+    else if (t.name === 'count') { S.settings.count = Number(t.value); persist(); }
+    else if (t.id === 'self') { S.settings.self = t.checked; persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

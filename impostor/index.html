@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Impostor | Pass the Phone</title>
+<meta name="description" content="Everyone gets the secret word except the impostor. Pass one phone around, give one-word clues, then vote.">
+<meta name="theme-color" content="#17151b">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;900&family=Big+Shoulders+Stencil+Display:wght@800;900&family=Courier+Prime:wght@400;700&display=swap">
+<style>
+/* Layout: a case file on a dark desk. Each screen is one sheet; the secret sits inside a folder you hold open. */
+:root{
+  color-scheme:dark;
+  --desk:#17151b;
+  --chalk:#f1ebe0;
+  --muted:#a89f93;
+  --kraft:#d6b47c;
+  --kraft-hi:#e9cf9f;
+  --kraft-lo:#a7834d;
+  --sheet:#f5eddd;
+  --sheet-line:#e2d6bf;
+  --ink:#1c1915;
+  --ink-soft:#5b5246;
+  --red:#e2382d;
+  --red-lo:#a3241b;
+  --f-stamp:"Big Shoulders Stencil Display","Impact","Arial Narrow Bold",sans-serif;
+  --f-head:"Big Shoulders Display","Impact","Arial Narrow Bold",sans-serif;
+  --f-type:"Courier Prime","Courier New",ui-monospace,monospace;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--desk)}
+body{margin:0;min-height:100vh;color:var(--chalk);font-family:var(--f-type);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  background-color:var(--desk);
+  background-image:radial-gradient(ellipse 90% 60% at 50% -10%,rgba(255,236,200,.09),transparent 70%),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+button{font:inherit;color:inherit}
+.wrap{max-width:760px;margin:0 auto;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.back{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:6px 14px 6px 10px;border-radius:999px;color:var(--chalk);text-decoration:none;font-family:var(--f-head);font-weight:700;font-size:15px;letter-spacing:.12em;text-transform:uppercase;box-shadow:inset 0 0 0 1px rgba(241,235,224,.3)}
+.back svg{width:16px;height:16px}
+.ptp-sound{display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:transparent;box-shadow:inset 0 0 0 1px rgba(241,235,224,.3);color:var(--chalk);cursor:pointer}
+.ptp-sound svg{width:22px;height:22px}
+.back:focus-visible,.ptp-sound:focus-visible,.btn:focus-visible,.chip:focus-visible,.tag:focus-visible,.pp-add:focus-visible,.pp-remove:focus-visible,.howto summary:focus-visible{outline:3px solid var(--kraft-hi);outline-offset:3px}
+
+.title{margin:24px 0 0;font-family:var(--f-stamp);font-weight:900;font-size:clamp(70px,19vw,150px);line-height:.82;letter-spacing:.01em;text-transform:uppercase;color:var(--chalk)}
+.title i{font-style:normal;color:var(--red)}
+.tagline{margin:12px 0 0;font-size:18px;color:var(--muted)}
+
+/* The case file folder */
+.folder{position:relative;margin-top:48px;padding:26px 20px 24px;border-radius:4px 14px 10px 10px;color:var(--ink);
+  background:linear-gradient(180deg,var(--kraft-hi),var(--kraft) 26%,#cba36a);box-shadow:0 26px 50px -20px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.45)}
+.folder::before{content:"";position:absolute;left:0;top:-24px;width:min(48%,230px);height:26px;border-radius:10px 16px 0 0;background:var(--kraft-hi)}
+.folder-tab{position:absolute;left:16px;top:-20px;font-family:var(--f-head);font-weight:900;font-size:14px;letter-spacing:.2em;text-transform:uppercase;color:var(--red-lo)}
+.sec{margin-top:24px}
+.sec:first-of-type{margin-top:0}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:18px}
+.label{display:block;margin:0 0 10px;font-family:var(--f-head);font-weight:900;font-size:15px;letter-spacing:.18em;text-transform:uppercase;color:var(--red-lo)}
+.note{margin:8px 0 0;min-height:1.3em;font-size:15px;color:var(--red-lo);font-weight:700}
+
+.pp-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.pp-row{display:flex;align-items:center;gap:8px}
+.pp-num{width:26px;flex:none;font-family:var(--f-head);font-weight:900;font-size:20px;color:var(--ink-soft);text-align:right}
+.pp-input{flex:1;min-width:0;height:46px;padding:0 12px;border:0;border-bottom:2px dashed rgba(28,25,21,.4);border-radius:6px 6px 0 0;background:rgba(255,255,255,.3);color:var(--ink);font:700 19px/1 var(--f-type)}
+.pp-input::placeholder{color:rgba(28,25,21,.42);font-weight:400}
+.pp-input:focus{outline:none;background:rgba(255,255,255,.6);border-bottom-color:var(--red)}
+.pp-remove{display:grid;place-items:center;flex:none;width:42px;height:42px;border:0;border-radius:50%;background:transparent;color:var(--ink-soft);cursor:pointer}
+.pp-remove:hover{background:rgba(28,25,21,.1)}
+.pp-remove:disabled{opacity:.25;cursor:default}
+.pp-add{margin-top:10px;min-height:44px;padding:8px 16px;border:2px dashed rgba(28,25,21,.45);border-radius:10px;background:transparent;font-family:var(--f-head);font-weight:900;font-size:17px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);cursor:pointer}
+.pp-add:disabled{opacity:.35;cursor:default}
+.pp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px}
+.opt{position:relative;display:block;cursor:pointer}
+.opt input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+.opt-box{display:block;height:100%;padding:12px 14px;border-radius:10px;background:rgba(255,255,255,.28);box-shadow:inset 0 0 0 2px rgba(28,25,21,.18)}
+.opt-box b{display:block;font-family:var(--f-head);font-weight:900;font-size:24px;letter-spacing:.04em;text-transform:uppercase}
+.opt-box small{display:block;margin-top:2px;font-size:15px;line-height:1.35;color:var(--ink-soft)}
+.opt input:checked+.opt-box{background:var(--sheet);box-shadow:inset 0 0 0 3px var(--red)}
+.opt input:focus-visible+.opt-box{outline:3px solid var(--ink);outline-offset:2px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg label{position:relative;cursor:pointer}
+.seg input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+.seg span{display:grid;place-items:center;min-width:52px;height:44px;padding:0 14px;border-radius:8px;background:rgba(255,255,255,.28);box-shadow:inset 0 0 0 2px rgba(28,25,21,.2);font-family:var(--f-head);font-weight:900;font-size:19px;letter-spacing:.04em;text-transform:uppercase}
+.seg input:checked+span{background:var(--ink);color:var(--sheet);box-shadow:none}
+.seg input:disabled+span{opacity:.3}
+.seg input:focus-visible+span{outline:3px solid var(--red);outline-offset:2px}
+.check{display:flex;align-items:center;gap:10px;font-weight:700;cursor:pointer}
+.check input{width:22px;height:22px;flex:none;accent-color:var(--red)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{min-height:40px;padding:6px 13px;border:0;border-radius:999px;background:rgba(255,255,255,.28);box-shadow:inset 0 0 0 2px rgba(28,25,21,.22);font-family:var(--f-type);font-weight:700;font-size:15px;color:var(--ink);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--sheet);box-shadow:none}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:10px 22px;border:0;border-radius:8px;cursor:pointer;font-family:var(--f-head);font-weight:900;font-size:21px;letter-spacing:.08em;text-transform:uppercase;touch-action:manipulation;transition:transform .08s ease}
+.btn-red{background:var(--red);color:#fff8ee;box-shadow:0 4px 0 var(--red-lo),0 14px 22px -12px rgba(0,0,0,.7)}
+.btn-red:active{transform:translateY(3px);box-shadow:0 1px 0 var(--red-lo)}
+.btn-ink{background:var(--ink);color:var(--sheet);box-shadow:0 4px 0 #000}
+.btn-ink:active{transform:translateY(3px);box-shadow:0 1px 0 #000}
+.btn-line{background:transparent;color:var(--chalk);box-shadow:inset 0 0 0 2px rgba(241,235,224,.45)}
+.btn-line:hover{background:rgba(241,235,224,.08)}
+.btn-plain{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 2px rgba(28,25,21,.4)}
+.btn-big{min-height:62px;padding-inline:30px;font-size:25px}
+.btn:disabled{opacity:.35;cursor:default;transform:none}
+.actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:24px}
+.actions.center{justify-content:center}
+.textbtn{background:none;border:0;padding:8px;color:var(--muted);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:15px}
+
+.center{text-align:center}
+.eyes{margin:40px 0 0;font-family:var(--f-head);font-weight:900;font-size:16px;letter-spacing:.26em;text-transform:uppercase;color:var(--muted)}
+.who{margin:8px 0 0;font-family:var(--f-stamp);font-weight:900;font-size:clamp(58px,16vw,124px);line-height:.88;text-transform:uppercase;color:var(--chalk);overflow-wrap:anywhere;text-wrap:balance}
+.who.mid{font-size:clamp(44px,11vw,84px)}
+.lead{margin:16px auto 0;max-width:31em;font-size:18px;color:var(--muted);text-wrap:pretty}
+.lead b{color:var(--chalk)}
+.note-desk{margin:16px auto 0;max-width:30em;font-size:15px;color:var(--muted)}
+.label-desk{display:block;margin:30px 0 12px;font-family:var(--f-head);font-weight:900;font-size:16px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+
+/* The folder you hold open */
+.dossier{position:relative;margin:30px auto 0;width:min(100%,520px);aspect-ratio:5/4;perspective:1600px;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:pointer;outline:none}
+.dossier:focus-visible{outline:3px solid var(--kraft-hi);outline-offset:6px;border-radius:10px}
+.sheet{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:22px;border-radius:8px;text-align:center;color:var(--ink);
+  background-color:var(--sheet);background-image:repeating-linear-gradient(180deg,transparent 0 33px,var(--sheet-line) 33px 34px);box-shadow:0 20px 40px -18px rgba(0,0,0,.85)}
+.flap{position:absolute;inset:0;border-radius:8px;transform-origin:50% 0;transform-style:preserve-3d;transition:transform .36s cubic-bezier(.3,.9,.4,1.12);
+  background:linear-gradient(180deg,var(--kraft-hi),var(--kraft) 40%,#c49c60);box-shadow:0 22px 40px -18px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.5)}
+.flap-face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;color:var(--ink);-webkit-backface-visibility:hidden;backface-visibility:hidden}
+.dossier.open .flap{transform:rotateX(104deg)}
+.flap-stamp{padding:2px 16px;border:4px solid var(--red);border-radius:6px;font-family:var(--f-stamp);font-weight:900;font-size:clamp(34px,9vw,54px);letter-spacing:.06em;text-transform:uppercase;color:var(--red);transform:rotate(-4deg)}
+.flap-hint{font-weight:700;font-size:17px}
+.flap-hint svg{display:block;width:40px;height:40px;margin:0 auto 6px}
+.k{font-family:var(--f-head);font-weight:900;font-size:15px;letter-spacing:.22em;text-transform:uppercase;color:var(--red-lo)}
+.word{font-family:var(--f-head);font-weight:900;font-size:clamp(46px,12vw,84px);line-height:.95;text-transform:uppercase;overflow-wrap:anywhere;text-wrap:balance}
+.cat{font-size:16px;color:var(--ink-soft)}
+.stamp{display:inline-block;padding:0 16px;border:6px solid var(--red);border-radius:10px;font-family:var(--f-stamp);font-weight:900;font-size:clamp(46px,13vw,88px);line-height:1.1;letter-spacing:.04em;text-transform:uppercase;color:var(--red);transform:rotate(-8deg)}
+.stamp.calm{border-color:var(--ink);color:var(--ink)}
+.tip{margin:12px auto 0;max-width:26em;font-size:15px;line-height:1.4;color:var(--ink-soft)}
+
+.clock{display:inline-block;margin-top:26px;padding:4px 24px;border-radius:6px;background:var(--sheet);color:var(--ink);font-family:var(--f-type);font-weight:700;font-size:clamp(54px,14vw,86px);line-height:1.15;font-variant-numeric:tabular-nums;transform:rotate(-1.5deg);box-shadow:0 14px 26px -14px rgba(0,0,0,.85)}
+.clock.low{color:var(--red)}
+.clock.done{font-size:clamp(34px,9vw,52px);color:var(--red)}
+
+.tags{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:12px;margin-top:6px}
+.tag{min-height:60px;padding:10px 14px;border:0;border-radius:6px;background:var(--sheet);color:var(--ink);font-family:var(--f-head);font-weight:900;font-size:23px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;overflow-wrap:anywhere;box-shadow:0 12px 20px -12px rgba(0,0,0,.85);transform:rotate(var(--r,0deg));transition:transform .12s ease}
+.tag:hover{transform:rotate(0deg) translateY(-2px)}
+
+.result{position:relative;margin:34px auto 0;max-width:560px;padding:34px 22px 22px;border-radius:8px;color:var(--ink);
+  background-color:var(--sheet);background-image:repeating-linear-gradient(180deg,transparent 0 33px,var(--sheet-line) 33px 34px);box-shadow:0 24px 44px -20px rgba(0,0,0,.9)}
+.result .stamp{font-size:clamp(40px,10vw,70px)}
+.facts{display:grid;gap:8px;margin:28px 0 0;text-align:left}
+.facts div{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px;padding-bottom:6px;border-bottom:1px dashed rgba(28,25,21,.3)}
+.facts dt{font-family:var(--f-head);font-weight:900;font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:var(--red-lo)}
+.facts dd{margin:0;min-width:0;font-weight:700;font-size:21px;text-align:right;overflow-wrap:anywhere}
+.board{margin:8px auto 0;max-width:440px;text-align:left}
+.scores{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.scores li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:8px 4px;border-bottom:1px dashed rgba(241,235,224,.2);font-weight:700;font-size:18px}
+.scores li span{min-width:0;overflow-wrap:anywhere}
+.scores b{font-family:var(--f-head);font-weight:900;font-size:24px;color:var(--kraft-hi);font-variant-numeric:tabular-nums}
+.howto{margin-top:30px;color:var(--muted)}
+.howto summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-family:var(--f-head);font-weight:900;font-size:17px;letter-spacing:.18em;text-transform:uppercase;color:var(--chalk)}
+.howto ol{margin:4px 0 0;padding-left:1.3em;display:grid;gap:8px}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="words.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const DATA = window.IMPOSTOR_WORDS || {};
+  const CATS = Object.keys(DATA);
+  const KEY = 'ptp.impostor';
+  const TIMERS = [[0, 'Off'], [60, '1 min'], [120, '2 min'], [180, '3 min'], [300, '5 min']];
+  const BACK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const HAND = '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M20 26V9a3 3 0 0 1 6 0v13m0-3a3 3 0 0 1 6 0v4m0-1a3 3 0 0 1 6 0v8c0 8-5 13-12 13h-2c-5 0-8-3-11-7l-5-7a3 3 0 0 1 5-3l3 3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const app = document.getElementById('app');
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ mode: 'classic', impostors: 1, hint: true, timer: 120, cats: CATS.slice() }, saved.settings || {}),
+    scores: saved.scores && typeof saved.scores === 'object' ? saved.scores : {},
+    roundNo: Number(saved.roundNo) || 0,
+    players: [],
+    screen: 'setup',
+    R: null,
+    lastImps: []
+  };
+  S.settings.cats = (Array.isArray(S.settings.cats) ? S.settings.cats : []).filter(c => DATA[c]);
+  if (!S.settings.cats.length) S.settings.cats = CATS.slice();
+
+  let editor = null;
+  let ticker = null;
+
+  function persist() { P.store.set(KEY, { settings: S.settings, scores: S.scores, roundNo: S.roundNo }); }
+  const nameOf = i => S.players[i];
+  function listNames(ids) {
+    const n = ids.map(nameOf);
+    if (n.length < 2) return n[0] || '';
+    return n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1];
+  }
+  function stampSound() {
+    sfx.tone(110, { to: 50, dur: 0.22, gain: 0.45 });
+    sfx.noise({ freq: 900, to: 200, dur: 0.14, gain: 0.35 });
+  }
+  function paperSound() { sfx.noise({ filter: 'bandpass', freq: 1800, to: 3200, dur: 0.18, gain: 0.12, q: 0.7 }); }
+
+  /* ---------- Views ---------- */
+  function header() {
+    return `<header class="top"><a class="back" href="../">${BACK}All games</a>${P.soundToggle()}</header>`;
+  }
+  function mode(value, title, text) {
+    return `<label class="opt"><input type="radio" name="mode" id="mode-${value}" value="${value}"${S.settings.mode === value ? ' checked' : ''}><span class="opt-box"><b>${title}</b><small>${text}</small></span></label>`;
+  }
+  function seg(name, opts, disabledFn) {
+    return `<div class="seg" role="radiogroup">${opts.map(([v, t]) => {
+      const dis = disabledFn && disabledFn(v);
+      return `<label><input type="radio" name="${name}" id="${name}-${v}" value="${v}"${Number(S.settings[name]) === v ? ' checked' : ''}${dis ? ' disabled' : ''}><span>${t}</span></label>`;
+    }).join('')}</div>`;
+  }
+  function scoreboard() {
+    const names = S.players.length ? S.players : Object.keys(S.scores);
+    if (!names.length || !names.some(n => S.scores[n])) return '';
+    const rows = names.map(n => [n, S.scores[n] || 0]).sort((a, b) => b[1] - a[1]);
+    return `<div class="board"><span class="label-desk">Scores</span><ol class="scores">${rows.map(([n, s]) => `<li><span>${esc(n)}</span><b>${s}</b></li>`).join('')}</ol></div>`;
+  }
+
+  function viewSetup() {
+    const st = S.settings;
+    const hasScores = Object.values(S.scores).some(v => v > 0);
+    return header() + `
+    <h1 class="title">Impos<i>t</i>or</h1>
+    <p class="tagline">Everyone gets the secret word. One of you is faking it.</p>
+    <div class="folder">
+      <span class="folder-tab">Case file</span>
+      <div class="sec"><span class="label">Players</span><div id="players"></div><p class="note" id="pnote" aria-live="polite"></p></div>
+      <div class="sec"><span class="label">Mode</span>
+        <div class="modes">
+          ${mode('classic', 'Classic', 'The impostor gets no word and has to bluff.')}
+          ${mode('undercover', 'Undercover', 'The impostor gets a similar word and does not know they are the impostor.')}
+        </div>
+      </div>
+      <div class="sec two">
+        <div><span class="label">Impostors</span>${seg('impostors', [[1, '1'], [2, '2']])}</div>
+        <div><span class="label">Talk timer</span>${seg('timer', TIMERS)}</div>
+      </div>
+      <div class="sec"${st.mode === 'undercover' ? ' hidden' : ''}>
+        <label class="check"><input type="checkbox" id="hint"${st.hint ? ' checked' : ''}><span>Tell the impostor the category</span></label>
+      </div>
+      <div class="sec"><span class="label">Categories</span>
+        <div class="chips">${CATS.map(c => `<button type="button" class="chip" data-cat="${esc(c)}" aria-pressed="${st.cats.includes(c)}">${esc(c)}</button>`).join('')}</div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-ink btn-big" type="button" data-act="start">Deal the words</button>
+        ${hasScores ? '<button class="btn btn-plain" type="button" data-act="reset-scores">Reset scores</button>' : ''}
+      </div>
+    </div>
+    ${scoreboard()}
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Pass the phone around. Each player presses and holds the folder to read their secret word.</li>
+        <li>One player is the impostor. In Classic mode they get no word. In Undercover mode they get a similar word and do not know they are the impostor.</li>
+        <li>Take turns saying one word about the secret word. Make it clear you know it, but not so clear that the impostor works it out.</li>
+        <li>After two laps, count to three and everyone points at who they suspect.</li>
+        <li>Catch the impostor and everyone else scores 1 point. If the impostor escapes, or names the secret word after being caught, the impostor scores 2.</li>
+      </ol>
+    </details>`;
+  }
+
+  function viewPass() {
+    const R = S.R, p = R.order[R.step], n = esc(nameOf(p));
+    return header() + `
+    <section class="center">
+      <p class="eyes">Secret ${R.step + 1} of ${R.order.length}</p>
+      <h2 class="who">${n}</h2>
+      <p class="lead">Give the phone to ${n}. Nobody else looks at the screen.</p>
+      <div class="actions center"><button class="btn btn-red btn-big" type="button" data-act="me">I'm ${n}</button></div>
+      ${R.step === 0 ? '<div class="actions center"><button class="textbtn" type="button" data-act="settings">Change setup</button></div>' : '<div class="actions center"><button class="textbtn" type="button" data-act="redeal">Someone peeked. Deal new words</button></div>'}
+    </section>`;
+  }
+
+  function viewSecret() {
+    const R = S.R, p = R.order[R.step], st = S.settings, isImp = R.imps.includes(p);
+    let inner;
+    if (isImp && st.mode === 'classic') {
+      inner = `<span class="stamp">Impostor</span>
+        <p class="tip">You do not get the word. Listen to the clues and blend in.</p>
+        ${st.hint ? `<p class="cat">Category: <b>${esc(R.cat)}</b></p>` : ''}
+        ${R.imps.length > 1 ? '<p class="tip">One other player is an impostor too.</p>' : ''}`;
+    } else {
+      const w = isImp ? R.decoy : R.word;
+      inner = `<span class="k">Your secret word</span><span class="word">${esc(w)}</span><span class="cat">Category: ${esc(R.cat)}</span>
+        <p class="tip">${st.mode === 'classic' ? 'Give clues that prove you know it without giving it away.' : 'Someone has a different word. Give clues that are not too obvious.'}</p>`;
+    }
+    const last = R.step === R.order.length - 1;
+    return header() + `
+    <section class="center">
+      <p class="eyes">For ${esc(nameOf(p))} only</p>
+      <div class="dossier" id="dossier" tabindex="0" role="button" aria-label="Press and hold to read your secret">
+        <div class="sheet">${inner}</div>
+        <div class="flap"><div class="flap-face"><span class="flap-stamp">Top secret</span><span class="flap-hint">${HAND}Press and hold to read</span></div></div>
+      </div>
+      <div class="actions center"><button class="btn btn-red btn-big" type="button" data-act="done-secret" id="doneBtn"${R.peeked ? '' : ' disabled'}>${last ? 'Done' : 'Done. Pass it on'}</button></div>
+      <p class="note-desk">Let go to close the folder. The button unlocks after you read it.</p>
+    </section>`;
+  }
+
+  function seating(R) {
+    const at = R.order.indexOf(R.starter);
+    return R.order.slice(at).concat(R.order.slice(0, at));
+  }
+  function viewPlay() {
+    const R = S.R, st = S.settings;
+    const seq = seating(R);
+    const who = st.mode === 'classic'
+      ? (R.imps.length > 1 ? 'Two of you do not know the word.' : 'One of you does not know the word.')
+      : (R.imps.length > 1 ? 'Two of you have a slightly different word, and they do not know it.' : 'One of you has a slightly different word, and does not know it.');
+    return header() + `
+    <section class="center">
+      <p class="eyes">Everyone has a word</p>
+      <h2 class="who mid">${esc(nameOf(R.starter))} starts</h2>
+      <p class="lead">Then ${esc(listNames(seq.slice(1)))}. Each person says <b>one word</b> about the secret word. Go around twice, then vote.</p>
+      <p class="lead">${who}</p>
+      ${st.timer ? `<div class="clock${R.timeLeft <= 0 ? ' done' : ''}" id="clock" role="timer">${R.timeLeft <= 0 ? "Time's up" : fmt(R.timeLeft)}</div>
+      <div class="actions center"><button class="btn btn-line" type="button" data-act="timer" id="timerBtn">${timerLabel(R)}</button></div>` : ''}
+      <div class="actions center"><button class="btn btn-red btn-big" type="button" data-act="vote">Time to vote</button></div>
+    </section>`;
+  }
+
+  function viewVote() {
+    return header() + `
+    <section class="center">
+      <p class="eyes">Vote</p>
+      <h2 class="who mid">Point on three</h2>
+      <p class="lead">Count down out loud. On three, everyone points at the player they think is the impostor.</p>
+      <span class="label-desk">Who got the most votes?</span>
+      <div class="tags">${S.players.map((n, i) => `<button class="tag" type="button" data-act="voted" data-i="${i}" style="--r:${((i * 37) % 7) - 3}deg">${esc(n)}</button>`).join('')}</div>
+      <div class="actions center"><button class="btn btn-line" type="button" data-act="voted" data-i="-1">It was a tie</button></div>
+    </section>`;
+  }
+
+  function viewGuess() {
+    const R = S.R, n = esc(nameOf(R.voted));
+    return header() + `
+    <section class="center">
+      <p class="eyes">Caught</p>
+      <h2 class="who mid">${n} is ${R.imps.length > 1 ? 'an' : 'the'} impostor</h2>
+      <p class="lead">One last chance. ${n}, say the secret word out loud. If you get it right, the impostors still win.</p>
+      <div class="actions center">
+        <button class="btn btn-line" type="button" data-act="guess" data-ok="1">They got it</button>
+        <button class="btn btn-red btn-big" type="button" data-act="guess" data-ok="0">Wrong word</button>
+      </div>
+    </section>`;
+  }
+
+  function viewResult() {
+    const R = S.R, st = S.settings, crew = R.winner === 'crew', many = R.imps.length > 1;
+    let how;
+    if (R.voted < 0) how = 'The vote was a tie, so nobody went out.';
+    else if (!R.imps.includes(R.voted)) how = 'You voted out ' + nameOf(R.voted) + ', who was not an impostor.';
+    else if (R.guessed) how = nameOf(R.voted) + ' was caught, but named the secret word.';
+    else how = 'You caught ' + nameOf(R.voted) + '.';
+    const pts = crew ? 'Everyone else gets 1 point.' : (many ? 'The impostors get 2 points each.' : 'The impostor gets 2 points.');
+    return header() + `
+    <section class="center">
+      <div class="result">
+        <span class="stamp${crew ? ' calm' : ''}">${crew ? 'Crew wins' : (many ? 'Impostors win' : 'Impostor wins')}</span>
+        <dl class="facts">
+          <div><dt>Secret word</dt><dd>${esc(R.word)}</dd></div>
+          ${st.mode === 'undercover' ? `<div><dt>${many ? 'Their word' : 'Impostor word'}</dt><dd>${esc(R.decoy)}</dd></div>` : ''}
+          <div><dt>${many ? 'Impostors' : 'Impostor'}</dt><dd>${esc(listNames(R.imps))}</dd></div>
+        </dl>
+        <p class="tip">${esc(how)} ${pts}</p>
+      </div>
+      ${scoreboard()}
+      <div class="actions center">
+        <button class="btn btn-line" type="button" data-act="settings">Change setup</button>
+        <button class="btn btn-red btn-big" type="button" data-act="next">Next round</button>
+      </div>
+    </section>`;
+  }
+
+  /* ---------- Game flow ---------- */
+  function updateNote() {
+    const note = document.getElementById('pnote');
+    if (!note || !editor) return;
+    const n = editor.count();
+    const two = document.getElementById('impostors-2');
+    if (two) {
+      two.disabled = n < 5;
+      if (n < 5 && S.settings.impostors === 2) { S.settings.impostors = 1; document.getElementById('impostors-1').checked = true; persist(); }
+    }
+    note.textContent = n < 5 ? 'Two impostors needs 5 or more players.' : '';
+  }
+
+  function start() {
+    S.players = editor.get();
+    sfx.unlock();
+    P.stayAwake();
+    newRound();
+    render();
+  }
+
+  function newRound() {
+    const n = S.players.length;
+    const items = [];
+    S.settings.cats.forEach(c => DATA[c].forEach(p => items.push({ cat: c, a: p[0], b: p[1] })));
+    const card = P.deck('impostor', items, x => x.a + '|' + x.b).one();
+    const flip = Math.random() < 0.5;
+    const k = S.settings.impostors === 2 && n >= 5 ? 2 : 1;
+    const all = P.shuffle([...Array(n).keys()]);
+    const fresh = all.filter(i => !S.lastImps.includes(i));
+    const imps = (fresh.length >= k ? fresh : all).slice(0, k);
+    S.lastImps = imps;
+    const offset = S.roundNo % n;
+    const order = [...Array(n).keys()].map(i => (i + offset) % n);
+    const crew = order.filter(i => !imps.includes(i));
+    S.R = {
+      cat: card.cat, word: flip ? card.b : card.a, decoy: flip ? card.a : card.b,
+      imps, order, step: 0, peeked: false, starter: P.pick(crew),
+      voted: null, guessed: false, winner: null,
+      timeLeft: S.settings.timer * 1000, running: false, last: 0, lastSec: null
+    };
+    S.roundNo++;
+    S.screen = 'pass';
+    persist();
+  }
+
+  function fmt(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+  function timerLabel(R) {
+    if (R.timeLeft <= 0) return 'Restart timer';
+    if (R.running) return 'Pause';
+    return R.timeLeft < S.settings.timer * 1000 ? 'Resume' : 'Start timer';
+  }
+  function stopTimer() { if (S.R) S.R.running = false; clearInterval(ticker); }
+  function toggleTimer() {
+    const R = S.R;
+    if (!R) return;
+    if (R.timeLeft <= 0) { R.timeLeft = S.settings.timer * 1000; R.lastSec = null; }
+    R.running = !R.running;
+    R.last = performance.now();
+    clearInterval(ticker);
+    if (R.running) ticker = setInterval(stepTimer, 200);
+    paintTimer();
+  }
+  function stepTimer() {
+    const R = S.R;
+    if (!R || !R.running) { clearInterval(ticker); return; }
+    const now = performance.now();
+    R.timeLeft -= now - R.last;
+    R.last = now;
+    const sec = Math.ceil(R.timeLeft / 1000);
+    if (sec !== R.lastSec) { R.lastSec = sec; if (sec > 0 && sec <= 10) sfx.tick(); }
+    if (R.timeLeft <= 0) {
+      R.timeLeft = 0;
+      R.running = false;
+      clearInterval(ticker);
+      sfx.buzz(0.9);
+      P.vibrate([220, 90, 220]);
+    }
+    paintTimer();
+  }
+  function paintTimer() {
+    const R = S.R, c = document.getElementById('clock'), b = document.getElementById('timerBtn');
+    if (!R) return;
+    if (c) {
+      const done = R.timeLeft <= 0;
+      c.textContent = done ? "Time's up" : fmt(R.timeLeft);
+      c.classList.toggle('done', done);
+      c.classList.toggle('low', !done && R.timeLeft <= 10000);
+    }
+    if (b) b.textContent = timerLabel(R);
+  }
+
+  function voted(i) {
+    const R = S.R;
+    R.voted = i;
+    stampSound();
+    if (i >= 0 && R.imps.includes(i)) {
+      if (S.settings.mode === 'classic') { S.screen = 'guess'; render(); }
+      else finish('crew');
+    } else finish('impostor');
+  }
+
+  function finish(winner) {
+    const R = S.R;
+    R.winner = winner;
+    S.players.forEach((n, i) => {
+      const imp = R.imps.includes(i);
+      if (winner === 'crew' && !imp) S.scores[n] = (S.scores[n] || 0) + 1;
+      if (winner === 'impostor' && imp) S.scores[n] = (S.scores[n] || 0) + 2;
+    });
+    persist();
+    S.screen = 'result';
+    render();
+    setTimeout(stampSound, 120);
+    if (winner === 'crew') { sfx.win(); P.confetti({ colors: ['#e2382d', '#f1ebe0', '#d6b47c', '#ffffff'] }); }
+    else sfx.lose();
+  }
+
+  function bindDossier() {
+    const d = document.getElementById('dossier'), done = document.getElementById('doneBtn');
+    if (!d) return;
+    let isOpen = false;
+    const open = v => {
+      if (v === isOpen) return;
+      isOpen = v;
+      d.classList.toggle('open', v);
+      if (v) {
+        paperSound();
+        if (!S.R.peeked) { S.R.peeked = true; done.disabled = false; }
+      }
+    };
+    d.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      try { d.setPointerCapture(e.pointerId); } catch (x) { /* older browsers */ }
+      open(true);
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => d.addEventListener(t, () => open(false)));
+    d.addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); open(true); } });
+    d.addEventListener('keyup', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); open(false); } });
+    d.addEventListener('blur', () => open(false));
+    d.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, secret: viewSecret, play: viewPlay, vote: viewVote, guess: viewGuess, result: viewResult };
+  let shown = null;
+  function render() {
+    if (S.screen !== 'play') stopTimer();
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') {
+      editor = P.playerEditor(document.getElementById('players'), { min: 3, max: 12, onChange: updateNote });
+      updateNote();
+    }
+    if (S.screen === 'secret') bindDossier();
+    if (S.screen !== shown || S.screen === 'pass') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  /* ---------- Events ---------- */
+  document.addEventListener('click', e => {
+    const cat = e.target.closest('[data-cat]');
+    if (cat) {
+      const c = cat.getAttribute('data-cat');
+      const on = S.settings.cats.includes(c);
+      if (on && S.settings.cats.length === 1) return;
+      S.settings.cats = on ? S.settings.cats.filter(x => x !== c) : S.settings.cats.concat(c);
+      cat.setAttribute('aria-pressed', String(!on));
+      persist();
+      return;
+    }
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': start(); break;
+      case 'me': S.R.peeked = false; S.screen = 'secret'; render(); break;
+      case 'done-secret':
+        S.R.step++;
+        S.screen = S.R.step < S.R.order.length ? 'pass' : 'play';
+        paperSound();
+        render();
+        break;
+      case 'redeal': newRound(); render(); break;
+      case 'timer': toggleTimer(); break;
+      case 'vote': S.screen = 'vote'; render(); break;
+      case 'voted': voted(Number(b.getAttribute('data-i'))); break;
+      case 'guess':
+        S.R.guessed = b.getAttribute('data-ok') === '1';
+        finish(S.R.guessed ? 'impostor' : 'crew');
+        break;
+      case 'next': newRound(); render(); break;
+      case 'settings': S.screen = 'setup'; render(); break;
+      case 'reset-scores': S.scores = {}; persist(); render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'mode') { S.settings.mode = t.value; persist(); render(); }
+    else if (t.name === 'impostors') { S.settings.impostors = Number(t.value); persist(); }
+    else if (t.name === 'timer') { S.settings.timer = Number(t.value); persist(); }
+    else if (t.id === 'hint') { S.settings.hint = t.checked; persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

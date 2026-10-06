@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tune In | Pass the Phone</title>
+<meta name="description" content="One player sees a hidden target on a dial and gives a clue. Everyone else turns the dial to find it.">
+<meta name="theme-color" content="#0f6b69">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Righteous&display=swap">
+<style>
+/* Layout: a tabletop radio. The dial is the whole show; every screen is built around it, with the spectrum card as its nameplate. */
+:root{
+  color-scheme:dark;
+  --sea:#0f6b69;
+  --sea-deep:#093f3e;
+  --cream:#fdf6e9;
+  --mist:#bfe0db;
+  --ink:#151a1f;
+  --face:#fbf3e3;
+  --cover:#1d3557;
+  --b2:#ffd166;
+  --b3:#f78c6b;
+  --b4:#ef476f;
+  --needle:#e63946;
+  --coral:#ff7a66;
+  --lilac:#c4a7ff;
+  --f-display:"Righteous","Trebuchet MS",sans-serif;
+  --f-body:"Atkinson Hyperlegible","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--sea-deep)}
+body{margin:0;min-height:100vh;color:var(--cream);font-family:var(--f-body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(255,255,255,.12),transparent 70%),radial-gradient(rgba(0,0,0,.14) 1.6px,transparent 2px) 0 0/12px 12px,linear-gradient(180deg,var(--sea),var(--sea-deep));background-attachment:fixed}
+button{font:inherit;color:inherit}
+.wrap{max-width:720px;margin:0 auto;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.back{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:6px 14px 6px 10px;border-radius:999px;color:var(--cream);text-decoration:none;font-weight:700;font-size:15px;box-shadow:inset 0 0 0 2px rgba(253,246,233,.3)}
+.back svg{width:16px;height:16px}
+.ptp-sound{display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:transparent;box-shadow:inset 0 0 0 2px rgba(253,246,233,.3);color:var(--cream);cursor:pointer}
+.ptp-sound svg{width:22px;height:22px}
+:is(.back,.ptp-sound,.btn,.pp-add,.pp-remove,.lr button,.nudge button,.howto summary):focus-visible{outline:3px solid var(--b2);outline-offset:3px}
+
+.title{display:flex;align-items:center;gap:14px;margin:26px 0 0;font-family:var(--f-display);font-weight:400;font-size:clamp(58px,15vw,112px);line-height:.9;letter-spacing:.01em}
+.title svg{width:.7em;height:.7em;flex:none}
+.tagline{margin:10px 0 0;font-size:19px;color:var(--mist)}
+.panel{margin-top:24px;padding:18px;border-radius:24px;background:rgba(4,36,36,.4);box-shadow:inset 0 0 0 2px rgba(253,246,233,.14)}
+.label{display:block;margin:0 0 10px;font-family:var(--f-display);font-size:19px;letter-spacing:.02em;color:var(--b2)}
+.sec+.sec{margin-top:22px}
+.note{margin:8px 0 0;min-height:1.3em;font-size:15px;color:var(--b2)}
+
+.modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px}
+.opt{position:relative;display:block;cursor:pointer}
+.opt input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+.opt-box{display:block;height:100%;padding:14px 16px;border-radius:18px;background:rgba(253,246,233,.08);box-shadow:inset 0 0 0 2px rgba(253,246,233,.2)}
+.opt-box b{display:block;font-family:var(--f-display);font-weight:400;font-size:24px}
+.opt-box small{display:block;margin-top:2px;font-size:15px;line-height:1.35;color:var(--mist)}
+.opt input:checked+.opt-box{background:var(--cream);color:var(--ink);box-shadow:inset 0 0 0 3px var(--b2)}
+.opt input:checked+.opt-box small{color:#41505a}
+.opt input:focus-visible+.opt-box{outline:3px solid var(--b2);outline-offset:2px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg label{position:relative;cursor:pointer}
+.seg input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+.seg span{display:grid;place-items:center;min-width:58px;height:44px;padding:0 16px;border-radius:999px;background:rgba(253,246,233,.08);box-shadow:inset 0 0 0 2px rgba(253,246,233,.2);font-weight:700;font-size:17px}
+.seg input:checked+span{background:var(--b2);color:var(--ink);box-shadow:none}
+.seg input:focus-visible+span{outline:3px solid var(--cream);outline-offset:2px}
+
+.pp-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.pp-row{display:flex;align-items:center;gap:8px}
+.pp-num{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:50%;background:rgba(253,246,233,.14);font-family:var(--f-display);font-size:15px}
+.pp-input{flex:1;min-width:0;height:48px;padding:0 14px;border:0;border-radius:14px;background:var(--cream);color:var(--ink);font:700 18px/1 var(--f-body)}
+.pp-input::placeholder{color:#7b8a8f;font-weight:400}
+.pp-input:focus{outline:3px solid var(--b2);outline-offset:1px}
+.pp-remove{display:grid;place-items:center;flex:none;width:42px;height:42px;border:0;border-radius:50%;background:rgba(253,246,233,.1);color:var(--cream);cursor:pointer}
+.pp-remove:disabled{opacity:.3;cursor:default}
+.pp-add{margin-top:10px;min-height:44px;padding:8px 18px;border:2px dashed rgba(253,246,233,.4);border-radius:999px;background:transparent;font-weight:700;color:var(--cream);cursor:pointer}
+.pp-add:disabled{opacity:.35;cursor:default}
+.pp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.teams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.team{min-width:0;padding:12px 14px;border-radius:18px;background:rgba(253,246,233,.08);box-shadow:inset 0 0 0 2px var(--c)}
+.team h3{margin:0 0 6px;font-family:var(--f-display);font-weight:400;font-size:20px;color:var(--c)}
+.team ul{list-style:none;margin:0;padding:0;display:grid;gap:2px;font-weight:700;overflow-wrap:anywhere}
+.team li.empty{color:var(--mist);font-weight:400}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:52px;padding:10px 24px;border:0;border-radius:999px;cursor:pointer;font-family:var(--f-display);font-weight:400;font-size:21px;letter-spacing:.01em;touch-action:manipulation;transition:transform .08s ease}
+.btn:active{transform:translateY(2px)}
+.btn-cream{background:var(--cream);color:var(--ink);box-shadow:0 4px 0 #b9ad97}
+.btn-hot{background:var(--coral);color:var(--ink);box-shadow:0 4px 0 #b24c3d}
+.btn-ghost{background:transparent;color:var(--cream);box-shadow:inset 0 0 0 2px rgba(253,246,233,.4)}
+.btn-big{min-height:60px;padding-inline:32px;font-size:24px}
+.btn:disabled{opacity:.35;cursor:default;transform:none}
+.actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:22px}
+.actions.center{justify-content:center}
+
+.center{text-align:center}
+.eyebrow{margin:26px 0 0;font-weight:700;font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:var(--mist)}
+.big{margin:6px 0 0;font-family:var(--f-display);font-weight:400;font-size:clamp(40px,10vw,72px);line-height:1;text-wrap:balance;overflow-wrap:anywhere}
+.lead{margin:12px auto 0;max-width:30em;font-size:18px;color:var(--mist);text-wrap:pretty}
+.lead b{color:var(--cream)}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;background:var(--c);color:var(--ink);font-family:var(--f-display);font-size:18px}
+
+/* The dial */
+.radio{max-width:580px;margin:20px auto 0}
+.dial{display:block;width:100%;height:auto;overflow:hidden;-webkit-user-select:none;user-select:none}
+.dial .face{fill:var(--face)}
+.dial .rim{fill:none;stroke:var(--ink);stroke-width:7;stroke-linejoin:round}
+.dial .base{fill:var(--ink)}
+.dial .bl{font:400 22px var(--f-display);fill:var(--ink);text-anchor:middle}
+.dial .tick{stroke:var(--ink);stroke-width:2.5;stroke-linecap:round}
+.dial .cover{transform-box:view-box;transform-origin:200px 214px;transition:transform 1s cubic-bezier(.65,0,.3,1)}
+.dial .cover.open{transform:rotate(180deg)}
+.dial .cover-fill{fill:var(--cover)}
+.dial .grille{fill:none;stroke:rgba(253,246,233,.08);stroke-width:9}
+.dial .needle{transform-box:view-box;transform-origin:200px 214px;transition:transform .7s cubic-bezier(.3,1.4,.5,1)}
+.dial.live .needle{transition:none}
+.dial .needle .shade{stroke:var(--ink);stroke-width:13;stroke-linecap:round}
+.dial .needle .line{stroke:var(--needle);stroke-width:6;stroke-linecap:round}
+.dial .knob{fill:var(--ink)}
+.dial .knob-dot{fill:var(--needle)}
+.dial.live{cursor:grab;touch-action:none}
+.dial.live:active{cursor:grabbing}
+.dial:focus-visible{outline:3px solid var(--b2);outline-offset:4px;border-radius:14px}
+.ends{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:5px solid var(--ink);border-top:0;border-radius:0 0 20px 20px;overflow:hidden}
+.end{min-width:0;padding:10px 14px 14px;color:var(--ink);font-family:var(--f-display);font-size:clamp(19px,4vw,27px);line-height:1.1;overflow-wrap:anywhere}
+.end small{display:block;margin-bottom:3px;font:700 12px/1 var(--f-body);letter-spacing:.16em;text-transform:uppercase;opacity:.65}
+.end.l{background:var(--l)}
+.end.r{background:var(--r);text-align:right}
+
+.clue{margin:16px auto 0;max-width:24em;font-family:var(--f-display);font-size:clamp(28px,7vw,46px);line-height:1.1;overflow-wrap:anywhere}
+.clue.quiet{font-family:var(--f-body);font-weight:700;font-size:19px;color:var(--mist)}
+.field{display:grid;gap:6px;max-width:440px;margin:20px auto 0;text-align:left}
+.field label{font-weight:700;color:var(--mist)}
+.field input{height:54px;padding:0 16px;border:0;border-radius:16px;background:var(--cream);color:var(--ink);font:700 20px/1 var(--f-body)}
+.field input:focus{outline:3px solid var(--b2);outline-offset:1px}
+.nudge{display:flex;justify-content:center;gap:12px;margin-top:14px}
+.nudge button{display:grid;place-items:center;width:56px;height:56px;border:0;border-radius:50%;background:var(--cream);color:var(--ink);cursor:pointer;box-shadow:0 4px 0 #b9ad97;touch-action:manipulation}
+.nudge button:active{transform:translateY(2px);box-shadow:0 2px 0 #b9ad97}
+.nudge svg{width:24px;height:24px}
+.lr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:520px;margin:22px auto 0}
+.lr button{min-height:78px;border:0;border-radius:22px;background:var(--cream);color:var(--ink);font-family:var(--f-display);font-size:30px;cursor:pointer;box-shadow:0 5px 0 #b9ad97;touch-action:manipulation}
+.lr button:active{transform:translateY(3px);box-shadow:0 2px 0 #b9ad97}
+
+.outcome{margin:20px auto 0;max-width:30em;opacity:0;transform:translateY(8px);transition:opacity .35s ease,transform .35s ease}
+.outcome.show{opacity:1;transform:none}
+.pts{font-family:var(--f-display);font-size:clamp(70px,20vw,120px);line-height:1;color:var(--b2)}
+.pts.zero{color:var(--mist)}
+.outcome p{margin:8px 0 0;font-size:19px}
+.scores{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:20px}
+.score{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 16px;border-radius:999px;background:rgba(4,36,36,.45);box-shadow:inset 0 0 0 2px var(--c);font-family:var(--f-display);font-size:19px}
+.score b{min-width:46px;padding:4px 10px;border-radius:999px;background:var(--c);color:var(--ink);font-weight:400;text-align:center;font-variant-numeric:tabular-nums}
+.howto{margin-top:26px;color:var(--mist)}
+.howto summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-family:var(--f-display);font-size:20px;color:var(--cream)}
+.howto ol{margin:4px 0 0;padding-left:1.3em;display:grid;gap:8px}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="cards.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const CARDS = window.TUNE_CARDS || [];
+  const KEY = 'ptp.tunein';
+  const COLORS = [['#5bc0eb', '#fa7921'], ['#9bc53d', '#ff6b6b'], ['#c3a6ff', '#ffd23f'], ['#4ecdc4', '#ff8fab'], ['#f7b2bd', '#2ec4b6'], ['#ffd166', '#5c9dff'], ['#b8f2e6', '#ffa69e']];
+  const TEAMS = [{ name: 'Coral', color: '#ff7a66' }, { name: 'Lilac', color: '#c4a7ff' }];
+  const BANDS = [[-11.25, -6.75, 2], [-6.75, -2.25, 3], [-2.25, 2.25, 4], [2.25, 6.75, 3], [6.75, 11.25, 2]];
+  const BAND_FILL = { 2: 'var(--b2)', 3: 'var(--b3)', 4: 'var(--b4)' };
+  const CX = 200, CY = 214, R = 186;
+  const BACK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const CHEV_L = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const CHEV_R = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const app = document.getElementById('app');
+  const deck = P.deck('tunein', CARDS, c => c[0] + '|' + c[1]);
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ mode: 'teams', goal: 10, cards: 7 }, saved.settings || {}),
+    screen: 'setup', players: [], mix: null,
+    teams: null, scores: [0, 0], turn: 0, psy: [0, 0],
+    total: 0, played: 0, psyIdx: 0,
+    T: null
+  };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const teamsMode = () => S.settings.mode === 'teams';
+
+  /* ---------- Dial drawing ---------- */
+  const fx = n => n.toFixed(2);
+  function pt(r, v) { const a = Math.PI * (1 - v / 100); return [CX + r * Math.cos(a), CY - r * Math.sin(a)]; }
+  function sector(a, b, r, fill) {
+    a = Math.max(0, a); b = Math.min(100, b);
+    if (b - a <= 0.01) return '';
+    const p1 = pt(r, a), p2 = pt(r, b);
+    return `<path d="M${CX} ${CY}L${fx(p1[0])} ${fx(p1[1])}A${r} ${r} 0 0 1 ${fx(p2[0])} ${fx(p2[1])}Z" fill="${fill}"/>`;
+  }
+  function dialSVG(o) {
+    const t = o.target;
+    const bands = BANDS.map(([a, b, n]) => sector(t + a, t + b, R - 3, BAND_FILL[n])).join('');
+    const labels = BANDS.map(([a, b, n]) => {
+      const m = t + (a + b) / 2;
+      if (m < 2 || m > 98) return '';
+      const p = pt(R - 28, m);
+      return `<text class="bl" x="${fx(p[0])}" y="${fx(p[1] + 8)}">${n}</text>`;
+    }).join('');
+    let ticks = '';
+    for (let v = 0; v <= 100; v += 5) {
+      const a = pt(R - 3, v), b = pt(R - (v % 25 === 0 ? 15 : 9), v);
+      ticks += `<line class="tick" x1="${fx(a[0])}" y1="${fx(a[1])}" x2="${fx(b[0])}" y2="${fx(b[1])}"/>`;
+    }
+    const grille = [56, 92, 128, 164].map(r => `<path class="grille" d="M${CX - r} ${CY}A${r} ${r} 0 0 1 ${CX + r} ${CY}"/>`).join('');
+    const needle = o.needle == null ? '' : `<g class="needle" style="transform:rotate(${fx((o.needle - 50) * 1.8)}deg)"><line class="shade" x1="${CX}" y1="${CY}" x2="${CX}" y2="${CY - R + 18}"/><line class="line" x1="${CX}" y1="${CY}" x2="${CX}" y2="${CY - R + 18}"/></g>`;
+    const live = o.live ? ` tabindex="0" role="slider" aria-label="Dial position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(o.needle)}"` : ' aria-hidden="true"';
+    return `<svg class="dial${o.live ? ' live' : ''}" id="dial" viewBox="0 0 400 232"${live}>
+      <defs><clipPath id="upper"><rect x="0" y="0" width="400" height="${CY + 1}"/></clipPath></defs>
+      <path class="face" d="M${CX - R} ${CY}A${R} ${R} 0 0 1 ${CX + R} ${CY}Z"/>
+      <g clip-path="url(#upper)">${bands}${labels}</g>
+      <g clip-path="url(#upper)"><g class="cover${o.open ? ' open' : ''}"><path class="cover-fill" d="M${CX - R - 4} ${CY}A${R + 4} ${R + 4} 0 0 1 ${CX + R + 4} ${CY}Z"/>${grille}</g></g>
+      ${ticks}
+      <path class="rim" d="M${CX - R} ${CY}A${R} ${R} 0 0 1 ${CX + R} ${CY}"/>
+      ${needle}
+      <rect class="base" x="0" y="${CY}" width="400" height="${232 - CY}"/>
+      <circle class="knob" cx="${CX}" cy="${CY}" r="19"/><circle class="knob-dot" cx="${CX}" cy="${CY}" r="6"/>
+    </svg>`;
+  }
+  function radio(o) {
+    const T = S.T;
+    return `<div class="radio">${dialSVG(o)}
+      <div class="ends" style="--l:${T.colors[0]};--r:${T.colors[1]}">
+        <div class="end l"><small>Left end</small>${esc(T.card[0])}</div>
+        <div class="end r"><small>Right end</small>${esc(T.card[1])}</div>
+      </div></div>`;
+  }
+  function bindDial() {
+    const svg = document.getElementById('dial');
+    if (!svg || !svg.classList.contains('live')) return;
+    let dragging = false;
+    const toValue = e => {
+      const m = svg.getScreenCTM();
+      if (!m) return S.T.needle;
+      const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
+      const dx = p.x - CX, dy = CY - p.y;
+      let a = Math.atan2(dy, dx);
+      if (dy < 0) a = dx < 0 ? Math.PI : 0;
+      return (1 - a / Math.PI) * 100;
+    };
+    const set = v => {
+      v = Math.max(0, Math.min(100, v));
+      const prev = S.T.needle;
+      S.T.needle = v;
+      const n = svg.querySelector('.needle');
+      if (n) n.style.transform = 'rotate(' + fx((v - 50) * 1.8) + 'deg)';
+      svg.setAttribute('aria-valuenow', String(Math.round(v)));
+      if (Math.floor(v / 3) !== Math.floor(prev / 3)) sfx.tick(2400);
+    };
+    svg.addEventListener('pointerdown', e => {
+      dragging = true;
+      try { svg.setPointerCapture(e.pointerId); } catch (x) { /* older browsers */ }
+      set(toValue(e));
+      e.preventDefault();
+    });
+    svg.addEventListener('pointermove', e => { if (dragging) set(toValue(e)); });
+    ['pointerup', 'pointercancel'].forEach(t => svg.addEventListener(t, () => { dragging = false; }));
+    svg.addEventListener('keydown', e => {
+      const step = e.shiftKey ? 5 : 1;
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); set(S.T.needle - step); }
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); set(S.T.needle + step); }
+    });
+    bindDial.set = set;
+  }
+
+  /* ---------- Views ---------- */
+  function header() { return `<header class="top"><a class="back" href="../">${BACK}All games</a>${P.soundToggle()}</header>`; }
+  function seg(name, opts) {
+    return `<div class="seg" role="radiogroup">${opts.map(([v, t]) => `<label><input type="radio" name="${name}" id="${name}-${v}" value="${v}"${Number(S.settings[name]) === v ? ' checked' : ''}><span>${t}</span></label>`).join('')}</div>`;
+  }
+  function opt(value, title, text) {
+    return `<label class="opt"><input type="radio" name="mode" id="mode-${value}" value="${value}"${S.settings.mode === value ? ' checked' : ''}><span class="opt-box"><b>${title}</b><small>${text}</small></span></label>`;
+  }
+  function teamColor(i) { return TEAMS[i].color; }
+  function scoresHTML() {
+    if (teamsMode()) {
+      return `<div class="scores">${S.teams.map((t, i) => `<span class="score" style="--c:${t.color}">Team ${t.name}<b>${S.scores[i]}</b></span>`).join('')}</div>
+        <p class="lead">First to ${S.settings.goal} wins.</p>`;
+    }
+    return `<div class="scores"><span class="score" style="--c:var(--b2)">Score<b>${S.total}</b></span><span class="score" style="--c:var(--mist)">Card<b>${Math.min(S.played + (S.screen === 'reveal' ? 0 : 1), S.settings.cards)}/${S.settings.cards}</b></span></div>`;
+  }
+
+  function viewSetup() {
+    const st = S.settings;
+    return header() + `
+    <h1 class="title"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 40A22 22 0 0 1 42 40" fill="none" stroke="#ffd166" stroke-width="5" stroke-linecap="round"/><path d="M13 40A15 15 0 0 1 35 40" fill="none" stroke="#f78c6b" stroke-width="5" stroke-linecap="round"/><path d="M24 40L32 17" stroke="#e63946" stroke-width="5" stroke-linecap="round"/><circle cx="24" cy="40" r="5" fill="#fdf6e9"/></svg>Tune In</h1>
+    <p class="tagline">Read each other's minds, one dial at a time.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">How do you want to play?</span>
+        <div class="modes">
+          ${opt('teams', 'Two teams', 'Take turns and race to the goal. The other team can steal a point.')}
+          ${opt('together', 'Everyone together', 'One team, a set number of cards. See how in sync you are.')}
+        </div>
+      </div>
+      <div class="sec"><span class="label">Players</span><div id="players"></div><p class="note" id="pnote" aria-live="polite"></p></div>
+      <div class="sec"${teamsMode() ? '' : ' hidden'}><span class="label">Teams</span><div class="teams" id="teams"></div>
+        <div class="actions"><button class="btn btn-ghost" type="button" data-act="shuffle">Shuffle teams</button></div></div>
+      <div class="sec"${teamsMode() ? '' : ' hidden'}><span class="label">Play to</span>${seg('goal', [[7, '7 points'], [10, '10 points'], [15, '15 points']])}</div>
+      <div class="sec"${teamsMode() ? ' hidden' : ''}><span class="label">Cards</span>${seg('cards', [[5, '5'], [7, '7'], [10, '10']])}</div>
+      <div class="actions"><button class="btn btn-hot btn-big" type="button" data-act="start" id="startBtn">Start</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Each turn, one player is the psychic. They peek at where the target is hiding on the dial.</li>
+        <li>The psychic gives a clue that fits that spot between the two ends. Between Cold and Hot, Bath water would sit on the warm side.</li>
+        <li>The guessers talk it over and drag the needle to where they think the target is.</li>
+        <li>In a team game, the other team then says if the target is left or right of the needle. A right call steals 1 point.</li>
+        <li>Open the dial. Land in the middle for 4 points, next to it for 3, then 2.</li>
+      </ol>
+    </details>`;
+  }
+  function paintTeams() {
+    const box = document.getElementById('teams');
+    const note = document.getElementById('pnote');
+    const btn = document.getElementById('startBtn');
+    if (!editor) return;
+    const names = editor.get();
+    const tooFew = teamsMode() ? names.length < 4 : names.length < 2;
+    if (note) note.textContent = teamsMode() && names.length < 4 ? 'Two teams needs at least 4 players.' : '';
+    if (btn) btn.disabled = tooFew;
+    if (!box) return;
+    const [a, b] = split(names);
+    box.innerHTML = [a, b].map((list, i) => `<div class="team" style="--c:${teamColor(i)}"><h3>Team ${TEAMS[i].name}</h3><ul>${list.length ? list.map(n => `<li>${esc(n)}</li>`).join('') : '<li class="empty">Nobody yet</li>'}</ul></div>`).join('');
+  }
+  function split(names) {
+    if (!S.mix || S.mix.length !== names.length) S.mix = names.map((_, i) => i);
+    const a = [], b = [];
+    S.mix.forEach((idx, k) => (k % 2 === 0 ? a : b).push(names[idx]));
+    return [a, b];
+  }
+
+  function psychicLine() {
+    const T = S.T;
+    return teamsMode() ? `<span class="pill" style="--c:${teamColor(T.team)}">Team ${TEAMS[T.team].name}</span>` : '';
+  }
+  function viewHandoff() {
+    const T = S.T, n = esc(T.psychic);
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">${teamsMode() ? 'Next turn' : 'Card ' + (S.played + 1) + ' of ' + S.settings.cards}</p>
+      <div style="margin-top:12px">${psychicLine()}</div>
+      <h2 class="big">${n} is the psychic</h2>
+      <p class="lead">${n}, take the phone. Everyone else looks away until ${n} hands it back.</p>
+      <div class="actions center"><button class="btn btn-hot btn-big" type="button" data-act="psychic">I'm ${n}</button></div>
+      ${scoresHTML()}
+    </section>`;
+  }
+  function viewPeek() {
+    const T = S.T;
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">Psychic only</p>
+      <h2 class="big">Find the target</h2>
+      <p class="lead">Peek at the target, then think of a clue that sits at that spot between the two ends.</p>
+      ${radio({ target: T.target, needle: null, open: T.open })}
+      <div class="actions center">
+        <button class="btn btn-cream" type="button" data-act="peek" id="peekBtn">${T.open ? 'Hide the target' : 'Show the target'}</button>
+        <button class="btn btn-ghost" type="button" data-act="newcard">Different card</button>
+      </div>
+      <div class="field"><label for="clue">Your clue, if you want to show it</label><input id="clue" type="text" maxlength="40" autocomplete="off" placeholder="Or just say it out loud" value="${esc(T.clue)}"></div>
+      <div class="actions center"><button class="btn btn-hot btn-big" type="button" data-act="handover" id="handBtn"${T.peeked ? '' : ' disabled'}>Hide it and hand over</button></div>
+    </section>`;
+  }
+  function viewGuess() {
+    const T = S.T;
+    const who = teamsMode() ? 'Team ' + TEAMS[T.team].name + ', turn the dial' : 'Turn the dial';
+    return header() + `
+    <section class="center">
+      <div style="margin-top:22px">${psychicLine()}</div>
+      <h2 class="big">${esc(who)}</h2>
+      ${T.clue ? `<p class="clue">${esc(T.clue)}</p>` : `<p class="clue quiet">Listen to ${esc(T.psychic)}'s clue.</p>`}
+      ${radio({ target: T.target, needle: T.needle, open: false, live: true })}
+      <div class="nudge"><button type="button" data-act="nudge" data-d="-1" aria-label="Move needle left">${CHEV_L}</button><button type="button" data-act="nudge" data-d="1" aria-label="Move needle right">${CHEV_R}</button></div>
+      <div class="actions center"><button class="btn btn-hot btn-big" type="button" data-act="lock">Lock it in</button></div>
+    </section>`;
+  }
+  function viewCounter() {
+    const T = S.T, other = 1 - T.team;
+    return header() + `
+    <section class="center">
+      <div style="margin-top:22px"><span class="pill" style="--c:${teamColor(other)}">Team ${TEAMS[other].name}</span></div>
+      <h2 class="big">Left or right?</h2>
+      <p class="lead">Is the target to the left or the right of the needle? Get it right to steal 1 point.</p>
+      ${radio({ target: T.target, needle: T.needle, open: false })}
+      <div class="lr"><button type="button" data-act="lr" data-v="left">Left</button><button type="button" data-act="lr" data-v="right">Right</button></div>
+    </section>`;
+  }
+  function viewReveal() {
+    const T = S.T;
+    const word = T.points === 4 ? 'Bullseye.' : T.points === 3 ? 'So close.' : T.points === 2 ? 'Not bad.' : 'Missed it.';
+    let lines;
+    if (teamsMode()) {
+      const tn = TEAMS[T.team].name, on = TEAMS[1 - T.team].name;
+      lines = `<p>${word} Team ${tn} scores ${P.plural(T.points, 'point')}.</p>
+        <p>Team ${on} said ${T.guess} and ${T.bonus ? 'stole 1 point.' : 'got nothing.'}</p>`;
+    } else lines = `<p>${word} That card is worth ${P.plural(T.points, 'point')}.</p>`;
+    const last = teamsMode() ? isOver() : S.played >= S.settings.cards;
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">The reveal</p>
+      ${T.clue ? `<p class="clue">${esc(T.clue)}</p>` : ''}
+      ${radio({ target: T.target, needle: T.needle, open: false })}
+      <div class="outcome" id="outcome" aria-live="polite">
+        <div class="pts${T.points ? '' : ' zero'}">+${T.points}</div>
+        ${lines}
+        ${scoresHTML()}
+      </div>
+      <div class="actions center"><button class="btn btn-hot btn-big" type="button" data-act="next">${last ? 'See how you did' : 'Next turn'}</button></div>
+    </section>`;
+  }
+  function isOver() {
+    const [a, b] = S.scores, g = S.settings.goal;
+    return (a >= g || b >= g) && a !== b;
+  }
+  function viewFinal() {
+    let head, body;
+    if (teamsMode()) {
+      const w = S.scores[0] > S.scores[1] ? 0 : 1;
+      head = `Team ${TEAMS[w].name} wins`;
+      body = `<p class="lead">${S.teams[w].members.map(esc).join(', ')}. You were on the same frequency.</p>${scoresHTML()}`;
+    } else {
+      const max = S.settings.cards * 4, pct = S.total / max;
+      const verdict = pct >= 0.8 ? 'Mind readers' : pct >= 0.6 ? 'Totally tuned in' : pct >= 0.4 ? 'A bit of static' : 'Lost signal';
+      head = verdict;
+      body = `<p class="lead">You scored <b>${S.total}</b> out of ${max} over ${P.plural(S.settings.cards, 'card')}.</p>`;
+    }
+    return header() + `
+    <section class="center">
+      <p class="eyebrow">Game over</p>
+      <h2 class="big">${esc(head)}</h2>
+      ${body}
+      <div class="actions center">
+        <button class="btn btn-ghost" type="button" data-act="setup">Change setup</button>
+        <button class="btn btn-hot btn-big" type="button" data-act="again">Play again</button>
+      </div>
+    </section>`;
+  }
+
+  /* ---------- Flow ---------- */
+  function startGame() {
+    S.players = editor.get();
+    if (teamsMode()) {
+      if (S.players.length < 4) return;
+      const [a, b] = split(S.players);
+      S.teams = [Object.assign({ members: a }, TEAMS[0]), Object.assign({ members: b }, TEAMS[1])];
+      S.scores = [0, 0];
+      S.turn = Math.random() < 0.5 ? 0 : 1;
+      S.psy = [0, 0];
+    } else {
+      S.total = 0; S.played = 0; S.psyIdx = 0;
+    }
+    sfx.unlock();
+    P.stayAwake();
+    newTurn();
+  }
+  function newTurn() {
+    let psychic, team = null;
+    if (teamsMode()) {
+      team = S.turn;
+      const m = S.teams[team].members;
+      psychic = m[S.psy[team] % m.length];
+    } else psychic = S.players[S.psyIdx % S.players.length];
+    S.T = { card: deck.one(), colors: P.pick(COLORS), target: 3 + Math.random() * 94, needle: 50, clue: '', psychic, team, peeked: false, open: false, guess: null, points: 0, bonus: 0 };
+    S.screen = 'handoff';
+    render();
+  }
+  function lockIn() {
+    const T = S.T, d = Math.abs(T.needle - T.target);
+    T.points = d <= 2.25 ? 4 : d <= 6.75 ? 3 : d <= 11.25 ? 2 : 0;
+    sfx.tone(300, { type: 'square', dur: 0.08, gain: 0.06 });
+    if (teamsMode()) S.screen = 'counter';
+    else { applyScore(); S.screen = 'reveal'; }
+    render();
+  }
+  function counter(dir) {
+    const T = S.T;
+    T.guess = dir;
+    T.bonus = (dir === 'left' && T.target < T.needle) || (dir === 'right' && T.target > T.needle) ? 1 : 0;
+    applyScore();
+    S.screen = 'reveal';
+    render();
+  }
+  function applyScore() {
+    const T = S.T;
+    if (teamsMode()) { S.scores[T.team] += T.points; S.scores[1 - T.team] += T.bonus; }
+    else { S.total += T.points; S.played++; }
+  }
+  function next() {
+    if (teamsMode()) {
+      S.psy[S.turn]++;
+      if (isOver()) { S.screen = 'final'; render(); celebrate(); return; }
+      S.turn = 1 - S.turn;
+    } else {
+      S.psyIdx++;
+      if (S.played >= S.settings.cards) { S.screen = 'final'; render(); celebrate(); return; }
+    }
+    newTurn();
+  }
+  function celebrate() {
+    sfx.win();
+    P.confetti({ colors: ['#ef476f', '#f78c6b', '#ffd166', '#fdf6e9', '#c4a7ff'] });
+  }
+  function playReveal() {
+    const cover = app.querySelector('.cover');
+    const out = document.getElementById('outcome');
+    const slow = !P.reducedMotion();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (cover) cover.classList.add('open');
+      if (slow) sfx.tone(160, { type: 'triangle', to: 760, dur: 0.95, gain: 0.07, glide: 0.95 });
+      setTimeout(() => {
+        if (out) out.classList.add('show');
+        const p = S.T.points;
+        if (p === 4) { sfx.win(); P.confetti({ colors: ['#ef476f', '#f78c6b', '#ffd166', '#fdf6e9'], count: 120 }); }
+        else if (p > 0) sfx.ding();
+        else sfx.buzz(0.55);
+      }, slow ? 1050 : 0);
+    }));
+  }
+
+  const VIEWS = { setup: viewSetup, handoff: viewHandoff, peek: viewPeek, guess: viewGuess, counter: viewCounter, reveal: viewReveal, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') {
+      editor = P.playerEditor(document.getElementById('players'), { min: 2, max: 16, onChange: paintTeams });
+      paintTeams();
+    }
+    if (S.screen === 'guess') bindDial();
+    if (S.screen === 'reveal') playReveal();
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  /* ---------- Events ---------- */
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    const T = S.T;
+    switch (b.getAttribute('data-act')) {
+      case 'start': startGame(); break;
+      case 'shuffle':
+        if (editor) { S.mix = P.shuffle(editor.get().map((_, i) => i)); paintTeams(); sfx.whoosh(); }
+        break;
+      case 'psychic': S.screen = 'peek'; render(); break;
+      case 'peek': {
+        T.open = !T.open;
+        T.peeked = true;
+        const c = app.querySelector('.cover');
+        if (c) c.classList.toggle('open', T.open);
+        b.textContent = T.open ? 'Hide the target' : 'Show the target';
+        document.getElementById('handBtn').disabled = false;
+        sfx.whoosh();
+        break;
+      }
+      case 'newcard': {
+        const clue = document.getElementById('clue');
+        if (clue) T.clue = clue.value.trim();
+        T.card = deck.one([T.card]);
+        T.colors = P.pick(COLORS);
+        render();
+        break;
+      }
+      case 'handover': {
+        const clue = document.getElementById('clue');
+        T.clue = clue ? clue.value.trim().slice(0, 40) : '';
+        T.open = false;
+        S.screen = 'guess';
+        render();
+        break;
+      }
+      case 'nudge': if (bindDial.set) bindDial.set(T.needle + Number(b.getAttribute('data-d'))); break;
+      case 'lock': lockIn(); break;
+      case 'lr': counter(b.getAttribute('data-v')); break;
+      case 'next': next(); break;
+      case 'again':
+        if (teamsMode()) { S.scores = [0, 0]; S.turn = 1 - S.turn; }
+        else { S.total = 0; S.played = 0; }
+        newTurn();
+        break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'mode') { S.settings.mode = t.value; persist(); render(); }
+    else if (t.name === 'goal' || t.name === 'cards') { S.settings[t.name] = Number(t.value); persist(); }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.id === 'clue') { e.preventDefault(); const h = document.getElementById('handBtn'); if (h && !h.disabled) h.click(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

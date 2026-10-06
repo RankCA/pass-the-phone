@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Short Fuse | Pass the Phone</title>
+<meta name="description" content="Say a word that fits, then hand off the bomb. Whoever is holding it when it blows loses a life.">
+<meta name="theme-color" content="#ffd400">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&display=swap">
+<style>
+/* Layout: a comic page. Panels with heavy ink borders and offset shadows; the bomb owns the middle of the screen. */
+:root{
+  color-scheme:light;
+  --sun:#ffd400;
+  --ink:#131016;
+  --paper:#fffdf5;
+  --red:#ff3b2f;
+  --orange:#ff8a1f;
+  --blue:#2f6bff;
+  --heart:#ff3b5c;
+  --muted:#4a4250;
+  --f-comic:"Bangers","Impact","Arial Black",sans-serif;
+  --f-body:"Comic Neue","Comic Sans MS","Trebuchet MS",sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--sun)}
+body{margin:0;min-height:100vh;color:var(--ink);font-family:var(--f-body);font-size:18px;line-height:1.45;-webkit-font-smoothing:antialiased;
+  background-color:var(--sun);background-image:radial-gradient(rgba(19,16,22,.13) 2px,transparent 2.6px);background-size:16px 16px}
+body.flash::after{content:"";position:fixed;inset:0;z-index:60;background:#fff;animation:flash .35s ease-out forwards;pointer-events:none}
+@keyframes flash{from{opacity:1}to{opacity:0}}
+button{font:inherit;color:inherit}
+.wrap{max-width:720px;margin:0 auto;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.back{display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:6px 14px 6px 10px;border:3px solid var(--ink);border-radius:999px;background:var(--paper);color:var(--ink);text-decoration:none;font-weight:700;font-size:16px;box-shadow:3px 3px 0 var(--ink)}
+.back svg{width:16px;height:16px}
+.ptp-sound{display:grid;place-items:center;width:46px;height:46px;border:3px solid var(--ink);border-radius:50%;background:var(--paper);color:var(--ink);cursor:pointer;box-shadow:3px 3px 0 var(--ink)}
+.ptp-sound svg{width:22px;height:22px}
+:is(.back,.ptp-sound,.btn,.pp-add,.pp-remove,.who-btn,.howto summary):focus-visible{outline:4px solid var(--blue);outline-offset:3px}
+
+.title{margin:22px 0 0;font-family:var(--f-comic);font-weight:400;font-size:clamp(66px,17vw,132px);line-height:.88;letter-spacing:.02em;color:var(--red);-webkit-text-stroke:3px var(--ink);text-shadow:6px 6px 0 var(--ink);transform:rotate(-3deg);transform-origin:left}
+.tagline{margin:18px 0 0;font-size:20px;font-weight:700}
+.panel{margin-top:24px;padding:18px;border:4px solid var(--ink);border-radius:8px;background:var(--paper);box-shadow:8px 8px 0 var(--ink)}
+.label{display:block;margin:0 0 8px;font-family:var(--f-comic);font-size:26px;letter-spacing:.04em;line-height:1}
+.sec+.sec{margin-top:20px}
+.hint{margin:6px 0 0;font-size:16px;color:var(--muted)}
+
+.pp-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.pp-row{display:flex;align-items:center;gap:8px}
+.pp-num{display:grid;place-items:center;flex:none;width:32px;height:32px;border:3px solid var(--ink);border-radius:50%;background:var(--sun);font-family:var(--f-comic);font-size:18px}
+.pp-input{flex:1;min-width:0;height:48px;padding:0 12px;border:3px solid var(--ink);border-radius:6px;background:#fff;color:var(--ink);font:700 19px/1 var(--f-body)}
+.pp-input::placeholder{color:#8d8592;font-weight:400}
+.pp-input:focus{outline:none;box-shadow:4px 4px 0 var(--blue)}
+.pp-remove{display:grid;place-items:center;flex:none;width:44px;height:44px;border:3px solid var(--ink);border-radius:50%;background:#fff;color:var(--ink);cursor:pointer}
+.pp-remove:disabled{opacity:.3;cursor:default}
+.pp-add{margin-top:10px;min-height:46px;padding:6px 16px;border:3px dashed var(--ink);border-radius:8px;background:transparent;font-family:var(--f-comic);font-size:22px;letter-spacing:.04em;cursor:pointer}
+.pp-add:disabled{opacity:.35;cursor:default}
+.pp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.seg{display:flex;flex-wrap:wrap;gap:8px}
+.seg label{position:relative;cursor:pointer}
+.seg input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+.seg span{display:grid;place-items:center;min-height:46px;padding:4px 16px;border:3px solid var(--ink);border-radius:6px;background:#fff;font-family:var(--f-comic);font-size:22px;letter-spacing:.03em;box-shadow:3px 3px 0 var(--ink)}
+.seg input:checked+span{background:var(--red);color:#fff;-webkit-text-stroke:1px var(--ink)}
+.seg input:focus-visible+span{outline:4px solid var(--blue);outline-offset:2px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:56px;padding:6px 26px;border:4px solid var(--ink);border-radius:8px;cursor:pointer;font-family:var(--f-comic);font-weight:400;font-size:28px;letter-spacing:.05em;box-shadow:5px 5px 0 var(--ink);touch-action:manipulation;transition:transform .06s ease,box-shadow .06s ease}
+.btn:active{transform:translate(3px,3px);box-shadow:2px 2px 0 var(--ink)}
+.btn-red{background:var(--red);color:#fff;-webkit-text-stroke:1.2px var(--ink)}
+.btn-white{background:#fff;color:var(--ink)}
+.btn-big{min-height:72px;padding-inline:36px;font-size:36px}
+.btn:disabled{opacity:.4;cursor:default;transform:none}
+.actions{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:22px}
+.actions.center{justify-content:center}
+.textbtn{background:none;border:0;padding:8px;font-weight:700;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+
+.center{text-align:center}
+.caption{display:inline-block;margin:26px 0 0;padding:4px 14px;border:3px solid var(--ink);background:var(--paper);font-family:var(--f-comic);font-size:22px;letter-spacing:.06em;box-shadow:4px 4px 0 var(--ink);transform:rotate(-2deg)}
+.big{margin:16px 0 0;font-family:var(--f-comic);font-weight:400;font-size:clamp(44px,11vw,80px);line-height:.95;letter-spacing:.02em;text-wrap:balance;overflow-wrap:anywhere}
+.lead{margin:12px auto 0;max-width:30em;font-size:19px;font-weight:700;text-wrap:pretty}
+
+.prompt{position:relative;margin:22px auto 0;max-width:560px;padding:16px 18px 18px;border:4px solid var(--ink);border-radius:10px;background:#fff;box-shadow:8px 8px 0 var(--ink);transform:rotate(-1.5deg)}
+.prompt small{display:block;font-weight:700;font-size:17px;color:var(--muted)}
+.prompt b{display:block;margin-top:4px;font-family:var(--f-comic);font-weight:400;font-size:clamp(40px,10vw,68px);line-height:1;letter-spacing:.03em;overflow-wrap:anywhere}
+.stage{display:grid;place-items:center;margin-top:10px}
+.bomb{width:min(78vw,330px);height:auto;transform-origin:50% 62%;animation:wobble .9s ease-in-out infinite}
+.bomb.hot{animation-duration:.42s}
+.bomb.critical{animation:shake .11s linear infinite}
+@keyframes wobble{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+@keyframes shake{0%{transform:translate(0,0) rotate(0)}25%{transform:translate(-4px,2px) rotate(-2deg)}50%{transform:translate(4px,-2px) rotate(2deg)}75%{transform:translate(-2px,-2px) rotate(-1deg)}100%{transform:translate(0,0)}}
+.fuse{stroke-dasharray:7 9;animation:burn .45s linear infinite}
+@keyframes burn{to{stroke-dashoffset:-16}}
+.spark{transform-box:fill-box;transform-origin:center;animation:spark .16s steps(2) infinite}
+@keyframes spark{0%{transform:scale(.75) rotate(0)}100%{transform:scale(1.15) rotate(28deg)}}
+
+.boom{display:grid;place-items:center;margin-top:8px}
+.boom svg{width:min(92vw,440px);height:auto;animation:pop .45s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes pop{from{transform:scale(.2) rotate(-25deg)}to{transform:scale(1) rotate(-6deg)}}
+.boom text{font-family:var(--f-comic);letter-spacing:.04em}
+
+.lives{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,190px),1fr));gap:10px;margin-top:22px;text-align:left}
+.life{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border:3px solid var(--ink);border-radius:8px;background:#fff;box-shadow:4px 4px 0 var(--ink);font-weight:700;font-size:18px;min-width:0}
+.life span{min-width:0;overflow-wrap:anywhere}
+.life.out{opacity:.45;text-decoration:line-through}
+.hearts{display:flex;gap:3px;flex:none}
+.hearts svg{width:20px;height:20px}
+.who-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:12px;margin-top:16px}
+.who-btn{min-height:64px;padding:8px 12px;border:4px solid var(--ink);border-radius:8px;background:#fff;font-family:var(--f-comic);font-size:28px;letter-spacing:.03em;cursor:pointer;box-shadow:5px 5px 0 var(--ink);overflow-wrap:anywhere;touch-action:manipulation}
+.who-btn:active{transform:translate(3px,3px);box-shadow:2px 2px 0 var(--ink)}
+.who-btn:hover{background:var(--sun)}
+.howto{margin-top:26px}
+.howto summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-family:var(--f-comic);font-size:28px;letter-spacing:.04em}
+.howto ol{margin:6px 0 0;padding-left:1.4em;display:grid;gap:8px;font-weight:700}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="prompts.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const DATA = window.FUSE_PROMPTS || { categories: ['Animals'], letters: ['ING'], starts: ['B'] };
+  const KEY = 'ptp.fuse';
+  const FUSES = { short: [8, 20], normal: [15, 40], long: [30, 65] };
+  const BACK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const app = document.getElementById('app');
+  const decks = {
+    categories: P.deck('fuse-cat', DATA.categories),
+    letters: P.deck('fuse-let', DATA.letters),
+    starts: P.deck('fuse-start', DATA.starts)
+  };
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ kind: 'mixed', fuse: 'normal', lives: 3 }, saved.settings || {}),
+    screen: 'setup', players: [], lives: [], round: 0, starter: 0, prompt: null,
+    fuseMs: 0, started: 0, holder: null, lastOut: null
+  };
+  let editor = null, timer = null, tock = false, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+
+  /* ---------- Art ---------- */
+  function heart(full) {
+    return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-5.2-8-11a4.6 4.6 0 0 1 8-3 4.6 4.6 0 0 1 8 3c0 5.8-8 11-8 11z" fill="${full ? 'var(--heart)' : '#fff'}" stroke="#131016" stroke-width="2.2" stroke-linejoin="round"/></svg>`;
+  }
+  function bombSVG() {
+    return `<svg class="bomb" id="bomb" viewBox="0 0 300 300" aria-hidden="true">
+      <path class="fuse-base" d="M152 64C160 30 206 52 232 28" fill="none" stroke="#131016" stroke-width="12" stroke-linecap="round"/>
+      <path class="fuse" d="M152 64C160 30 206 52 232 28" fill="none" stroke="#c99a5b" stroke-width="5" stroke-linecap="round"/>
+      <g transform="rotate(14 145 76)"><rect x="118" y="56" width="54" height="38" rx="7" fill="#3a3846" stroke="#131016" stroke-width="8"/></g>
+      <circle cx="140" cy="176" r="104" fill="#1d1b25" stroke="#131016" stroke-width="8"/>
+      <ellipse cx="102" cy="134" rx="26" ry="15" fill="#fff" opacity=".85" transform="rotate(-38 102 134)"/>
+      <ellipse cx="80" cy="170" rx="7" ry="5" fill="#fff" opacity=".5" transform="rotate(-38 80 170)"/>
+      <g class="spark">
+        <polygon points="234,2 241,19 259,13 248,28 264,38 245,40 244,59 233,45 219,55 223,37 205,31 222,24 218,7 231,18" fill="#ff8a1f" stroke="#131016" stroke-width="4" stroke-linejoin="round"/>
+        <circle cx="234" cy="30" r="8" fill="#fff36b"/>
+      </g>
+    </svg>`;
+  }
+  function burstSVG(label) {
+    const pts = [];
+    for (let i = 0; i < 28; i++) {
+      const a = (i / 28) * Math.PI * 2, r = i % 2 ? 112 : (i % 4 === 0 ? 156 : 142);
+      pts.push((160 + Math.cos(a) * r).toFixed(1) + ',' + (150 + Math.sin(a) * r * 0.82).toFixed(1));
+    }
+    const inner = pts.map(p => { const [x, y] = p.split(',').map(Number); return (160 + (x - 160) * 0.72).toFixed(1) + ',' + (150 + (y - 150) * 0.72).toFixed(1); });
+    return `<svg viewBox="0 0 320 300" role="img" aria-label="${esc(label)}">
+      <polygon points="${pts.join(' ')}" fill="#ff3b2f" stroke="#131016" stroke-width="7" stroke-linejoin="round"/>
+      <polygon points="${inner.join(' ')}" fill="#ffd400" stroke="#131016" stroke-width="5" stroke-linejoin="round"/>
+      <text x="162" y="174" text-anchor="middle" font-size="84" fill="#131016">${esc(label)}</text>
+      <text x="158" y="170" text-anchor="middle" font-size="84" fill="#fff" stroke="#131016" stroke-width="3">${esc(label)}</text>
+    </svg>`;
+  }
+
+  /* ---------- Views ---------- */
+  function header() { return `<header class="top"><a class="back" href="../">${BACK}All games</a>${P.soundToggle()}</header>`; }
+  function seg(name, opts) {
+    return `<div class="seg" role="radiogroup">${opts.map(([v, t]) => `<label><input type="radio" name="${name}" id="${name}-${v}" value="${v}"${String(S.settings[name]) === String(v) ? ' checked' : ''}><span>${t}</span></label>`).join('')}</div>`;
+  }
+  const scoring = () => S.settings.lives > 0;
+  const alive = () => S.players.map((_, i) => i).filter(i => !scoring() || S.lives[i] > 0);
+  function livesHTML() {
+    if (!scoring()) return '';
+    return `<div class="lives">${S.players.map((n, i) => `<div class="life${S.lives[i] > 0 ? '' : ' out'}"><span>${esc(n)}</span><span class="hearts" aria-label="${P.plural(S.lives[i], 'life', 'lives')} left">${Array.from({ length: S.settings.lives }, (_, k) => heart(k < S.lives[i])).join('')}</span></div>`).join('')}</div>`;
+  }
+
+  function viewSetup() {
+    return header() + `
+    <h1 class="title">Short Fuse</h1>
+    <p class="tagline">Say a word that fits, then pass the phone. Do not be the one holding it.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Prompts</span>${seg('kind', [['mixed', 'Mix it up'], ['categories', 'Categories'], ['letters', 'Letters inside'], ['starts', 'First letter']])}</div>
+      <div class="sec"><span class="label">Fuse</span>${seg('fuse', [['short', 'Short'], ['normal', 'Normal'], ['long', 'Long']])}
+        <p class="hint">The exact time is hidden. A normal fuse burns for 15 to 40 seconds.</p></div>
+      <div class="sec"><span class="label">Lives</span>${seg('lives', [[1, '1'], [2, '2'], [3, '3'], [0, 'No scoring']])}</div>
+      <div class="actions"><button class="btn btn-red btn-big" type="button" data-act="start">Let's go</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Light the fuse and read the prompt out loud.</li>
+        <li>Say a word that fits, then hand the phone to the next person. No repeats.</li>
+        <li>The fuse is secret. It might blow in ten seconds or in a minute.</li>
+        <li>Whoever is holding the phone when it explodes loses a life. Last player standing wins.</li>
+      </ol>
+    </details>`;
+  }
+  function viewReady() {
+    const s = S.players[S.starter];
+    return header() + `
+    <section class="center">
+      <span class="caption">Round ${S.round}</span>
+      <h2 class="big">${scoring() ? esc(s) + ' starts' : 'Ready?'}</h2>
+      <p class="lead">${scoring() ? 'Hold the phone, light the fuse, and say the first word.' : 'Whoever holds the phone lights the fuse and goes first.'} Pass it to the next person after every answer.</p>
+      <div class="actions center"><button class="btn btn-red btn-big" type="button" data-act="light">Light the fuse</button></div>
+      ${livesHTML()}
+      <div class="actions center"><button class="textbtn" type="button" data-act="setup">Change setup</button></div>
+    </section>`;
+  }
+  function viewLive() {
+    const p = S.prompt;
+    return `
+    <section class="center">
+      <div class="prompt"><small>${esc(p.label)}</small><b>${esc(p.text)}</b></div>
+      <div class="stage">${bombSVG()}</div>
+      <p class="lead">Answer, then pass it on.</p>
+      <div class="actions center"><button class="textbtn" type="button" data-act="stop">Stop this round</button></div>
+    </section>`;
+  }
+  function viewBoom() {
+    const p = S.prompt;
+    const options = alive();
+    return `
+    <section class="center">
+      <div class="boom">${burstSVG('BOOM!')}</div>
+      <p class="lead">The prompt was ${esc(p.text)}.</p>
+      ${scoring() ? `<h2 class="big">Who was holding it?</h2>
+        <div class="who-grid">${options.map(i => `<button class="who-btn" type="button" data-act="holder" data-i="${i}">${esc(S.players[i])}</button>`).join('')}</div>
+        <div class="actions center"><button class="textbtn" type="button" data-act="holder" data-i="-1">Not sure. Skip it</button></div>`
+        : `<div class="actions center"><button class="btn btn-red btn-big" type="button" data-act="again">Next round</button></div>`}
+    </section>`;
+  }
+  function viewOut() {
+    const n = S.players[S.holder];
+    const isOut = S.lives[S.holder] <= 0;
+    return header() + `
+    <section class="center">
+      <span class="caption">${isOut ? 'Knocked out' : 'Ouch'}</span>
+      <h2 class="big">${isOut ? esc(n) + ' is out' : esc(n) + ' loses a life'}</h2>
+      <p class="lead">${isOut ? 'Better luck next game.' : esc(n) + ' starts the next round.'}</p>
+      ${livesHTML()}
+      <div class="actions center"><button class="btn btn-red btn-big" type="button" data-act="again">Next round</button></div>
+    </section>`;
+  }
+  function viewWin() {
+    const w = alive()[0];
+    return header() + `
+    <section class="center">
+      <span class="caption">Last one standing</span>
+      <h2 class="big">${esc(S.players[w])} wins</h2>
+      <p class="lead">Nerves of steel. Everybody else went boom.</p>
+      ${livesHTML()}
+      <div class="actions center">
+        <button class="btn btn-white" type="button" data-act="setup">Change setup</button>
+        <button class="btn btn-red btn-big" type="button" data-act="rematch">Play again</button>
+      </div>
+    </section>`;
+  }
+
+  /* ---------- Flow ---------- */
+  function drawPrompt() {
+    let kind = S.settings.kind;
+    if (kind === 'mixed') { const r = Math.random(); kind = r < 0.55 ? 'categories' : r < 0.8 ? 'letters' : 'starts'; }
+    const text = decks[kind].one();
+    const label = kind === 'categories' ? 'Name one of these' : kind === 'letters' ? 'Say a word that has these letters in it' : 'Say a word that starts with';
+    return { kind, text, label };
+  }
+  function startGame() {
+    S.players = editor.get();
+    S.lives = S.players.map(() => S.settings.lives);
+    S.round = 1;
+    S.starter = Math.floor(Math.random() * S.players.length);
+    sfx.unlock();
+    P.stayAwake();
+    S.screen = 'ready';
+    render();
+  }
+  function light() {
+    const [lo, hi] = FUSES[S.settings.fuse] || FUSES.normal;
+    S.fuseMs = (lo + Math.random() * (hi - lo)) * 1000;
+    S.started = performance.now();
+    S.prompt = drawPrompt();
+    S.screen = 'live';
+    render();
+    sfx.noise({ filter: 'highpass', freq: 2500, dur: 0.6, gain: 0.12 });
+    clearTimeout(timer);
+    timer = setTimeout(burn, 250);
+  }
+  function burn() {
+    if (S.screen !== 'live') return;
+    const el = performance.now() - S.started, p = el / S.fuseMs;
+    if (p >= 1) { explode(); return; }
+    tock = !tock;
+    sfx.tick(tock ? 1500 : 1100);
+    const bomb = document.getElementById('bomb');
+    if (bomb) {
+      bomb.classList.toggle('hot', p > 0.6 && p <= 0.85);
+      bomb.classList.toggle('critical', p > 0.85);
+    }
+    const gap = p > 0.85 ? 160 : p > 0.6 ? 290 : 470;
+    timer = setTimeout(burn, Math.max(30, Math.min(gap, S.fuseMs - el)));
+  }
+  function explode() {
+    clearTimeout(timer);
+    S.screen = 'boom';
+    render();
+    sfx.boom();
+    P.vibrate([500, 120, 300]);
+    document.body.classList.add('flash');
+    setTimeout(() => document.body.classList.remove('flash'), 400);
+  }
+  function holder(i) {
+    if (i < 0) { nextRound(S.starter); return; }
+    S.holder = i;
+    S.lives[i] = Math.max(0, S.lives[i] - 1);
+    if (alive().length <= 1) { S.screen = 'win'; render(); sfx.win(); P.confetti({ colors: ['#ff3b2f', '#ffd400', '#2f6bff', '#ffffff', '#131016'] }); return; }
+    S.screen = 'out';
+    render();
+    if (S.lives[i] <= 0) sfx.lose();
+  }
+  function nextRound(from) {
+    S.round++;
+    const list = alive();
+    if (scoring()) {
+      let s = from;
+      for (let k = 0; k < S.players.length && !list.includes(s); k++) s = (s + 1) % S.players.length;
+      S.starter = list.includes(s) ? s : list[0];
+    }
+    S.screen = 'ready';
+    render();
+  }
+
+  const VIEWS = { setup: viewSetup, ready: viewReady, live: viewLive, boom: viewBoom, out: viewOut, win: viewWin };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 2, max: 12 });
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': startGame(); break;
+      case 'light': light(); break;
+      case 'stop': clearTimeout(timer); S.screen = 'ready'; render(); break;
+      case 'holder': holder(Number(b.getAttribute('data-i'))); break;
+      case 'again': nextRound(S.holder != null ? S.holder : S.starter); break;
+      case 'rematch':
+        S.lives = S.players.map(() => S.settings.lives);
+        S.round = 0;
+        S.holder = null;
+        nextRound(Math.floor(Math.random() * S.players.length));
+        break;
+      case 'setup': clearTimeout(timer); S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'kind' || t.name === 'fuse') { S.settings[t.name] = t.value; persist(); }
+    else if (t.name === 'lives') { S.settings.lives = Number(t.value); persist(); }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && S.screen === 'live') { clearTimeout(timer); burn(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
