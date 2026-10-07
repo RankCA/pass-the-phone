@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Spectral:wght@400;600;700&display=swap">
-<link rel="stylesheet" href="../shared/base.css?v=81627d75">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
 <style>
 /* Layout: a moonlit village. Night screens are mostly sky so nothing glows in a dark room; day brings the sun up over the same trees. */
 :root{
@@ -65,12 +65,12 @@ body.day .trees{fill:#2f4a3b}
 .result-card p{margin:0;font-size:22px}
 .cast{list-style:none;margin:22px auto 0;padding:0;max-width:520px;display:grid;gap:6px;text-align:left}
 .cast li{display:flex;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:12px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);font-weight:700}
-.cast li.dead span:first-child{text-decoration:line-through;opacity:.6}
+.cast li.dead span:first-child{text-decoration:line-through;color:var(--muted)}
 .cast li .wolfname{color:var(--wolf)}
 body.day .cast li .wolfname{color:#a32424}
 .alive-row{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:20px}
 .alive-row span{padding:4px 12px;border-radius:999px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);font-weight:700}
-.alive-row span.dead{opacity:.45;text-decoration:line-through}
+.alive-row span.dead{background:transparent;color:var(--muted);text-decoration:line-through}
 </style>
 </head>
 <body>

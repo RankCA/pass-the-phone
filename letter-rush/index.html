@@ -11,14 +11,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;800&display=swap">
-<link rel="stylesheet" href="../shared/base.css?v=81627d75">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
 <style>
 /* Layout: a game table. Green felt, one big wooden letter tile, and the category list on a lined score pad. */
 :root{
   color-scheme:dark;
   --bg:#1d6a47;
   --fg:#f4fbf6;
-  --muted:#bfe3cf;
+  --muted:#e2f3e9;
   --panel:rgba(5,38,24,.3);
   --line:rgba(244,251,246,.34);
   --field:#fffdf6;
@@ -33,7 +33,7 @@
   --f-display:"Alfa Slab One",Rockwell,Georgia,serif;
   --f-body:"Source Sans 3",system-ui,-apple-system,sans-serif;
 }
-body{background-color:#1d6a47;background-image:radial-gradient(ellipse 90% 60% at 50% 30%,rgba(255,255,255,.1),transparent 70%),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-attachment:fixed}
+body{background-color:#1d6a47;background-image:radial-gradient(ellipse 90% 60% at 50% 30%,rgba(255,255,255,.05),transparent 70%),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-attachment:fixed}
 .title{letter-spacing:.01em;text-shadow:0 5px 0 rgba(5,38,24,.45)}
 .tile{position:relative;display:grid;place-items:center;width:clamp(120px,34vw,190px);aspect-ratio:1;margin:18px auto 0;border-radius:18px;background:linear-gradient(145deg,#f7d89a,#e9b864 60%,#d49d43);color:#3a2408;font-family:var(--f-display);font-size:clamp(72px,22vw,120px);line-height:1;box-shadow:inset 0 -8px 0 rgba(0,0,0,.14),inset 0 3px 0 rgba(255,255,255,.5),0 16px 26px -12px rgba(0,0,0,.6)}
 .tile small{position:absolute;right:12px;bottom:8px;font-family:var(--f-display);font-size:20px}

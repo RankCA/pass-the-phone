@@ -18,7 +18,7 @@
   --violet:#5b21d6;
   --violet-deep:#2b0d73;
   --white:#ffffff;
-  --mist:#ddd0ff;
+  --mist:#f1ecff;
   --ink:#170a3a;
   --lime:#c6ff3d;
   --good:#16c172;
@@ -30,7 +30,7 @@
 [hidden]{display:none!important}
 html{background:var(--violet-deep)}
 body{margin:0;min-height:100vh;color:var(--white);font-family:var(--f-body);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased;
-  background:radial-gradient(circle at 15% 0%,rgba(167,139,250,.55),transparent 45%),radial-gradient(circle at 100% 100%,rgba(236,72,153,.45),transparent 50%),linear-gradient(160deg,var(--violet),var(--violet-deep));background-attachment:fixed}
+  background:radial-gradient(circle at 15% 0%,rgba(167,139,250,.3),transparent 45%),radial-gradient(circle at 100% 100%,rgba(236,72,153,.45),transparent 50%),linear-gradient(160deg,var(--violet),var(--violet-deep));background-attachment:fixed}
 body.playing{overflow:hidden;overscroll-behavior:none}
 button{font:inherit;color:inherit}
 .wrap{max-width:760px;margin:0 auto;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
@@ -50,7 +50,7 @@ button{font:inherit;color:inherit}
 .deck input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
 .deck span{display:flex;flex-direction:column;justify-content:space-between;gap:10px;min-height:96px;padding:12px 14px;border-radius:20px;background:var(--c);color:var(--ink);transform:rotate(var(--r,0deg));transition:transform .15s ease,box-shadow .15s ease;box-shadow:0 8px 0 rgba(23,10,58,.35)}
 .deck b{font-family:var(--f-display);font-weight:400;font-size:22px;line-height:1.05}
-.deck small{font-weight:800;font-size:13px;opacity:.7}
+.deck small{font-weight:800;font-size:14px;opacity:.9}
 .deck input:checked+span{transform:rotate(0) translateY(-4px);box-shadow:0 0 0 4px var(--white),0 12px 0 rgba(23,10,58,.4)}
 .deck input:focus-visible+span{outline:3px solid var(--lime);outline-offset:6px}
 .seg{display:flex;flex-wrap:wrap;gap:8px}
@@ -103,10 +103,10 @@ button{font:inherit;color:inherit}
 .bar i{display:block;height:100%;width:100%;background:rgba(255,255,255,.85);transform-origin:left}
 .count{font-family:var(--f-display);font-size:clamp(120px,40vmin,320px);line-height:1;animation:in .35s cubic-bezier(.2,1.5,.4,1)}
 .flash{position:absolute;inset:0;z-index:3;display:grid;place-items:center;font-family:var(--f-display);font-size:clamp(56px,16vmin,160px);color:var(--white);pointer-events:none;opacity:0}
-.flash.good{background:var(--good);animation:fl .7s ease forwards}
-.flash.skip{background:var(--skip);animation:fl .7s ease forwards}
+.flash.good{background:#15803d;animation:fl .7s ease forwards}
+.flash.skip{background:#c2410c;animation:fl .7s ease forwards}
 @keyframes fl{0%{opacity:0}12%{opacity:1}80%{opacity:1}100%{opacity:0}}
-.mode{position:absolute;top:max(14px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right));z-index:2;font-weight:800;font-size:13px;letter-spacing:.08em;text-transform:uppercase;opacity:.75;pointer-events:none}
+.mode{position:absolute;top:max(14px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right));z-index:2;font-weight:800;font-size:14px;letter-spacing:.08em;text-transform:uppercase;pointer-events:none}
 
 .score-big{font-family:var(--f-display);font-size:clamp(90px,26vw,170px);line-height:1;color:var(--lime)}
 .results{list-style:none;margin:22px auto 0;padding:0;max-width:520px;display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
@@ -141,7 +141,7 @@ button{font:inherit;color:inherit}
   RAW.forEach(d => d.words.forEach(w => { if (!all.includes(w)) all.push(w); }));
   const DECKS = RAW.concat([{ id: 'mix', name: 'Mix of everything', color: '#ffb3e6', words: all }]);
   const KEY = 'ptp.forehead';
-  const BG = ['#7c3aed', '#db2777', '#0ea5e9', '#f97316', '#16a34a', '#e11d48', '#9333ea', '#0891b2'];
+  const BG = ['#7c3aed', '#db2777', '#0369a1', '#c2410c', '#15803d', '#e11d48', '#9333ea', '#0e7490'];
   const BACK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const app = document.getElementById('app');
 

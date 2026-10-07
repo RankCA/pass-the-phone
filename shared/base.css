@@ -1,11 +1,12 @@
 /* Pass the Phone base styles for the newer games.
-   Each game sets these tokens on :root and adds its own look on top. */
+   Each game sets these tokens on :root and adds its own look on top.
+   --panel-ink and --btn2-ink are optional. Where they are not set, text falls back
+   to --fg at the element itself, so a game can change --fg mid-game and they follow. */
 :root{
   --bg:#141414;
   --fg:#ffffff;
   --muted:rgba(255,255,255,.72);
   --panel:rgba(255,255,255,.08);
-  --panel-ink:var(--fg);
   --line:rgba(255,255,255,.28);
   --field:#ffffff;
   --field-ink:#141414;
@@ -13,8 +14,7 @@
   --accent-ink:#141414;
   --accent-shadow:rgba(0,0,0,.35);
   --btn2:transparent;
-  --btn2-ink:var(--fg);
-  --danger:#ff4d4d;
+  --danger:#d61f2c;
   --focus:#ffd23f;
   --radius:18px;
   --btn-radius:999px;
@@ -37,7 +37,7 @@ button{font:inherit;color:inherit}
 
 .title{margin:24px 0 0;font-family:var(--f-display);font-weight:400;font-size:clamp(52px,13vw,104px);line-height:.95;text-wrap:balance}
 .tagline{margin:12px 0 0;font-size:19px;color:var(--muted);text-wrap:pretty}
-.panel{margin-top:22px;padding:18px;border-radius:var(--radius);background:var(--panel);color:var(--panel-ink)}
+.panel{margin-top:22px;padding:18px;border-radius:var(--radius);background:var(--panel);color:var(--panel-ink,var(--fg))}
 .label{display:block;margin:0 0 10px;font-family:var(--f-display);font-size:20px;line-height:1.15}
 .sec+.sec{margin-top:22px}
 .hint{margin:6px 0 0;font-size:15px;opacity:.82}
@@ -51,7 +51,7 @@ button{font:inherit;color:inherit}
 .pp-remove{display:grid;place-items:center;flex:none;width:42px;height:42px;border:0;border-radius:50%;background:transparent;box-shadow:inset 0 0 0 2px var(--line);cursor:pointer}
 .pp-remove:disabled{opacity:.3;cursor:default}
 .pp-add{margin-top:10px;min-height:44px;padding:6px 18px;border:2px dashed var(--line);border-radius:999px;background:transparent;font-weight:700;cursor:pointer}
-.pp-add:disabled{opacity:.35;cursor:default}
+.pp-add:disabled{opacity:.5;cursor:default}
 .pp-sr,.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 .seg{display:flex;flex-wrap:wrap;gap:8px}
@@ -67,6 +67,7 @@ button{font:inherit;color:inherit}
 .opt-box b{display:block;font-family:var(--f-display);font-weight:400;font-size:21px;line-height:1.15}
 .opt-box small{display:block;margin-top:3px;font-size:15px;line-height:1.35;opacity:.82}
 .opt input:checked+.opt-box{background:var(--accent);color:var(--accent-ink);box-shadow:none}
+.opt input:checked+.opt-box small{opacity:1}
 .opt input:focus-visible+.opt-box{outline:3px solid var(--focus);outline-offset:2px}
 .check{display:flex;align-items:center;gap:10px;font-weight:700;cursor:pointer}
 .check input{width:22px;height:22px;flex:none;accent-color:var(--accent)}
@@ -74,12 +75,12 @@ button{font:inherit;color:inherit}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:54px;padding:8px 26px;border:0;border-radius:var(--btn-radius);cursor:pointer;font-family:var(--f-display);font-weight:400;font-size:21px;line-height:1.1;text-decoration:none;touch-action:manipulation;transition:transform .08s ease}
 .btn:active{transform:translateY(2px)}
 .btn-main{background:var(--accent);color:var(--accent-ink);box-shadow:0 5px 0 var(--accent-shadow)}
-.btn-alt{background:var(--btn2);color:var(--btn2-ink);box-shadow:inset 0 0 0 2px var(--line)}
+.btn-alt{background:var(--btn2);color:var(--btn2-ink,var(--fg));box-shadow:inset 0 0 0 2px var(--line)}
 .btn-big{min-height:62px;padding-inline:32px;font-size:24px}
-.btn:disabled{opacity:.4;cursor:default;transform:none}
+.btn:disabled{opacity:.55;cursor:default;transform:none}
 .actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:22px}
 .actions.center{justify-content:center}
-.textbtn{background:none;border:0;padding:8px;color:inherit;opacity:.85;text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:15px}
+.textbtn{background:none;border:0;padding:8px;color:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:15px}
 
 .center{text-align:center}
 .eyebrow{margin:28px 0 0;font-weight:800;font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
@@ -94,16 +95,16 @@ button{font:inherit;color:inherit}
 .err{min-height:1.4em;margin:6px 0 0;font-weight:700}
 
 .scores{list-style:none;margin:18px auto 0;padding:0;display:grid;gap:6px;max-width:440px;text-align:left}
-.scores li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 14px;border-radius:12px;background:var(--panel);color:var(--panel-ink);font-weight:700}
+.scores li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 14px;border-radius:12px;background:var(--panel);color:var(--panel-ink,var(--fg));font-weight:700}
 .scores li span{min-width:0;overflow-wrap:anywhere}
 .scores b{font-family:var(--f-display);font-weight:400;font-size:22px;font-variant-numeric:tabular-nums}
 .scores li.top{box-shadow:inset 0 0 0 3px var(--accent)}
 .pick{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px;margin-top:18px}
-.pick button{min-height:60px;padding:10px 12px;border:0;border-radius:calc(var(--radius) - 2px);background:var(--panel);color:var(--panel-ink);font-weight:800;font-size:19px;cursor:pointer;overflow-wrap:anywhere;touch-action:manipulation;box-shadow:inset 0 0 0 2px var(--line)}
+.pick button{min-height:60px;padding:10px 12px;border:0;border-radius:calc(var(--radius) - 2px);background:var(--panel);color:var(--panel-ink,var(--fg));font-weight:800;font-size:19px;cursor:pointer;overflow-wrap:anywhere;touch-action:manipulation;box-shadow:inset 0 0 0 2px var(--line)}
 .pick button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);box-shadow:none}
-.pick button:disabled{opacity:.35;cursor:default}
-.timer{display:inline-block;margin-top:18px;padding:4px 22px;border-radius:14px;background:var(--panel);color:var(--panel-ink);font-family:var(--f-display);font-size:clamp(46px,12vw,76px);line-height:1.1;font-variant-numeric:tabular-nums}
-.timer.low{color:var(--danger)}
+.pick button:disabled{opacity:.5;cursor:default}
+.timer{display:inline-block;margin-top:18px;padding:4px 22px;border-radius:14px;background:var(--panel);color:var(--panel-ink,var(--fg));font-family:var(--f-display);font-size:clamp(46px,12vw,76px);line-height:1.1;font-variant-numeric:tabular-nums}
+.timer.low{background:#fff;color:var(--danger)}
 .howto{margin-top:26px;color:var(--muted)}
 .howto summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-family:var(--f-display);font-size:21px;color:var(--fg)}
 .howto ol{margin:4px 0 0;padding-left:1.3em;display:grid;gap:8px}
