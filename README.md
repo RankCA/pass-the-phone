@@ -47,12 +47,20 @@ Then open http://localhost:8802.
 
 In the repository settings, open Pages, set the source to "Deploy from a branch", pick `main` and the `/ (root)` folder, and save. The site appears at `https://<user>.github.io/pass-the-phone/` after a minute.
 
+GitHub Pages lets browsers keep each file for 10 minutes. After you change any `.js` or `.css` file, run this before you push:
+
+```bash
+python3 tools/stamp.py
+```
+
+It adds a version tag to every script and stylesheet link, so a phone never mixes a new page with an old copy of a shared file.
+
 ## Layout
 
 - `index.html` is the home page with the game grid, the filters and the shared player list.
 - `shared/party.js` holds helpers every game uses: storage, the player list, sounds, timers, hold-to-reveal cards, spoken narration, answer matching, the screen wake lock and confetti.
 - `shared/base.css` is the base stylesheet for the newer games. Each game sets its own colors and fonts on top.
 - Each game lives in its own folder with an `index.html` and, where it needs one, a data file of questions, words or prompts.
-- `tools/make_icons.py` redraws the app icons. `tools/serve.py` is a local server with caching turned off.
+- `tools/make_icons.py` redraws the app icons. `tools/serve.py` is a local server with caching turned off. `tools/stamp.py` adds version tags to script and stylesheet links.
 
 To add questions or words, edit the data file in that game's folder. Each file explains its format at the top.
