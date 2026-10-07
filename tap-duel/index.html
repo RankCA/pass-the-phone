@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tap Duel | Pass the Phone</title>
+<meta name="description" content="Two players, one phone flat between you. Quick draw, tug of war, color clash and snap. First to the target wins.">
+<meta name="theme-color" content="#08070d">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Press+Start+2P&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: an arcade cabinet split down the middle. Each player owns half the glass; the top half is turned around for the player across the table. */
+:root{
+  color-scheme:dark;
+  --bg:#08070d;
+  --fg:#f4f2ff;
+  --muted:#a9a4c8;
+  --panel:rgba(255,255,255,.06);
+  --line:rgba(244,242,255,.26);
+  --field:#f4f2ff;
+  --field-ink:#08070d;
+  --p1:#00e5ff;
+  --p2:#ff2bd6;
+  --accent:#00e5ff;
+  --accent-ink:#04121a;
+  --accent-shadow:#007b8c;
+  --focus:#ffe14d;
+  --f-display:"Press Start 2P","Courier New",monospace;
+  --f-body:"Chakra Petch",system-ui,sans-serif;
+}
+body{background:radial-gradient(circle at 20% 10%,rgba(0,229,255,.12),transparent 40%),radial-gradient(circle at 80% 90%,rgba(255,43,214,.12),transparent 40%),var(--bg);background-attachment:fixed}
+.title{font-size:clamp(34px,9vw,64px);line-height:1.15;text-shadow:3px 3px 0 var(--p2),-3px -3px 0 var(--p1)}
+.btn{font-size:16px;letter-spacing:.02em}
+.btn-big{font-size:18px}
+.names{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.names label{display:grid;gap:6px;font-weight:700}
+.names input{min-width:0;height:50px;padding:0 14px;border:0;border-radius:12px;background:var(--field);color:var(--field-ink);font:700 18px/1 var(--f-body)}
+.names label:first-child input{box-shadow:inset 0 0 0 3px var(--p1)}
+.names label:last-child input{box-shadow:inset 0 0 0 3px var(--p2)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:44px;padding:6px 14px;border:0;border-radius:999px;background:var(--panel);color:var(--fg);box-shadow:inset 0 0 0 2px var(--line);font-weight:700;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--p1);color:var(--accent-ink);box-shadow:none}
+.games{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:10px;margin-top:6px}
+.game{padding:12px 14px;border-radius:14px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line)}
+.game b{display:block;font-family:var(--f-display);font-size:12px;line-height:1.5;color:var(--p1)}
+.game span{font-size:15px;color:var(--muted)}
+
+.arena{position:fixed;inset:0;z-index:30;display:grid;grid-template-rows:1fr auto 1fr;background:#08070d;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.half{position:relative;display:grid;place-items:center;overflow:hidden;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background-color .15s ease}
+.half.p1{--c:var(--p1);background:rgba(0,229,255,.08)}
+.half.p2{--c:var(--p2);background:rgba(255,43,214,.08)}
+.half-in{display:grid;justify-items:center;gap:10px;width:100%;padding:16px;text-align:center}
+.half.p2 .half-in{transform:rotate(180deg)}
+.who{font-family:var(--f-display);font-size:clamp(11px,3vw,15px);color:var(--c);letter-spacing:.04em;overflow-wrap:anywhere}
+.score{display:flex;gap:6px}
+.score i{width:14px;height:14px;border-radius:3px;box-shadow:inset 0 0 0 2px var(--c)}
+.score i.on{background:var(--c);box-shadow:0 0 12px var(--c)}
+.msg{font-family:var(--f-display);font-size:clamp(14px,4.4vw,24px);line-height:1.5;color:var(--fg);text-wrap:balance}
+.msg.big{font-size:clamp(26px,9vw,54px)}
+.msg small{display:block;margin-top:6px;font-family:var(--f-body);font-size:16px;line-height:1.35;color:var(--muted)}
+.half.go{background:var(--c)}
+.half.go .msg,.half.go .who{color:#08070d}
+.half.win{background:var(--c)}
+.half.win .msg,.half.win .who,.half.win .msg small{color:#08070d}
+.half.win .score i{box-shadow:inset 0 0 0 2px #08070d}
+.half.win .score i.on{background:#08070d;box-shadow:none}
+.half.lose{opacity:.45}
+.mid{position:relative;height:56px;display:grid;place-items:center;border-top:2px solid rgba(244,242,255,.2);border-bottom:2px solid rgba(244,242,255,.2)}
+.mid .round{font-family:var(--f-display);font-size:11px;color:var(--muted)}
+.rope{position:absolute;left:8%;right:8%;top:50%;height:6px;margin-top:-3px;border-radius:3px;background:repeating-linear-gradient(90deg,#c9a46a 0 10px,#9d7a44 10px 20px)}
+.knot{position:absolute;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:#ffe14d;box-shadow:0 0 18px #ffe14d;transition:left .08s linear}
+.mark{position:absolute;top:50%;width:4px;height:40px;margin-top:-20px;border-radius:2px}
+.shape{width:clamp(80px,26vw,140px);height:auto}
+.quit{position:absolute;top:50%;right:10px;z-index:2;transform:translateY(-50%);min-height:40px;padding:4px 12px;border:0;border-radius:999px;background:rgba(244,242,255,.12);color:var(--fg);font:700 13px var(--f-body);cursor:pointer}
+.final{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.duel';
+  const GAMES = {
+    draw: { name: 'Quick Draw', rule: 'Wait for the flash, then tap first. Tap too soon and you lose.' },
+    tug: { name: 'Tug of War', rule: 'Tap as fast as you can to pull the knot to your side.' },
+    clash: { name: 'Color Clash', rule: 'Tap when the word matches its color. A wrong tap loses.' },
+    snap: { name: 'Snap', rule: 'Tap when a shape is the same as the one before it.' }
+  };
+  const COLORS = { RED: '#ff3b4f', BLUE: '#3b8bff', GREEN: '#2fe38a', YELLOW: '#ffe14d' };
+  const SHAPES = ['circle', 'square', 'triangle', 'star'];
+  const SHAPE_COLORS = ['#ff3b4f', '#3b8bff', '#2fe38a', '#ffe14d'];
+  const app = document.getElementById('app');
+
+  const roster = P.getRoster();
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ target: 3, games: Object.keys(GAMES) }, saved.settings || {}),
+    names: [roster[0] || 'Player 1', roster[1] || 'Player 2'],
+    screen: 'setup', score: [0, 0], round: 0, queue: [], game: null, phase: 'intro', ready: [false, false], data: {}
+  };
+  S.settings.games = (S.settings.games || []).filter(g => GAMES[g]);
+  if (!S.settings.games.length) S.settings.games = Object.keys(GAMES);
+  let timers = [];
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  function later(fn, ms) { const t = setTimeout(fn, ms); timers.push(t); return t; }
+  function every(fn, ms) { const t = setInterval(fn, ms); timers.push(t); return t; }
+  function clearAll() { timers.forEach(t => { clearTimeout(t); clearInterval(t); }); timers = []; }
+
+  /* ---------- Setup ---------- */
+  function viewSetup() {
+    const st = S.settings;
+    return P.header() + `
+    <h1 class="title">Tap Duel</h1>
+    <p class="tagline">Two players, one phone lying flat between you. Each of you owns half the screen.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span>
+        <div class="names"><label>Near side<input id="n0" type="text" maxlength="14" value="${esc(S.names[0])}" autocomplete="off"></label><label>Far side<input id="n1" type="text" maxlength="14" value="${esc(S.names[1])}" autocomplete="off"></label></div></div>
+      <div class="sec"><span class="label">First to</span>${P.seg('target', [[3, '3'], [5, '5'], [7, '7']], st.target)}</div>
+      <div class="sec"><span class="label">Games</span>
+        <div class="chips">${Object.keys(GAMES).map(g => `<button type="button" class="chip" data-game="${g}" aria-pressed="${st.games.includes(g)}">${GAMES[g].name}</button>`).join('')}</div>
+        <div class="games">${Object.keys(GAMES).map(g => `<div class="game"><b>${GAMES[g].name}</b><span>${GAMES[g].rule}</span></div>`).join('')}</div>
+      </div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Fight</button></div>
+      <p class="hint">On a computer, the near player presses A and the far player presses L.</p>
+    </div>`;
+  }
+
+  /* ---------- Arena ---------- */
+  function arenaHTML() {
+    const half = p => `<div class="half p${p + 1}" data-p="${p}" id="h${p}"><div class="half-in"><div class="who">${esc(S.names[p])}</div><div class="score">${Array.from({ length: S.settings.target }, (_, k) => `<i class="${k < S.score[p] ? 'on' : ''}"></i>`).join('')}</div><div class="msg" id="m${p}"></div></div></div>`;
+    return `<div class="arena" id="arena">${half(1)}<div class="mid" id="mid"><span class="round" id="round"></span><button class="quit" type="button" data-act="quit">Quit</button></div>${half(0)}</div>`;
+  }
+  function setMsg(p, html, big) { const m = document.getElementById('m' + p); if (m) { m.innerHTML = html; m.classList.toggle('big', !!big); } }
+  function both(html, big) { setMsg(0, html, big); setMsg(1, html, big); }
+  function halfClass(p, cls) { const h = document.getElementById('h' + p); if (h) { h.classList.remove('go', 'win', 'lose'); if (cls) h.classList.add(cls); } }
+  function paintScore() {
+    [0, 1].forEach(p => {
+      const dots = document.querySelectorAll('#h' + p + ' .score i');
+      dots.forEach((d, k) => d.classList.toggle('on', k < S.score[p]));
+    });
+  }
+  function shapeSVG(s) {
+    const c = SHAPE_COLORS[s.c];
+    const shapes = {
+      circle: `<circle cx="50" cy="50" r="38" fill="${c}"/>`,
+      square: `<rect x="14" y="14" width="72" height="72" rx="8" fill="${c}"/>`,
+      triangle: `<path d="M50 10L90 86H10z" fill="${c}"/>`,
+      star: `<path d="M50 6l12 30 32 2-25 20 9 32-28-18-28 18 9-32-25-20 32-2z" fill="${c}"/>`
+    };
+    return `<svg class="shape" viewBox="0 0 100 100" aria-hidden="true">${shapes[s.s]}</svg>`;
+  }
+
+  function startMatch() {
+    S.names = [P.cleanName(document.getElementById('n0').value) || 'Player 1', P.cleanName(document.getElementById('n1').value) || 'Player 2'];
+    if (S.names[0] === S.names[1]) S.names[1] += ' 2';
+    S.score = [0, 0];
+    S.round = 0;
+    S.queue = [];
+    sfx.unlock();
+    P.stayAwake();
+    S.screen = 'arena';
+    document.body.style.overflow = 'hidden';
+    app.innerHTML = arenaHTML();
+    nextRound();
+  }
+  function nextRound() {
+    clearAll();
+    if (!S.queue.length) S.queue = P.shuffle(S.settings.games.slice());
+    S.game = S.queue.shift();
+    S.round++;
+    S.phase = 'intro';
+    S.ready = [false, false];
+    S.data = {};
+    halfClass(0); halfClass(1);
+    const mid = document.getElementById('mid');
+    mid.querySelectorAll('.rope,.knot,.mark').forEach(n => n.remove());
+    document.getElementById('round').textContent = 'Round ' + S.round;
+    both(`${GAMES[S.game].name}<small>${GAMES[S.game].rule}<br>Tap your side when you are ready.</small>`);
+  }
+  function countIn() {
+    S.phase = 'count';
+    let n = 3;
+    both(String(n), true);
+    sfx.beep(false);
+    const t = every(() => {
+      n--;
+      if (n > 0) { both(String(n), true); sfx.beep(false); }
+      else { clearInterval(t); sfx.beep(true); begin(); }
+    }, 700);
+  }
+  function begin() {
+    S.phase = 'live';
+    const g = S.game;
+    if (g === 'draw') {
+      S.data.go = false;
+      both('Wait for it', true);
+      later(() => { S.data.go = true; halfClass(0, 'go'); halfClass(1, 'go'); both('TAP!', true); sfx.tone(1200, { type: 'square', dur: 0.15, gain: 0.1 }); }, 1500 + Math.random() * 3800);
+    } else if (g === 'tug') {
+      S.data.pos = 0;
+      const mid = document.getElementById('mid');
+      mid.insertAdjacentHTML('beforeend', '<div class="rope"></div><div class="mark" style="left:8%;background:var(--p2)"></div><div class="mark" style="left:92%;background:var(--p1)"></div><div class="knot" id="knot" style="left:50%"></div>');
+      both('PULL!', true);
+      later(() => { if (S.phase !== 'live') return; const p = S.data.pos; if (p === 0) drawRound('Dead even'); else win(p > 0 ? 0 : 1, 'Time'); }, 15000);
+    } else if (g === 'clash') {
+      let since = 0;
+      const flip = () => {
+        const words = Object.keys(COLORS);
+        const word = P.pick(words);
+        const match = since >= 5 || Math.random() < 0.3;
+        const color = match ? word : P.pick(words.filter(w => w !== word));
+        S.data.match = match;
+        since = match ? 0 : since + 1;
+        both(`<span style="color:${COLORS[color]}">${word}</span>`, true);
+      };
+      flip();
+      every(() => { if (S.phase === 'live') flip(); }, 1100);
+    } else if (g === 'snap') {
+      let prev = null, since = 0;
+      const next = () => {
+        let cur;
+        if (prev && (since >= 5 || Math.random() < 0.28)) cur = prev;
+        else { do { cur = { s: P.pick(SHAPES), c: Math.floor(Math.random() * 4) }; } while (prev && cur.s === prev.s && cur.c === prev.c); }
+        S.data.match = !!prev && cur.s === prev.s && cur.c === prev.c;
+        since = S.data.match ? 0 : since + 1;
+        prev = cur;
+        both(shapeSVG(cur));
+      };
+      next();
+      every(() => { if (S.phase === 'live') next(); }, 1050);
+    }
+  }
+  function tap(p) {
+    if (S.screen !== 'arena') return;
+    if (S.phase === 'intro') {
+      if (S.ready[p]) return;
+      S.ready[p] = true;
+      setMsg(p, 'Ready!', true);
+      sfx.pop();
+      if (S.ready[0] && S.ready[1]) countIn();
+      return;
+    }
+    if (S.phase !== 'live') return;
+    const g = S.game;
+    if (g === 'draw') {
+      if (S.data.go) win(p, 'Fastest finger');
+      else win(1 - p, 'Too soon', p);
+    } else if (g === 'tug') {
+      S.data.pos += p === 0 ? 0.07 : -0.07;
+      const k = document.getElementById('knot');
+      if (k) k.style.left = (50 + S.data.pos * 42).toFixed(1) + '%';
+      sfx.tick(p === 0 ? 900 : 700);
+      if (S.data.pos >= 1) win(0, 'Pulled it');
+      else if (S.data.pos <= -1) win(1, 'Pulled it');
+    } else if (S.data.match) win(p, 'Snap');
+    else win(1 - p, 'Wrong tap', p);
+  }
+  function drawRound(note) {
+    S.phase = 'result';
+    clearAll();
+    both(note + '<small>Nobody scores. Next round.</small>');
+    sfx.buzz(0.4);
+    later(nextRound, 1800);
+  }
+  function win(p, note, culprit) {
+    S.phase = 'result';
+    clearAll();
+    S.score[p]++;
+    paintScore();
+    halfClass(p, 'win');
+    halfClass(1 - p, 'lose');
+    setMsg(p, 'Point!<small>' + note + '</small>', true);
+    setMsg(1 - p, culprit === 1 - p ? note + '<small>Point to ' + esc(S.names[p]) + '</small>' : 'Too slow<small>Point to ' + esc(S.names[p]) + '</small>');
+    if (culprit != null) sfx.buzz(0.4); else sfx.ding();
+    P.vibrate(60);
+    if (S.score[p] >= S.settings.target) later(() => finish(p), 1500);
+    else later(nextRound, 1900);
+  }
+  function finish(p) {
+    S.phase = 'over';
+    clearAll();
+    halfClass(p, 'win');
+    halfClass(1 - p, 'lose');
+    const buttons = '<div class="final"><button class="btn btn-main" type="button" data-act="rematch">Rematch</button><button class="btn btn-alt" type="button" data-act="quit">Done</button></div>';
+    setMsg(p, 'You win!<small>' + S.score[0 === p ? 0 : 1] + ' to ' + S.score[1 - p] + '</small>' + buttons, true);
+    setMsg(1 - p, esc(S.names[p]) + ' wins<small>' + S.score[p] + ' to ' + S.score[1 - p] + '</small>' + buttons);
+    sfx.win();
+    P.confetti({ colors: ['#00e5ff', '#ff2bd6', '#ffe14d', '#ffffff'] });
+  }
+  function quit() {
+    clearAll();
+    S.screen = 'setup';
+    document.body.style.overflow = '';
+    render();
+  }
+
+  function render() { app.innerHTML = viewSetup(); }
+
+  document.addEventListener('pointerdown', e => {
+    const h = e.target.closest && e.target.closest('.half');
+    if (!h || e.target.closest('button')) return;
+    e.preventDefault();
+    tap(Number(h.getAttribute('data-p')));
+  });
+  document.addEventListener('keydown', e => {
+    if (S.screen !== 'arena' || e.repeat) return;
+    if (e.key === 'a' || e.key === 'A') tap(0);
+    else if (e.key === 'l' || e.key === 'L') tap(1);
+  });
+  document.addEventListener('click', e => {
+    const g = e.target.closest('[data-game]');
+    if (g) {
+      const id = g.getAttribute('data-game'), on = S.settings.games.includes(id);
+      if (on && S.settings.games.length === 1) return;
+      S.settings.games = on ? S.settings.games.filter(x => x !== id) : S.settings.games.concat(id);
+      g.setAttribute('aria-pressed', String(!on));
+      persist();
+      return;
+    }
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': startMatch(); break;
+      case 'rematch': S.score = [0, 0]; S.round = 0; app.innerHTML = arenaHTML(); nextRound(); break;
+      case 'quit': quit(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.name === 'target') { S.settings.target = Number(e.target.value); persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

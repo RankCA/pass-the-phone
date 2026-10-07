@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fishbowl | Pass the Phone</title>
+<meta name="description" content="Everyone fills the bowl with names. Three rounds with the same slips: describe them, then one word, then act them out.">
+<meta name="theme-color" content="#0b8fb0">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mulish:wght@400;700;800&family=Sniglet:wght@400;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: inside an aquarium. Bubbles drift up the background, slips float like folded paper, the goldfish orange marks every action. */
+:root{
+  color-scheme:dark;
+  --bg:#0b8fb0;
+  --fg:#f2fdff;
+  --muted:#c4eef7;
+  --panel:rgba(3,48,64,.32);
+  --line:rgba(242,253,255,.38);
+  --field:#f2fdff;
+  --field-ink:#05364a;
+  --accent:#ffa94d;
+  --accent-ink:#3a1a00;
+  --accent-shadow:#b8620c;
+  --kelp:#3ddc97;
+  --coral:#ff6f91;
+  --focus:#ffe066;
+  --f-display:"Sniglet","Arial Rounded MT Bold",sans-serif;
+  --f-body:"Mulish",system-ui,-apple-system,sans-serif;
+}
+body{background:linear-gradient(180deg,#14b3d4 0%,#0b8fb0 35%,#06556d 100%);background-attachment:fixed}
+.bubbles{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.bubbles i{position:absolute;bottom:-40px;border-radius:50%;background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.55),rgba(255,255,255,.08) 60%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);animation:rise linear infinite}
+@keyframes rise{to{transform:translateY(-115vh) translateX(20px)}}
+.title{font-weight:800;text-shadow:0 5px 0 rgba(3,48,64,.35)}
+.bowl{display:block;width:min(52vw,220px);height:auto;margin:14px 0 0}
+.teams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.team{min-width:0;padding:12px 14px;border-radius:18px;background:var(--panel);box-shadow:inset 0 0 0 3px var(--c)}
+.team h3{margin:0 0 6px;font-family:var(--f-display);font-weight:800;font-size:20px;color:var(--c)}
+.team ul{list-style:none;margin:0;padding:0;display:grid;gap:2px;font-weight:700;overflow-wrap:anywhere}
+.pill{display:inline-block;margin-top:22px;padding:6px 16px;border-radius:999px;background:var(--c);color:#05364a;font-family:var(--f-display);font-weight:800;font-size:18px}
+.slips{display:grid;gap:10px;max-width:460px;margin:18px auto 0;text-align:left}
+.slips input{width:100%;min-height:54px;padding:12px 16px;border:0;border-radius:14px;background:var(--field);color:var(--field-ink);font:700 20px/1.2 var(--f-body)}
+.slips input:focus{outline:3px solid var(--focus);outline-offset:1px}
+.slip{position:relative;margin:22px auto 0;max-width:480px;padding:34px 22px;border-radius:6px;background:#fffdf4;color:#05364a;font-family:var(--f-display);font-weight:800;font-size:clamp(32px,8.5vw,54px);line-height:1.08;text-align:center;overflow-wrap:anywhere;box-shadow:0 18px 30px -14px rgba(3,30,40,.7);transform:rotate(-1.5deg);animation:float .35s cubic-bezier(.2,1.4,.4,1)}
+.slip::after{content:"";position:absolute;right:0;top:0;width:34px;height:34px;background:linear-gradient(225deg,#0b8fb0 50%,#e3dccb 50%);border-bottom-left-radius:6px}
+@keyframes float{from{transform:translateY(16px) rotate(4deg);opacity:0}}
+.round-rule{margin:18px auto 0;max-width:460px;padding:16px 18px;border-radius:20px;background:var(--panel);box-shadow:inset 0 0 0 2px var(--line);font-size:19px}
+.round-rule b{display:block;font-family:var(--f-display);font-weight:800;font-size:26px;color:var(--accent)}
+.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:480px;margin:22px auto 0}
+.controls button{min-height:80px;border:0;border-radius:22px;font-family:var(--f-display);font-weight:800;font-size:24px;cursor:pointer;touch-action:manipulation}
+.controls button:active{transform:translateY(3px)}
+.c-skip{background:var(--panel);color:var(--fg);box-shadow:inset 0 0 0 2px var(--line)}
+.c-got{background:var(--accent);color:var(--accent-ink);box-shadow:0 5px 0 var(--accent-shadow)}
+.runbar{display:flex;justify-content:space-between;align-items:center;gap:12px;max-width:480px;margin:16px auto 0}
+.runbar .timer{margin:0;font-size:clamp(34px,9vw,52px);padding:2px 18px}
+.runbar span{font-family:var(--f-display);font-weight:800;font-size:19px}
+.board{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:20px}
+.board span{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 16px;border-radius:999px;background:var(--panel);box-shadow:inset 0 0 0 3px var(--c);font-family:var(--f-display);font-weight:800}
+.board b{min-width:42px;padding:3px 10px;border-radius:999px;background:var(--c);color:#05364a;text-align:center}
+.got-list{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:16px auto 0;max-width:520px;padding:0;list-style:none}
+.got-list li{padding:5px 12px;border-radius:999px;background:#fffdf4;color:#05364a;font-weight:800}
+</style>
+</head>
+<body>
+<div class="bubbles" aria-hidden="true" id="bubbles"></div>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="ideas.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const IDEAS = window.FISH_IDEAS || ['Santa Claus'];
+  const KEY = 'ptp.fishbowl';
+  const TEAMS = [{ name: 'Goldfish', color: 'var(--accent)' }, { name: 'Seaweed', color: 'var(--kelp)' }];
+  const RULES = [
+    ['Describe it', 'Say anything you like except the name on the slip.'],
+    ['One word', 'You get to say exactly one word for each slip. Choose it well.'],
+    ['Act it out', 'No words and no sounds. Act it out, like charades.']
+  ];
+  const app = document.getElementById('app');
+
+  (function bubbles() {
+    const box = document.getElementById('bubbles');
+    let html = '';
+    for (let i = 0; i < 16; i++) {
+      const s = 8 + Math.random() * 26;
+      html += '<i style="left:' + (Math.random() * 100).toFixed(1) + '%;width:' + s.toFixed(0) + 'px;height:' + s.toFixed(0) + 'px;animation-duration:' + (9 + Math.random() * 12).toFixed(1) + 's;animation-delay:-' + (Math.random() * 18).toFixed(1) + 's"></i>';
+    }
+    box.innerHTML = html;
+  })();
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ slips: 3, time: 45 }, saved.settings || {}),
+    screen: 'setup', players: [], mix: null, teams: null, scores: [0, 0],
+    fill: 0, slips: [], round: 0, bowl: [], current: null, turnNo: 0, first: 0, giver: [0, 0], turnGot: [], lastLeft: 0
+  };
+  let editor = null, timer = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const team = () => (S.first + S.turnNo) % 2;
+  const giverName = t => { const m = S.teams[t].members; return m[S.giver[t] % m.length]; };
+  function split(names) {
+    if (!S.mix || S.mix.length !== names.length) S.mix = names.map((_, i) => i);
+    return P.splitTeams(names, S.mix);
+  }
+  const boardHTML = () => `<div class="board">${TEAMS.map((t, i) => `<span style="--c:${t.color}">${t.name}<b>${S.scores[i]}</b></span>`).join('')}</div>`;
+  const BOWL = '<svg class="bowl" viewBox="0 0 120 100" aria-hidden="true"><path d="M30 14h60v8c18 8 26 24 22 42-4 20-24 32-52 32S12 84 8 64C4 46 12 30 30 22z" fill="rgba(242,253,255,.25)" stroke="#f2fdff" stroke-width="4"/><path d="M14 56c14 6 78 6 92 0-2 20-20 34-46 34S16 76 14 56z" fill="#5fd4f0"/><path d="M50 62c8-8 20-8 26 0-6 8-18 8-26 0zM76 62l8-6v12z" fill="#ffa94d"/><circle cx="56" cy="61" r="2" fill="#05364a"/><rect x="34" y="40" width="22" height="12" rx="2" fill="#fffdf4" transform="rotate(-14 45 46)"/><rect x="62" y="36" width="22" height="12" rx="2" fill="#fffdf4" transform="rotate(12 73 42)"/></svg>';
+
+  /* ---------- Views ---------- */
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Fishbowl</h1>
+    ${BOWL}
+    <p class="tagline">Fill the bowl with names, then play three rounds with the same slips: describe, one word, act it out.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div><p class="hint" id="pnote"></p></div>
+      <div class="sec"><span class="label">Teams</span><div class="teams" id="teams"></div>
+        <div class="actions"><button class="btn btn-alt" type="button" data-act="shuffle">Shuffle teams</button></div></div>
+      <div class="sec"><span class="label">Slips per player</span>${P.seg('slips', [[3, '3'], [4, '4'], [5, '5']], S.settings.slips)}</div>
+      <div class="sec"><span class="label">Time per turn</span>${P.seg('time', [[30, '30 sec'], [45, '45 sec'], [60, '60 sec']], S.settings.time)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start" id="startBtn">Fill the bowl</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Pass the phone around. Everyone secretly writes names of people, characters or things that everyone knows.</li>
+        <li>Teams take turns. One player gives clues while their team guesses as many slips as they can before time runs out.</li>
+        <li>Round one: describe it. Round two: one word only. Round three: act it out. The slips stay the same, so you will remember them.</li>
+        <li>Each slip guessed is a point. Most points after round three wins.</li>
+      </ol>
+    </details>`;
+  }
+  function paintTeams() {
+    if (!editor) return;
+    const names = editor.get(), box = document.getElementById('teams');
+    const btn = document.getElementById('startBtn'), note = document.getElementById('pnote');
+    if (btn) btn.disabled = names.length < 4;
+    if (note) note.textContent = names.length < 4 ? 'Two teams need at least 4 players.' : '';
+    if (!box) return;
+    const [a, b] = split(names);
+    box.innerHTML = [a, b].map((list, i) => `<div class="team" style="--c:${TEAMS[i].color}"><h3>${TEAMS[i].name}</h3><ul>${list.map(n => `<li>${esc(n)}</li>`).join('') || '<li>Nobody yet</li>'}</ul></div>`).join('');
+  }
+  function viewFillPass() {
+    return P.header() + P.passScreen({ eyebrow: 'Slips ' + (S.fill + 1) + ' of ' + S.players.length, name: S.players[S.fill], lead: 'Write your slips where nobody else can see.' });
+  }
+  function viewWrite() {
+    const n = S.settings.slips;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(S.players[S.fill])}, write ${n} slips</p>
+      <h2 class="big">Into the bowl</h2>
+      <p class="lead">Famous people, characters, places or things. Pick ones everybody knows.</p>
+      <div class="slips">${Array.from({ length: n }, (_, i) => `<label class="sr" for="slip-${i}">Slip ${i + 1}</label><input id="slip-${i}" data-slip="${i}" type="text" maxlength="40" autocomplete="off" placeholder="Slip ${i + 1}">`).join('')}</div>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="idea">Give me an idea</button><button class="btn btn-main btn-big" type="button" data-act="drop" id="dropBtn" disabled>Drop them in</button></div>
+    </section>`;
+  }
+  function viewRound() {
+    const [title, text] = RULES[S.round];
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Round ${S.round + 1} of 3</p>
+      <h2 class="big">${title}</h2>
+      <div class="round-rule"><b>${title}</b>${text}</div>
+      <p class="lead">The bowl has ${P.plural(S.slips.length, 'slip')}. Keep going until it is empty.</p>
+      ${boardHTML()}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="round-go">Let's go</button></div>
+    </section>`;
+  }
+  function viewHandoff() {
+    const t = team(), g = giverName(t);
+    return P.header() + `
+    <section class="center">
+      <span class="pill" style="--c:${TEAMS[t].color}">${TEAMS[t].name} team, round ${S.round + 1}: ${RULES[S.round][0].toLowerCase()}</span>
+      <h2 class="big">${esc(g)} gives the clues</h2>
+      <p class="lead">${P.plural(S.bowl.length, 'slip')} left in the bowl. Give ${esc(g)} the phone.</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="go">Start the clock</button></div>
+      ${boardHTML()}
+    </section>`;
+  }
+  function viewPlay() {
+    return `
+    <section class="center">
+      <div class="runbar"><div class="timer" id="timer" role="timer">${P.clock(timer ? timer.left : S.settings.time * 1000)}</div><span>${RULES[S.round][0]}</span><span>${S.bowl.length} left</span></div>
+      <div class="slip" aria-live="polite">${esc(S.slips[S.current])}</div>
+      <div class="controls"><button class="c-skip" type="button" data-act="skip"${S.bowl.length < 2 ? ' disabled' : ''}>Skip</button><button class="c-got" type="button" data-act="got">Got it</button></div>
+    </section>`;
+  }
+  function viewTurnEnd() {
+    const t = team();
+    return P.header() + `
+    <section class="center">
+      <span class="pill" style="--c:${TEAMS[t].color}">${TEAMS[t].name} team</span>
+      <h2 class="big">${P.plural(S.turnGot.length, 'slip')} this turn</h2>
+      <ul class="got-list">${S.turnGot.map(i => `<li>${esc(S.slips[i])}</li>`).join('')}</ul>
+      ${boardHTML()}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="next-turn">Next team</button></div>
+    </section>`;
+  }
+  function viewRoundEnd() {
+    const last = S.round >= 2;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">The bowl is empty</p>
+      <h2 class="big">Round ${S.round + 1} done</h2>
+      <p class="lead">${S.turnGot.length ? 'The ' + TEAMS[team()].name + ' team grabbed ' + P.plural(S.turnGot.length, 'slip') + ' to finish it.' : ''}</p>
+      ${boardHTML()}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="next-round">${last ? 'See who won' : 'Refill the bowl for round ' + (S.round + 2)}</button></div>
+    </section>`;
+  }
+  function viewFinal() {
+    const [a, b] = S.scores;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Game over</p>
+      <h2 class="big">${a === b ? "It's a tie" : 'The ' + TEAMS[a > b ? 0 : 1].name + ' team wins'}</h2>
+      ${boardHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Same slips, new game</button></div>
+    </section>`;
+  }
+
+  /* ---------- Flow ---------- */
+  function start() {
+    S.players = editor.get();
+    if (S.players.length < 4) return;
+    const [a, b] = split(S.players);
+    S.teams = [{ members: a }, { members: b }];
+    S.slips = [];
+    S.fill = 0;
+    sfx.unlock();
+    P.stayAwake();
+    S.screen = 'fillPass';
+    render();
+  }
+  function newGame() {
+    S.scores = [0, 0];
+    S.round = 0;
+    S.turnNo = 0;
+    S.first = Math.random() < 0.5 ? 0 : 1;
+    S.giver = [0, 0];
+    S.bowl = S.slips.map((_, i) => i);
+    S.screen = 'round';
+    render();
+  }
+  function drawSlip() {
+    const options = S.bowl.filter(i => i !== S.current);
+    S.current = options.length ? P.pick(options) : S.bowl[0];
+  }
+  function go() {
+    S.turnGot = [];
+    S.current = null;
+    drawSlip();
+    S.screen = 'play';
+    if (timer) timer.stop();
+    timer = P.countdown(S.settings.time * 1000, {
+      tickLast: 5,
+      onTick: ms => { const el = document.getElementById('timer'); if (el) { el.textContent = P.clock(ms); el.classList.toggle('low', ms <= 10000); } },
+      onEnd: () => { sfx.buzz(1); P.vibrate([300, 100, 300]); S.screen = 'turnEnd'; render(); }
+    });
+    render();
+    timer.start();
+  }
+  function got() {
+    if (S.screen !== 'play') return;
+    S.bowl = S.bowl.filter(i => i !== S.current);
+    S.turnGot.push(S.current);
+    S.scores[team()]++;
+    sfx.ding();
+    P.vibrate(30);
+    if (!S.bowl.length) {
+      timer.stop();
+      S.screen = 'roundEnd';
+      render();
+      sfx.win();
+      return;
+    }
+    drawSlip();
+    render();
+  }
+  function skip() {
+    if (S.screen !== 'play' || S.bowl.length < 2) return;
+    sfx.whoosh();
+    drawSlip();
+    render();
+  }
+  function nextTurn() {
+    S.giver[team()]++;
+    S.turnNo++;
+    S.screen = 'handoff';
+    render();
+  }
+
+  const VIEWS = { setup: viewSetup, fillPass: viewFillPass, write: viewWrite, round: viewRound, handoff: viewHandoff, play: viewPlay, turnEnd: viewTurnEnd, roundEnd: viewRoundEnd, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') { editor = P.playerEditor(document.getElementById('players'), { min: 4, max: 16, onChange: paintTeams }); paintTeams(); }
+    if (S.screen === 'write') { const f = document.getElementById('slip-0'); if (f) f.focus(); }
+    if (S.screen !== shown || S.screen === 'fillPass') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+  function slipInputs() { return [...document.querySelectorAll('[data-slip]')]; }
+  function paintDrop() { const b = document.getElementById('dropBtn'); if (b) b.disabled = !slipInputs().every(i => i.value.trim()); }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': start(); break;
+      case 'shuffle': if (editor) { S.mix = P.shuffle(editor.get().map((_, i) => i)); paintTeams(); sfx.whoosh(); } break;
+      case 'me': S.screen = 'write'; render(); break;
+      case 'idea': {
+        const empty = slipInputs().find(i => !i.value.trim());
+        if (!empty) break;
+        const used = S.slips.map(s => s.toLowerCase()).concat(slipInputs().map(i => i.value.trim().toLowerCase()));
+        const fresh = IDEAS.filter(x => !used.includes(x.toLowerCase()));
+        empty.value = P.pick(fresh.length ? fresh : IDEAS);
+        paintDrop();
+        break;
+      }
+      case 'drop':
+        slipInputs().forEach(i => S.slips.push(i.value.trim().slice(0, 40)));
+        sfx.whoosh();
+        S.fill++;
+        if (S.fill < S.players.length) { S.screen = 'fillPass'; render(); }
+        else newGame();
+        break;
+      case 'round-go': S.screen = 'handoff'; render(); break;
+      case 'go': go(); break;
+      case 'got': got(); break;
+      case 'skip': skip(); break;
+      case 'next-turn': nextTurn(); break;
+      case 'next-round':
+        if (S.round >= 2) { S.screen = 'final'; render(); sfx.win(); P.confetti({ colors: ['#ffa94d', '#3ddc97', '#f2fdff', '#ff6f91'] }); break; }
+        S.round++;
+        S.giver[team()]++;
+        S.turnNo++;
+        S.bowl = S.slips.map((_, i) => i);
+        S.screen = 'round';
+        render();
+        break;
+      case 'again': newGame(); break;
+      case 'setup': if (timer) timer.stop(); S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('input', e => { if (e.target.hasAttribute('data-slip')) paintDrop(); });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.hasAttribute && e.target.hasAttribute('data-slip')) {
+      e.preventDefault();
+      const next = document.getElementById('slip-' + (Number(e.target.getAttribute('data-slip')) + 1));
+      if (next) next.focus(); else { const d = document.getElementById('dropBtn'); if (d && !d.disabled) d.click(); }
+    }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.name === 'slips' || e.target.name === 'time') { S.settings[e.target.name] = Number(e.target.value); persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

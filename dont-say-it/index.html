@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Don't Say It | Pass the Phone</title>
+<meta name="description" content="Get your team to guess the word without saying any of the five banned words. A team game for one phone.">
+<meta name="theme-color" content="#c81d34">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: a warning sign. Stop-sign red everywhere, and the card is the only calm white thing on screen. */
+:root{
+  color-scheme:dark;
+  --bg:#b8182e;
+  --fg:#fff8f0;
+  --muted:#ffd6d6;
+  --panel:rgba(26,13,16,.22);
+  --line:rgba(255,248,240,.38);
+  --field:#fff8f0;
+  --field-ink:#1a0d10;
+  --accent:#fff8f0;
+  --accent-ink:#b8182e;
+  --accent-shadow:#6e0b1b;
+  --ink:#1a0d10;
+  --fire:#ffa62b;
+  --ice:#8fe3ff;
+  --focus:#fff36b;
+  --f-display:"Archivo Black","Arial Black",sans-serif;
+  --f-body:"Archivo",Arial,sans-serif;
+}
+body{background:repeating-linear-gradient(-45deg,rgba(0,0,0,.05) 0 22px,transparent 22px 44px),radial-gradient(ellipse at 50% 0%,#e3324a,#a01428 70%);background-attachment:fixed}
+.title{letter-spacing:-.01em}
+.title .no{display:inline-block;color:var(--ink);background:var(--fg);padding:0 .12em;border-radius:.1em;transform:rotate(-3deg)}
+.teams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.team{min-width:0;padding:12px 14px;border-radius:16px;background:var(--panel);box-shadow:inset 0 0 0 3px var(--c)}
+.team h3{margin:0 0 6px;font-family:var(--f-display);font-weight:400;font-size:19px;color:var(--c)}
+.team ul{list-style:none;margin:0;padding:0;display:grid;gap:2px;font-weight:700;overflow-wrap:anywhere}
+.pill{display:inline-block;margin-top:22px;padding:6px 16px;border-radius:999px;background:var(--c);color:var(--ink);font-family:var(--f-display);font-size:17px}
+.card{margin:18px auto 0;max-width:460px;border-radius:22px;background:#fff8f0;color:var(--ink);box-shadow:0 18px 32px -16px rgba(0,0,0,.6);overflow:hidden;animation:deal .25s cubic-bezier(.2,1.4,.4,1)}
+@keyframes deal{from{transform:translateY(10px) rotate(-2deg);opacity:0}}
+.card-word{padding:24px 18px 20px;font-family:var(--f-display);font-size:clamp(34px,9.5vw,58px);line-height:1.04;text-align:center;overflow-wrap:anywhere}
+.card-ban{list-style:none;margin:0;padding:12px 18px 18px;display:grid;gap:7px;background:var(--ink);color:#fff8f0}
+.card-ban small{display:block;margin-bottom:2px;font-weight:800;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:#ff8f9f}
+.card-ban li{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-size:clamp(19px,5vw,25px);letter-spacing:.01em;overflow-wrap:anywhere}
+.card-ban svg{width:22px;height:22px;flex:none}
+.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:520px;margin:20px auto 0}
+.controls button{min-height:76px;padding:8px;border:0;border-radius:18px;font-family:var(--f-display);font-size:clamp(17px,4.6vw,22px);cursor:pointer;touch-action:manipulation;transition:transform .08s ease}
+.controls button:active{transform:translateY(3px)}
+.c-skip{background:rgba(26,13,16,.3);color:var(--fg);box-shadow:inset 0 0 0 2px var(--line)}
+.c-buzz{background:var(--ink);color:#ff8f9f;box-shadow:0 5px 0 #000}
+.c-got{background:#fff8f0;color:var(--ink);box-shadow:0 5px 0 var(--accent-shadow)}
+.runbar{display:flex;justify-content:space-between;align-items:center;gap:12px;max-width:520px;margin:18px auto 0}
+.runbar .timer{margin:0;font-size:clamp(34px,9vw,52px);padding:2px 18px}
+.runbar .tally{font-family:var(--f-display);font-size:20px}
+.log{list-style:none;margin:20px auto 0;padding:0;max-width:520px;display:grid;gap:8px;text-align:left}
+.log button{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:52px;padding:8px 16px;border:0;border-radius:14px;background:var(--panel);color:var(--fg);font-weight:800;font-size:18px;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
+.log button span:first-child{min-width:0;overflow-wrap:anywhere;text-align:left}
+.tag{flex:none;padding:3px 10px;border-radius:999px;font-family:var(--f-display);font-weight:400;font-size:14px}
+.tag.got{background:#fff8f0;color:var(--ink)}
+.tag.skip{background:rgba(255,255,255,.2)}
+.tag.buzz{background:var(--ink);color:#ff8f9f}
+.board{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:20px}
+.board span{display:flex;align-items:center;gap:10px;padding:6px 6px 6px 16px;border-radius:999px;background:var(--panel);box-shadow:inset 0 0 0 3px var(--c);font-family:var(--f-display);font-size:17px}
+.board b{min-width:42px;padding:3px 10px;border-radius:999px;background:var(--c);color:var(--ink);font-weight:400;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="cards.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const CARDS = window.DSI_CARDS || [];
+  const KEY = 'ptp.dsi';
+  const TEAMS = [{ name: 'Fire', color: 'var(--fire)' }, { name: 'Ice', color: 'var(--ice)' }];
+  const NO = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="#ff4d63" stroke-width="3"/><path d="M6 6l12 12" stroke="#ff4d63" stroke-width="3"/></svg>';
+  const app = document.getElementById('app');
+  const deck = P.deck('dsi', CARDS, c => c[0]);
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ time: 60, turns: 4, skipCost: false }, saved.settings || {}),
+    screen: 'setup', players: [], mix: null, teams: null, scores: [0, 0], first: 0, turnNo: 0, giver: [0, 0],
+    card: null, log: []
+  };
+  let editor = null, timer = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const team = () => (S.first + S.turnNo) % 2;
+  const totalTurns = () => S.settings.turns * 2;
+  const giverName = t => { const m = S.teams[t].members; return m[S.giver[t] % m.length]; };
+  const value = kind => (kind === 'got' ? 1 : kind === 'buzz' ? -1 : S.settings.skipCost ? -1 : 0);
+  const turnPoints = () => S.log.reduce((s, l) => s + value(l.kind), 0);
+
+  function split(names) {
+    if (!S.mix || S.mix.length !== names.length) S.mix = names.map((_, i) => i);
+    return P.splitTeams(names, S.mix);
+  }
+  function boardHTML() {
+    return `<div class="board">${TEAMS.map((t, i) => `<span style="--c:${t.color}">Team ${t.name}<b>${S.scores[i]}</b></span>`).join('')}</div>`;
+  }
+
+  /* ---------- Views ---------- */
+  function viewSetup() {
+    const st = S.settings;
+    return P.header() + `
+    <h1 class="title">Don't <span class="no">Say</span> It</h1>
+    <p class="tagline">Describe the word to your team. Five obvious words are off limits.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div><p class="hint" id="pnote"></p></div>
+      <div class="sec"><span class="label">Teams</span><div class="teams" id="teams"></div>
+        <div class="actions"><button class="btn btn-alt" type="button" data-act="shuffle">Shuffle teams</button></div></div>
+      <div class="sec"><span class="label">Time per turn</span>${P.seg('time', [[45, '45 sec'], [60, '60 sec'], [90, '90 sec']], st.time)}</div>
+      <div class="sec"><span class="label">Turns per team</span>${P.seg('turns', [[3, '3'], [4, '4'], [5, '5'], [6, '6']], st.turns)}</div>
+      <div class="sec"><label class="check"><input type="checkbox" id="skipCost"${st.skipCost ? ' checked' : ''}> Skipping a card costs a point</label></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start" id="startBtn">Start</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Split into two teams. On your turn, one player holds the phone and describes the word on the card.</li>
+        <li>You cannot say the word itself or any of the five words underneath. No rhymes, no "sounds like", no spelling.</li>
+        <li>Someone from the other team watches the screen. If you slip, they shout and you tap Buzz. That costs a point.</li>
+        <li>Each card your team guesses is a point. Most points after the last turn wins.</li>
+      </ol>
+    </details>`;
+  }
+  function paintTeams() {
+    if (!editor) return;
+    const names = editor.get(), box = document.getElementById('teams');
+    const btn = document.getElementById('startBtn'), note = document.getElementById('pnote');
+    if (btn) btn.disabled = names.length < 4;
+    if (note) note.textContent = names.length < 4 ? 'Two teams need at least 4 players.' : '';
+    if (!box) return;
+    const [a, b] = split(names);
+    box.innerHTML = [a, b].map((list, i) => `<div class="team" style="--c:${TEAMS[i].color}"><h3>Team ${TEAMS[i].name}</h3><ul>${list.map(n => `<li>${esc(n)}</li>`).join('') || '<li>Nobody yet</li>'}</ul></div>`).join('');
+  }
+  function viewHandoff() {
+    const t = team(), other = 1 - t, g = giverName(t);
+    return P.header() + `
+    <section class="center">
+      <span class="pill" style="--c:${TEAMS[t].color}">Team ${TEAMS[t].name}, turn ${Math.floor(S.turnNo / 2) + 1} of ${S.settings.turns}</span>
+      <h2 class="big">${esc(g)} describes</h2>
+      <p class="lead">Give the phone to ${esc(g)}. Someone from Team ${TEAMS[other].name} stands behind them and watches for banned words.</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="go">Start the clock</button></div>
+      ${boardHTML()}
+    </section>`;
+  }
+  function cardHTML(c) {
+    return `<div class="card" aria-live="polite"><div class="card-word">${esc(c[0])}</div>
+      <ul class="card-ban"><li><small>Do not say</small></li>${c.slice(1).map(w => `<li>${NO}<span>${esc(w)}</span></li>`).join('')}</ul></div>`;
+  }
+  function viewPlay() {
+    const got = S.log.filter(l => l.kind === 'got').length;
+    return `
+    <section class="center">
+      <div class="runbar"><div class="timer" id="timer" role="timer">${P.clock(timer ? timer.left : S.settings.time * 1000)}</div><span class="tally">${P.plural(got, 'point')}</span></div>
+      ${cardHTML(S.card)}
+      <div class="controls">
+        <button class="c-skip" type="button" data-act="mark" data-k="skip">Skip</button>
+        <button class="c-buzz" type="button" data-act="mark" data-k="buzz">Buzz</button>
+        <button class="c-got" type="button" data-act="mark" data-k="got">Got it</button>
+      </div>
+    </section>`;
+  }
+  function viewTurnEnd() {
+    const t = team(), pts = turnPoints();
+    return P.header() + `
+    <section class="center">
+      <span class="pill" style="--c:${TEAMS[t].color}">Team ${TEAMS[t].name}</span>
+      <h2 class="big">${pts >= 0 ? '+' : ''}${pts} this turn</h2>
+      <p class="lead">Tap a card to fix it if something was marked wrong.</p>
+      <ul class="log">${S.log.map((l, i) => `<li><button type="button" data-act="fix" data-i="${i}"><span>${esc(l.word)}</span><span class="tag ${l.kind}">${l.kind === 'got' ? 'Got it' : l.kind === 'buzz' ? 'Buzzed' : 'Skipped'}</span></button></li>`).join('') || '<li class="lead">No cards this turn.</li>'}</ul>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="bank">${S.turnNo + 1 >= totalTurns() ? 'See who won' : 'Next team'}</button></div>
+    </section>`;
+  }
+  function viewFinal() {
+    const [a, b] = S.scores;
+    const head = a === b ? "It's a tie" : 'Team ' + TEAMS[a > b ? 0 : 1].name + ' wins';
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Game over</p>
+      <h2 class="big">${head}</h2>
+      ${boardHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  /* ---------- Flow ---------- */
+  function startGame() {
+    S.players = editor.get();
+    if (S.players.length < 4) return;
+    const [a, b] = split(S.players);
+    S.teams = [{ members: a }, { members: b }];
+    S.scores = [0, 0];
+    S.first = Math.random() < 0.5 ? 0 : 1;
+    S.turnNo = 0;
+    S.giver = [0, 0];
+    sfx.unlock();
+    P.stayAwake();
+    S.screen = 'handoff';
+    render();
+  }
+  function go() {
+    S.log = [];
+    S.card = deck.one();
+    S.screen = 'play';
+    if (timer) timer.stop();
+    timer = P.countdown(S.settings.time * 1000, {
+      tickLast: 5,
+      onTick: ms => { const el = document.getElementById('timer'); if (el) { el.textContent = P.clock(ms); el.classList.toggle('low', ms <= 10000); } },
+      onEnd: () => { sfx.buzz(1); P.vibrate([300, 100, 300]); S.screen = 'turnEnd'; render(); }
+    });
+    render();
+    timer.start();
+  }
+  function mark(kind) {
+    if (S.screen !== 'play') return;
+    S.log.push({ word: S.card[0], kind });
+    if (kind === 'got') sfx.ding(); else if (kind === 'buzz') sfx.buzz(0.5); else sfx.whoosh();
+    P.vibrate(kind === 'buzz' ? [80, 40, 80] : 30);
+    S.card = deck.one(S.log.map(l => [l.word]));
+    render();
+  }
+  function bank() {
+    const t = team();
+    S.scores[t] += turnPoints();
+    S.giver[t]++;
+    S.turnNo++;
+    if (S.turnNo >= totalTurns()) {
+      S.screen = 'final';
+      render();
+      if (S.scores[0] !== S.scores[1]) { sfx.win(); P.confetti({ colors: ['#fff8f0', '#ffa62b', '#8fe3ff', '#1a0d10'] }); }
+      return;
+    }
+    S.screen = 'handoff';
+    render();
+  }
+
+  const VIEWS = { setup: viewSetup, handoff: viewHandoff, play: viewPlay, turnEnd: viewTurnEnd, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') { editor = P.playerEditor(document.getElementById('players'), { min: 4, max: 16, onChange: paintTeams }); paintTeams(); }
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': startGame(); break;
+      case 'shuffle': if (editor) { S.mix = P.shuffle(editor.get().map((_, i) => i)); paintTeams(); sfx.whoosh(); } break;
+      case 'go': go(); break;
+      case 'mark': mark(b.getAttribute('data-k')); break;
+      case 'fix': {
+        const l = S.log[Number(b.getAttribute('data-i'))];
+        l.kind = l.kind === 'got' ? 'skip' : l.kind === 'skip' ? 'buzz' : 'got';
+        sfx.pop();
+        render();
+        break;
+      }
+      case 'bank': bank(); break;
+      case 'again': S.scores = [0, 0]; S.turnNo = 0; S.first = 1 - S.first; S.screen = 'handoff'; render(); break;
+      case 'setup': if (timer) timer.stop(); S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'time' || t.name === 'turns') { S.settings[t.name] = Number(t.value); persist(); }
+    else if (t.id === 'skipCost') { S.settings.skipCost = t.checked; persist(); }
+  });
+  document.addEventListener('keydown', e => {
+    if (S.screen !== 'play' || (e.target.closest && e.target.closest('button'))) return;
+    if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); mark('got'); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); mark('skip'); }
+    else if (e.key === 'b' || e.key === 'B') { e.preventDefault(); mark('buzz'); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

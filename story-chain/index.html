@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Story Chain | Pass the Phone</title>
+<meta name="description" content="Write a story one sentence at a time, seeing only the line before yours. Then read the whole thing out loud.">
+<meta name="theme-color" content="#4c3fb0">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,800;1,9..144,600&family=Nunito+Sans:wght@400;700;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: a bedtime storybook. Deep periwinkle night outside, bright book pages inside; every line keeps its author's name in the margin. */
+:root{
+  color-scheme:dark;
+  --bg:#4c3fb0;
+  --fg:#f6f3ff;
+  --muted:#d4ccff;
+  --panel:rgba(20,14,70,.28);
+  --line:rgba(246,243,255,.34);
+  --field:#ffffff;
+  --field-ink:#211a4d;
+  --accent:#ffcf6b;
+  --accent-ink:#2a1a00;
+  --accent-shadow:#b0801d;
+  --page:#fffdf8;
+  --page-ink:#211a4d;
+  --focus:#ffcf6b;
+  --f-display:"Fraunces",Georgia,serif;
+  --f-body:"Nunito Sans",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(circle at 15% 10%,rgba(255,207,107,.22),transparent 35%),radial-gradient(circle at 90% 90%,rgba(255,120,190,.2),transparent 40%),linear-gradient(170deg,#5a4bd0,#3b2f94);background-attachment:fixed}
+.title{font-weight:800;font-variation-settings:"opsz" 144;letter-spacing:-.02em}
+.title em{font-style:italic;font-weight:600;color:var(--accent)}
+.label,.big,.btn,.opt-box b{font-weight:800}
+.book{position:relative;margin:22px auto 0;max-width:600px;padding:26px 24px;border-radius:6px 18px 18px 6px;background:var(--page);color:var(--page-ink);box-shadow:-10px 0 0 -4px #e7e0ff,0 22px 40px -22px rgba(0,0,0,.7);text-align:left}
+.book::before{content:"";position:absolute;left:0;top:0;bottom:0;width:10px;border-radius:6px 0 0 6px;background:linear-gradient(90deg,rgba(33,26,77,.18),transparent)}
+.book small{display:block;font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:#6a5fb8}
+.book p.line{margin:8px 0 0;font-family:var(--f-display);font-size:clamp(22px,5.4vw,30px);line-height:1.3;overflow-wrap:anywhere}
+.story{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.story li{display:grid;grid-template-columns:5.5em minmax(0,1fr);gap:12px;align-items:baseline;animation:ink .5s ease}
+@keyframes ink{from{opacity:0;transform:translateY(6px)}}
+.story .who{font-weight:800;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#6a5fb8;overflow-wrap:anywhere}
+.story .txt{font-family:var(--f-display);font-size:clamp(19px,4.6vw,24px);line-height:1.35;overflow-wrap:anywhere}
+.counter{display:block;margin-top:6px;text-align:right;font-size:14px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="openers.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const OPENERS = window.STORY_OPENERS || ['Once upon a time, something odd happened.'];
+  const KEY = 'ptp.story';
+  const app = document.getElementById('app');
+  const deck = P.deck('story', OPENERS);
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ laps: 1, start: 'random' }, saved.settings || {}),
+    round: Number(saved.round) || 0,
+    screen: 'setup', players: [], order: [], pos: 0, lines: [], shown: 0
+  };
+  let editor = null, shownScreen = null;
+  function persist() { P.store.set(KEY, { settings: S.settings, round: S.round }); }
+  const writer = () => S.players[S.order[S.pos]];
+
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Story <em>Chain</em></h1>
+    <p class="tagline">Write a story together, one sentence each. You only ever see the line right before yours.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Storytellers</span><div id="players"></div></div>
+      <div class="sec"><span class="label">How long</span>${P.seg('laps', [[1, 'Once around'], [2, 'Twice around']], S.settings.laps)}</div>
+      <div class="sec"><span class="label">First line</span>${P.seg('start', [['random', 'Give us one'], ['own', 'We write it']], S.settings.start)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Open the book</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Pass the phone around the circle.</li>
+        <li>Each player reads only the last sentence and writes the next one. No peeking further back.</li>
+        <li>Keep it going: twists, new characters, whatever the last line inspires.</li>
+        <li>At the end, read the whole story out loud and see where it went.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    return P.header() + P.passScreen({ eyebrow: 'Line ' + (S.lines.length + 1) + ' of ' + (S.order.length + (S.settings.start === 'random' ? 1 : 0)), name: writer(), lead: 'Only ' + esc(writer()) + ' reads the screen.' });
+  }
+  function viewWrite() {
+    const last = S.lines[S.lines.length - 1];
+    const opening = !last;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(writer())}, your turn</p>
+      ${opening ? '<h2 class="big">Write the first line</h2><p class="lead">Start the story any way you like.</p>'
+        : `<div class="book"><small>The story so far ends with</small><p class="line">${esc(last.text)}</p></div>`}
+      <div class="field"><label for="line">${opening ? 'Opening line' : 'What happens next?'}</label><textarea id="line" maxlength="220" placeholder="Write one sentence"></textarea><span class="counter" id="count">0 / 220</span></div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="add" id="addBtn" disabled>Add it and pass</button></div>
+    </section>`;
+  }
+  function viewReveal() {
+    const done = S.shown >= S.lines.length;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${done ? 'The end' : 'Gather round'}</p>
+      <h2 class="big">${done ? 'Your story' : 'Read it out loud'}</h2>
+      <div class="book"><ol class="story">${S.lines.slice(0, S.shown).map(l => `<li><span class="who">${esc(l.by || 'Opener')}</span><span class="txt">${esc(l.text)}</span></li>`).join('')}</ol>${S.shown ? '' : '<p class="line">Tap the button to reveal the first line.</p>'}</div>
+      ${done ? `<div class="actions center">
+          ${P.canSpeak() ? '<button class="btn btn-alt" type="button" data-act="read">Read it to us</button>' : ''}
+          <button class="btn btn-alt" type="button" data-act="copy">Copy the story</button>
+          <button class="btn btn-main btn-big" type="button" data-act="new">New story</button>
+        </div><p class="hint" id="copyNote" aria-live="polite"></p>`
+        : `<div class="actions center"><button class="btn btn-alt" type="button" data-act="all">Show it all</button><button class="btn btn-main btn-big" type="button" data-act="more">${S.shown ? 'Next line' : 'First line'}</button></div>`}
+    </section>`;
+  }
+
+  function startStory() {
+    S.players = editor.get();
+    const n = S.players.length, off = S.round % n;
+    S.round++;
+    persist();
+    const lap = Array.from({ length: n }, (_, k) => (off + k) % n);
+    S.order = S.settings.laps === 2 ? lap.concat(lap) : lap;
+    S.pos = 0;
+    S.shown = 0;
+    S.lines = S.settings.start === 'random' ? [{ text: deck.one(), by: null }] : [];
+    sfx.unlock();
+    P.stayAwake();
+    S.screen = 'pass';
+    render();
+  }
+  function add() {
+    const el = document.getElementById('line');
+    const v = (el ? el.value : '').replace(/\s+/g, ' ').trim();
+    if (!v) return;
+    S.lines.push({ text: v.slice(0, 220), by: writer() });
+    S.pos++;
+    sfx.whoosh();
+    S.screen = S.pos < S.order.length ? 'pass' : 'reveal';
+    render();
+  }
+  function storyText() { return S.lines.map(l => l.text).join(' '); }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, write: viewWrite, reveal: viewReveal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 2, max: 12 });
+    if (S.screen === 'write') { const t = document.getElementById('line'); if (t) t.focus(); }
+    if (S.screen !== shownScreen || S.screen === 'pass') window.scrollTo(0, 0);
+    shownScreen = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': startStory(); break;
+      case 'me': S.screen = 'write'; render(); break;
+      case 'add': add(); break;
+      case 'more':
+        S.shown++;
+        sfx.pop();
+        render();
+        if (S.shown >= S.lines.length) { sfx.win(); P.confetti({ colors: ['#ffcf6b', '#f6f3ff', '#ff78be', '#8fe3ff'], count: 90 }); }
+        break;
+      case 'all': S.shown = S.lines.length; render(); sfx.win(); break;
+      case 'read': P.speak(storyText(), { rate: 0.95 }); break;
+      case 'copy': {
+        const note = document.getElementById('copyNote');
+        const text = S.lines.map(l => l.text).join('\n');
+        const ok = () => { if (note) note.textContent = 'Copied.'; };
+        const fail = () => { if (note) note.textContent = 'Copy did not work here. Select the story and copy it.'; };
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, fail);
+          else fail();
+        } catch (x) { fail(); }
+        break;
+      }
+      case 'new': P.hush(); S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('input', e => {
+    if (e.target.id === 'line') {
+      document.getElementById('addBtn').disabled = !e.target.value.trim();
+      document.getElementById('count').textContent = e.target.value.length + ' / 220';
+    }
+  });
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'laps') { S.settings.laps = Number(t.value); persist(); }
+    else if (t.name === 'start') { S.settings.start = t.value; persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

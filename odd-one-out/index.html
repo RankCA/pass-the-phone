@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Odd One Out | Pass the Phone</title>
+<meta name="description" content="Everyone answers the same question at once, except one player who got a different one. Spot the odd one out.">
+<meta name="theme-color" content="#2fc39b">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: a grid of identical squares with one pink circle hiding in it. Everything is square and orderly except the odd one. */
+:root{
+  color-scheme:light;
+  --bg:#2fc39b;
+  --fg:#0d2b24;
+  --muted:#1f4d42;
+  --panel:rgba(255,255,255,.6);
+  --panel-ink:#0d2b24;
+  --line:rgba(13,43,36,.25);
+  --field:#ffffff;
+  --field-ink:#0d2b24;
+  --accent:#ff4f8b;
+  --accent-ink:#ffffff;
+  --accent-shadow:#b51f57;
+  --ink:#0d2b24;
+  --focus:#0d2b24;
+  --radius:6px;
+  --btn-radius:8px;
+  --f-display:"Bungee","Arial Black",sans-serif;
+  --f-body:"Outfit",system-ui,-apple-system,sans-serif;
+}
+body{background-color:#2fc39b;background-image:linear-gradient(rgba(13,43,36,.07) 2px,transparent 2px),linear-gradient(90deg,rgba(13,43,36,.07) 2px,transparent 2px);background-size:34px 34px;background-attachment:fixed}
+.title{font-size:clamp(46px,12vw,92px);line-height:1}
+.title .o{display:inline-block;width:.78em;height:.78em;margin:0 .04em;border-radius:50%;background:var(--accent);vertical-align:-.05em}
+.squares{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;max-width:300px;margin-top:16px}
+.squares i{aspect-ratio:1;background:var(--ink);border-radius:2px}
+.squares i.odd{background:var(--accent);border-radius:50%}
+.panel{box-shadow:0 10px 0 rgba(13,43,36,.15)}
+.reveal-front{background:var(--ink);color:#e9fff8}
+.reveal-front b{font-family:var(--f-display);font-size:26px}
+.reveal-front small{font-weight:600;color:#a7e9d6}
+.reveal-back{background:#fff;color:var(--fg);box-shadow:inset 0 0 0 4px var(--ink)}
+.reveal-back small{font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:12px;color:var(--muted)}
+.reveal-back b{font-size:clamp(22px,5.6vw,30px);line-height:1.25;font-weight:800;overflow-wrap:anywhere}
+.reveal-back p{margin:6px 0 0;font-size:15px;color:var(--muted)}
+.how{display:inline-flex;align-items:center;gap:10px;margin-top:16px;padding:8px 16px;border-radius:8px;background:var(--ink);color:#e9fff8;font-weight:800}
+.count{margin:22px 0 0;font-family:var(--f-display);font-size:clamp(70px,24vw,150px);line-height:1;color:var(--ink)}
+.count.go{color:var(--accent)}
+.qs{display:grid;gap:10px;max-width:560px;margin:22px auto 0;text-align:left}
+.qs div{padding:14px 16px;border-radius:8px;background:#fff;box-shadow:inset 0 0 0 3px var(--ink)}
+.qs div.odd{box-shadow:inset 0 0 0 3px var(--accent)}
+.qs small{display:block;font-weight:800;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.qs b{display:block;margin-top:4px;font-size:20px;line-height:1.3;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="questions.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const PAIRS = window.ODD_PAIRS || [];
+  const KEY = 'ptp.odd';
+  const HOW = {
+    fingers: 'On three, everyone holds up 0 to 10 fingers.',
+    point: 'On three, everyone points at a player.',
+    hand: 'On three, raise your hand or keep it down.',
+    word: 'On three, everyone says one word out loud.'
+  };
+  const app = document.getElementById('app');
+  const deck = P.deck('odd', PAIRS, p => p.a);
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = { scores: saved.scores || {}, screen: 'setup', players: [], pair: null, flip: false, odd: 0, deal: 0, peeked: false, accused: null, winner: null };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { scores: S.scores }); }
+  const nameOf = i => S.players[i];
+  const mainQ = () => (S.flip ? S.pair.b : S.pair.a);
+  const oddQ = () => (S.flip ? S.pair.a : S.pair.b);
+  const squares = () => `<div class="squares" aria-hidden="true">${Array.from({ length: 24 }, (_, i) => `<i class="${i === 13 ? 'odd' : ''}"></i>`).join('')}</div>`;
+
+  function viewSetup() {
+    const has = Object.values(S.scores).some(v => v > 0);
+    return P.header() + `
+    <h1 class="title"><span aria-hidden="true">Odd <span class="o"></span>ne Out</span><span class="sr">Odd One Out</span></h1>
+    ${squares()}
+    <p class="tagline">Everyone gets the same question, except one player. Answer at the same time and spot who does not fit.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Deal the questions</button>${has ? '<button class="btn btn-alt" type="button" data-act="reset">Reset scores</button>' : ''}</div>
+    </div>
+    ${has ? P.scoreList(Object.entries(S.scores)) : ''}
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Pass the phone. Everyone holds the card to read their question. One player secretly got a different question.</li>
+        <li>On three, everyone answers at once: fingers, pointing, hands up or one word.</li>
+        <li>Explain your answers and find whose answer does not fit. The odd one does not know they are odd, so they will defend themselves too.</li>
+        <li>Vote. Catch the odd one and everyone else scores 1. If they get away, they score 2.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    return P.header() + P.passScreen({ eyebrow: 'Question ' + (S.deal + 1) + ' of ' + S.players.length, name: nameOf(S.deal), lead: 'Only ' + esc(nameOf(S.deal)) + ' looks.' });
+  }
+  function viewCard() {
+    const i = S.deal, q = i === S.odd ? oddQ() : mainQ();
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">For ${esc(nameOf(i))} only</p>
+      <div class="reveal" id="card" tabindex="0" role="button" aria-label="Press and hold to read your question">
+        <div class="reveal-in">
+          <div class="reveal-face reveal-front"><b>Your question</b><small>Press and hold to read</small></div>
+          <div class="reveal-face reveal-back"><small>Your question</small><b>${esc(q)}</b><p>${HOW[S.pair.type]} Remember your answer.</p></div>
+        </div>
+      </div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="seen" id="seenBtn"${S.peeked ? '' : ' disabled'}>${i < S.players.length - 1 ? 'Done. Pass it on' : 'Done'}</button></div>
+    </section>`;
+  }
+  function viewAnswer() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Everyone has a question</p>
+      <h2 class="big">Answer together</h2>
+      <span class="how">${HOW[S.pair.type]}</span>
+      <p class="count" id="count" aria-live="assertive"></p>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="countin">Count us in</button><button class="btn btn-main btn-big" type="button" data-act="vote">Time to vote</button></div>
+      <p class="lead">Talk it over first. Ask people to explain their answers. The odd one does not know they are odd.</p>
+    </section>`;
+  }
+  function viewVote() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Point on three</p>
+      <h2 class="big">Who is the odd one out?</h2>
+      <div class="pick">${S.players.map((n, i) => `<button type="button" data-act="accuse" data-i="${i}">${esc(n)}</button>`).join('')}</div>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="accuse" data-i="-1">It was a tie</button></div>
+    </section>`;
+  }
+  function viewResult() {
+    const caught = S.winner === 'group';
+    let how;
+    if (S.accused < 0) how = 'The vote was a tie, so the odd one slipped by.';
+    else if (S.accused !== S.odd) how = 'You voted for ' + nameOf(S.accused) + ', who had the same question as everyone.';
+    else how = 'You found ' + nameOf(S.odd) + '.';
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${caught ? 'Caught' : 'Got away'}</p>
+      <h2 class="big">${esc(nameOf(S.odd))} was the odd one out</h2>
+      <p class="lead">${esc(how)} ${caught ? 'Everyone else gets 1 point.' : esc(nameOf(S.odd)) + ' gets 2 points.'}</p>
+      <div class="qs"><div><small>Everyone's question</small><b>${esc(mainQ())}</b></div><div class="odd"><small>${esc(nameOf(S.odd))}'s question</small><b>${esc(oddQ())}</b></div></div>
+      ${P.scoreList(S.players.map(n => [n, S.scores[n] || 0]))}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change players</button><button class="btn btn-main btn-big" type="button" data-act="next">Next question</button></div>
+    </section>`;
+  }
+
+  function newRound() {
+    S.pair = deck.one();
+    S.flip = Math.random() < 0.5;
+    S.odd = Math.floor(Math.random() * S.players.length);
+    S.deal = 0;
+    S.peeked = false;
+    S.accused = null;
+    S.screen = 'pass';
+    render();
+  }
+  function countIn() {
+    const el = document.getElementById('count');
+    let n = 3;
+    const step = () => {
+      if (!el) return;
+      if (n > 0) { el.textContent = n; el.classList.remove('go'); sfx.beep(false); n--; setTimeout(step, 700); }
+      else { el.textContent = 'Answer!'; el.classList.add('go'); sfx.beep(true); P.vibrate(80); }
+    };
+    step();
+  }
+  function finish(winner) {
+    S.winner = winner;
+    S.players.forEach((n, i) => {
+      if (winner === 'group' && i !== S.odd) S.scores[n] = (S.scores[n] || 0) + 1;
+      if (winner === 'odd' && i === S.odd) S.scores[n] = (S.scores[n] || 0) + 2;
+    });
+    persist();
+    S.screen = 'result';
+    render();
+    if (winner === 'group') { sfx.win(); P.confetti({ colors: ['#ff4f8b', '#0d2b24', '#ffffff', '#2fc39b'] }); } else sfx.lose();
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, card: viewCard, answer: viewAnswer, vote: viewVote, result: viewResult };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 3, max: 12 });
+    if (S.screen === 'card') P.holdToReveal(document.getElementById('card'), () => { S.peeked = true; document.getElementById('seenBtn').disabled = false; });
+    if (S.screen !== shown || S.screen === 'pass') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': S.players = editor.get(); sfx.unlock(); P.stayAwake(); newRound(); break;
+      case 'reset': S.scores = {}; persist(); render(); break;
+      case 'me': S.peeked = false; S.screen = 'card'; render(); break;
+      case 'seen': S.deal++; S.screen = S.deal < S.players.length ? 'pass' : 'answer'; render(); break;
+      case 'countin': countIn(); break;
+      case 'vote': S.screen = 'vote'; render(); break;
+      case 'accuse': {
+        const i = Number(b.getAttribute('data-i'));
+        S.accused = i;
+        finish(i === S.odd ? 'group' : 'odd');
+        break;
+      }
+      case 'next': newRound(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Where Are We? | Pass the Phone</title>
+<meta name="description" content="Everyone knows the secret place except the spy. Ask each other questions and find the spy before they work out where you are.">
+<meta name="theme-color" content="#8fd0ff">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;600;800&family=Shrikhand&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: a stack of travel postcards under a summer sky. Airmail stripes frame every secret; the place list is a page of stamps. */
+:root{
+  color-scheme:light;
+  --bg:#a9dcff;
+  --fg:#13294b;
+  --muted:#38557f;
+  --panel:#ffffff;
+  --panel-ink:#13294b;
+  --line:rgba(19,41,75,.22);
+  --field:#ffffff;
+  --field-ink:#13294b;
+  --accent:#ff5a5f;
+  --accent-ink:#ffffff;
+  --accent-shadow:#b22a2f;
+  --air:#2c5fd4;
+  --sun:#ffd166;
+  --focus:#2c5fd4;
+  --f-display:"Shrikhand",Georgia,serif;
+  --f-body:"Rubik",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(circle at 86% 7%,#fff3c4 0 54px,rgba(255,243,196,.5) 56px,transparent 150px),linear-gradient(180deg,#8fd0ff 0%,#c4e8ff 55%,#eef9ff 100%);background-attachment:fixed}
+.clouds{position:fixed;inset:0;z-index:-1;pointer-events:none}
+.clouds svg{position:absolute;fill:#fff;opacity:.85}
+.title{color:var(--fg);text-shadow:4px 4px 0 #fff}
+.panel{box-shadow:0 16px 30px -22px rgba(19,41,75,.6)}
+.btn{font-weight:400}
+.airmail{background:#fff;border:9px solid transparent;border-image:repeating-linear-gradient(-45deg,var(--accent) 0 12px,#fff 12px 22px,var(--air) 22px 34px,#fff 34px 44px) 9}
+.reveal-face.airmail{border-radius:0}
+.reveal-front{color:var(--fg)}
+.reveal-front b{font-family:var(--f-display);font-size:34px}
+.reveal-front small{font-weight:600;letter-spacing:.14em;text-transform:uppercase;font-size:13px;color:var(--muted)}
+.stamp{width:64px;height:76px;padding:6px;background:var(--sun);-webkit-mask:radial-gradient(circle 4px at 4px 4px,transparent 98%,#000) -4px -4px/10px 10px;mask:radial-gradient(circle 4px at 4px 4px,transparent 98%,#000) -4px -4px/10px 10px}
+.stamp svg{width:100%;height:100%}
+.reveal-back{color:var(--fg)}
+.reveal-back small{font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--muted)}
+.reveal-back b{font-family:var(--f-display);font-weight:400;font-size:clamp(30px,8vw,46px);line-height:1.05;overflow-wrap:anywhere}
+.reveal-back .role{font-weight:800;font-size:20px}
+.reveal-back .spy{font-family:var(--f-display);font-size:clamp(40px,11vw,60px);color:var(--accent)}
+.reveal-back p{margin:4px 0 0;font-size:15px;color:var(--muted);max-width:24em}
+.places{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:18px auto 0;max-width:640px}
+.places span,.places button{padding:7px 12px;border:0;border-radius:6px;background:#fff;color:var(--fg);font:600 16px var(--f-body);box-shadow:0 0 0 2px rgba(44,95,212,.25),0 6px 10px -8px rgba(19,41,75,.6)}
+.places button{min-height:46px;cursor:pointer}
+.places button:hover{box-shadow:0 0 0 3px var(--air)}
+.starter{display:inline-block;margin-top:14px;padding:6px 16px;border-radius:999px;background:var(--sun);font-weight:800}
+.result-card{margin:22px auto 0;max-width:520px;padding:20px;text-align:left}
+.result-card dl{display:grid;gap:8px;margin:0}
+.result-card div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dashed var(--line);padding-bottom:6px}
+.result-card dt{font-weight:700;color:var(--muted)}
+.result-card dd{margin:0;font-weight:800;text-align:right;overflow-wrap:anywhere;min-width:0}
+</style>
+</head>
+<body>
+<div class="clouds" aria-hidden="true">
+  <svg viewBox="0 0 200 80" style="left:4%;top:18%;width:180px"><path d="M30 70a24 24 0 0 1 4-48 34 34 0 0 1 64-6 26 26 0 0 1 44 16 22 22 0 0 1 28 38z"/></svg>
+  <svg viewBox="0 0 200 80" style="right:6%;top:42%;width:140px"><path d="M30 70a24 24 0 0 1 4-48 34 34 0 0 1 64-6 26 26 0 0 1 44 16 22 22 0 0 1 28 38z"/></svg>
+  <svg viewBox="0 0 200 80" style="left:20%;top:72%;width:120px;opacity:.6"><path d="M30 70a24 24 0 0 1 4-48 34 34 0 0 1 64-6 26 26 0 0 1 44 16 22 22 0 0 1 28 38z"/></svg>
+</div>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="places.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const PLACES = window.WAW_PLACES || [];
+  const KEY = 'ptp.where';
+  const STAMP = '<svg viewBox="0 0 50 60" aria-hidden="true"><path d="M8 48h34L25 14z" fill="#2c5fd4"/><circle cx="35" cy="16" r="7" fill="#ff5a5f"/><path d="M4 54h42" stroke="#13294b" stroke-width="3"/></svg>';
+  const app = document.getElementById('app');
+  const deck = P.deck('where', PLACES, p => p.name);
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ time: 420 }, saved.settings || {}),
+    scores: saved.scores || {},
+    screen: 'setup', players: [], place: null, spy: 0, roles: [], deal: 0, peeked: false, starter: 0,
+    showList: false, accused: null, mode: null, spyPick: null, winner: null
+  };
+  let editor = null, timer = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings, scores: S.scores }); }
+  const nameOf = i => S.players[i];
+  const placeTags = (btn) => `<div class="places">${PLACES.map(p => btn ? `<button type="button" data-act="pick-place" data-place="${esc(p.name)}">${esc(p.name)}</button>` : `<span>${esc(p.name)}</span>`).join('')}</div>`;
+
+  function viewSetup() {
+    const has = Object.values(S.scores).some(v => v > 0);
+    return P.header() + `
+    <h1 class="title">Where Are We?</h1>
+    <p class="tagline">Everyone knows the secret place except the spy. Ask sneaky questions and find the spy before they work it out.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Round length</span>${P.seg('time', [[300, '5 min'], [420, '7 min'], [540, '9 min']], S.settings.time)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Hand out postcards</button>${has ? '<button class="btn btn-alt" type="button" data-act="reset">Reset scores</button>' : ''}</div>
+    </div>
+    ${has ? P.scoreList(Object.entries(S.scores)) : ''}
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Pass the phone. Everyone holds their postcard to see the secret place and their role there. The spy sees only that they are the spy.</li>
+        <li>Take turns asking one player a question about the place, like "What are you wearing?" Whoever answers asks next.</li>
+        <li>Answers should prove you know the place without making it obvious. The spy has to bluff.</li>
+        <li>Vote when you are ready. A caught spy can still win by naming the place. The spy can also stop the game at any time to guess.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    return P.header() + P.passScreen({ eyebrow: 'Postcard ' + (S.deal + 1) + ' of ' + S.players.length, name: nameOf(S.deal), lead: 'Only ' + esc(nameOf(S.deal)) + ' looks.' });
+  }
+  function viewCard() {
+    const i = S.deal, spy = i === S.spy;
+    const back = spy
+      ? '<small>Your secret</small><span class="spy">You are the spy</span><p>Listen closely, blend in, and work out where everyone is.</p>'
+      : `<small>Greetings from</small><b>${esc(S.place.name)}</b><span class="role">You are the ${esc(S.roles[i].toLowerCase())}</span><p>One player is a spy who does not know where you are.</p>`;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">For ${esc(nameOf(i))} only</p>
+      <div class="reveal" id="card" tabindex="0" role="button" aria-label="Press and hold to read your postcard">
+        <div class="reveal-in">
+          <div class="reveal-face reveal-front airmail"><div class="stamp">${STAMP}</div><b>Postcard</b><small>Press and hold to read</small></div>
+          <div class="reveal-face reveal-back airmail">${back}</div>
+        </div>
+      </div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="seen" id="seenBtn"${S.peeked ? '' : ' disabled'}>${i < S.players.length - 1 ? 'Done. Pass it on' : 'Done'}</button></div>
+    </section>`;
+  }
+  function viewPlay() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Everyone has a postcard</p>
+      <h2 class="big">Ask away</h2>
+      <span class="starter">${esc(nameOf(S.starter))} asks the first question</span>
+      <div><div class="timer" id="timer" role="timer">${P.clock(timer ? timer.left : S.settings.time * 1000)}</div></div>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="pause" id="pauseBtn">${timer && timer.running ? 'Pause' : timer ? 'Resume' : 'Start the clock'}</button><button class="btn btn-alt" type="button" data-act="list">${S.showList ? 'Hide the places' : 'See all places'}</button></div>
+      ${S.showList ? placeTags(false) : ''}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="spy-guess">The spy wants to guess</button><button class="btn btn-main btn-big" type="button" data-act="vote">Vote now</button></div>
+    </section>`;
+  }
+  function viewVote() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Time to vote</p>
+      <h2 class="big">Who is the spy?</h2>
+      <p class="lead">Point on three. Tap whoever got the most votes.</p>
+      <div class="pick">${S.players.map((n, i) => `<button type="button" data-act="accuse" data-i="${i}">${esc(n)}</button>`).join('')}</div>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="accuse" data-i="-1">It was a tie</button></div>
+    </section>`;
+  }
+  function viewSpyGuess() {
+    const lead = S.mode === 'caught'
+      ? esc(nameOf(S.spy)) + ' is the spy. One last chance: pick the place. Get it right and the spy still wins.'
+      : 'Only the spy touches the phone now. Pick the place. Get it right to win, get it wrong and everyone else wins.';
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${S.mode === 'caught' ? 'Spy caught' : 'The spy steps forward'}</p>
+      <h2 class="big">Where are we?</h2>
+      <p class="lead">${lead}</p>
+      ${placeTags(true)}
+      ${S.mode === 'reveal' ? '<div class="actions center"><button class="textbtn" type="button" data-act="cancel-guess">Never mind, keep playing</button></div>' : ''}
+    </section>`;
+  }
+  function viewResult() {
+    const spyWins = S.winner === 'spy';
+    let how;
+    if (S.mode === 'reveal') how = S.spyPick === S.place.name ? 'The spy stopped the game and named the place.' : 'The spy stopped the game and guessed ' + S.spyPick + '. Wrong.';
+    else if (S.accused == null || S.accused < 0) how = 'The vote was a tie, so the spy got away.';
+    else if (S.accused !== S.spy) how = 'You accused ' + nameOf(S.accused) + ', who was not the spy.';
+    else if (S.spyPick === S.place.name) how = 'The spy was caught, but named the place.';
+    else how = 'You caught the spy, who guessed ' + S.spyPick + '.';
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${spyWins ? 'The spy wins' : 'Everyone else wins'}</p>
+      <h2 class="big">We were at the ${esc(S.place.name.toLowerCase())}</h2>
+      <p class="lead">${esc(how)} ${spyWins ? esc(nameOf(S.spy)) + ' gets 2 points.' : 'Everyone except the spy gets 1 point.'}</p>
+      <div class="panel result-card"><dl>${S.players.map((n, i) => `<div><dt>${esc(n)}</dt><dd>${i === S.spy ? 'The spy' : esc(S.roles[i])}</dd></div>`).join('')}</dl></div>
+      ${P.scoreList(S.players.map(n => [n, S.scores[n] || 0]))}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="next">Next trip</button></div>
+    </section>`;
+  }
+
+  /* ---------- Flow ---------- */
+  function newRound() {
+    const n = S.players.length;
+    S.place = deck.one();
+    S.spy = Math.floor(Math.random() * n);
+    const pool = P.shuffle(S.place.roles.slice());
+    S.roles = S.players.map((_, i) => (i === S.spy ? '' : pool[i % pool.length]));
+    S.deal = 0;
+    S.peeked = false;
+    S.starter = Math.floor(Math.random() * n);
+    S.showList = false;
+    S.accused = null;
+    S.mode = null;
+    S.spyPick = null;
+    if (timer) timer.stop();
+    timer = null;
+    S.screen = 'pass';
+    render();
+  }
+  function ensureTimer() {
+    if (timer) return;
+    timer = P.countdown(S.settings.time * 1000, {
+      tickLast: 10,
+      onTick: ms => { const el = document.getElementById('timer'); if (el) { el.textContent = P.clock(ms); el.classList.toggle('low', ms <= 30000); } },
+      onEnd: () => { sfx.buzz(1); P.vibrate([300, 100, 300]); S.screen = 'vote'; render(); }
+    });
+  }
+  function finish(winner) {
+    if (timer) timer.stop();
+    S.winner = winner;
+    S.players.forEach((n, i) => {
+      if (winner === 'spy' && i === S.spy) S.scores[n] = (S.scores[n] || 0) + 2;
+      if (winner === 'town' && i !== S.spy) S.scores[n] = (S.scores[n] || 0) + 1;
+    });
+    persist();
+    S.screen = 'result';
+    render();
+    if (winner === 'town') { sfx.win(); P.confetti({ colors: ['#ff5a5f', '#2c5fd4', '#ffd166', '#ffffff'] }); } else sfx.lose();
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, card: viewCard, play: viewPlay, vote: viewVote, spyGuess: viewSpyGuess, result: viewResult };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 3, max: 12 });
+    if (S.screen === 'card') P.holdToReveal(document.getElementById('card'), () => { S.peeked = true; document.getElementById('seenBtn').disabled = false; });
+    if (S.screen !== shown || S.screen === 'pass') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': S.players = editor.get(); sfx.unlock(); P.stayAwake(); newRound(); break;
+      case 'reset': S.scores = {}; persist(); render(); break;
+      case 'me': S.peeked = false; S.screen = 'card'; render(); break;
+      case 'seen':
+        S.deal++;
+        S.screen = S.deal < S.players.length ? 'pass' : 'play';
+        render();
+        break;
+      case 'pause':
+        ensureTimer();
+        if (timer.running) timer.stop(); else timer.start();
+        b.textContent = timer.running ? 'Pause' : 'Resume';
+        break;
+      case 'list': S.showList = !S.showList; render(); break;
+      case 'spy-guess': if (timer) timer.stop(); S.mode = 'reveal'; S.screen = 'spyGuess'; render(); break;
+      case 'cancel-guess': S.mode = null; S.screen = 'play'; render(); break;
+      case 'vote': if (timer) timer.stop(); S.screen = 'vote'; render(); break;
+      case 'accuse': {
+        const i = Number(b.getAttribute('data-i'));
+        S.accused = i;
+        if (i === S.spy) { S.mode = 'caught'; S.screen = 'spyGuess'; render(); }
+        else finish('spy');
+        break;
+      }
+      case 'pick-place':
+        S.spyPick = b.getAttribute('data-place');
+        finish(S.spyPick === S.place.name ? 'spy' : 'town');
+        break;
+      case 'next': newRound(); break;
+      case 'setup': if (timer) timer.stop(); S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.name === 'time') { S.settings.time = Number(e.target.value); persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -295,9 +295,154 @@
     requestAnimationFrame(frame);
   }
 
+  /* ---------- Markup helpers (used with shared/base.css) ---------- */
+  const BACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function header() {
+    return '<header class="top"><a class="back" href="../">' + BACK_ICON + 'All games</a>' + soundToggle() + '</header>';
+  }
+  function seg(name, opts, current) {
+    return '<div class="seg" role="radiogroup">' + opts.map(o =>
+      '<label><input type="radio" name="' + name + '" id="' + name + '-' + o[0] + '" value="' + o[0] + '"' + (String(current) === String(o[0]) ? ' checked' : '') + '><span>' + o[1] + '</span></label>'
+    ).join('') + '</div>';
+  }
+  function opt(name, value, title, text, current) {
+    return '<label class="opt"><input type="radio" name="' + name + '" id="' + name + '-' + value + '" value="' + value + '"' + (String(current) === String(value) ? ' checked' : '') + '><span class="opt-box"><b>' + title + '</b><small>' + text + '</small></span></label>';
+  }
+  function listNames(names) {
+    if (names.length < 2) return names[0] || '';
+    return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+  }
+  function passScreen(o) {
+    return '<section class="center pass">' +
+      (o.eyebrow ? '<p class="eyebrow">' + esc(o.eyebrow) + '</p>' : '') +
+      '<h2 class="big">Pass to ' + esc(o.name) + '</h2>' +
+      (o.lead ? '<p class="lead">' + o.lead + '</p>' : '') +
+      '<div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="' + (o.act || 'me') + '">I am ' + esc(o.name) + '</button></div>' +
+      (o.extra || '') + '</section>';
+  }
+  function scoreList(entries) {
+    const rows = entries.slice().sort((a, b) => b[1] - a[1]);
+    const top = rows.length ? rows[0][1] : 0;
+    return '<ol class="scores">' + rows.map(r => '<li' + (top > 0 && r[1] === top ? ' class="top"' : '') + '><span>' + esc(r[0]) + '</span><b>' + r[1] + '</b></li>').join('') + '</ol>';
+  }
+  function splitTeams(names, mix) {
+    const a = [], b = [];
+    (mix || names.map((_, i) => i)).forEach((idx, k) => (k % 2 === 0 ? a : b).push(names[idx]));
+    return [a, b];
+  }
+
+  /* Press and hold to show a secret. The element gets the class "open" while held. */
+  function holdToReveal(el, onOpen) {
+    let open = false;
+    const set = v => {
+      if (v === open) return;
+      open = v;
+      el.classList.toggle('open', v);
+      if (v && onOpen) onOpen();
+    };
+    el.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      try { el.setPointerCapture(e.pointerId); } catch (x) { /* older browsers */ }
+      set(true);
+    });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => el.addEventListener(t, () => set(false)));
+    el.addEventListener('keydown', e => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); set(true); } });
+    el.addEventListener('keyup', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); set(false); } });
+    el.addEventListener('blur', () => set(false));
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  /* Countdown that survives re-renders. onTick(msLeft, secondsLeft) runs ten times a second. */
+  function countdown(ms, o) {
+    o = o || {};
+    let left = ms, last = 0, id = null, running = false, lastSec = null;
+    function step() {
+      const now = performance.now();
+      left -= now - last;
+      last = now;
+      const sec = Math.max(0, Math.ceil(left / 1000));
+      if (sec !== lastSec) {
+        lastSec = sec;
+        if (o.tickLast && sec > 0 && sec <= o.tickLast) sfx.tick();
+      }
+      if (o.onTick) o.onTick(Math.max(0, left), sec);
+      if (left <= 0) { stop(); if (o.onEnd) o.onEnd(); }
+    }
+    function start() {
+      if (running || left <= 0) return;
+      running = true;
+      last = performance.now();
+      clearInterval(id);
+      id = setInterval(step, 100);
+      step();
+    }
+    function stop() { running = false; clearInterval(id); }
+    return {
+      start, stop,
+      get left() { return Math.max(0, left); },
+      get running() { return running; },
+      reset(v) { stop(); left = v; lastSec = null; }
+    };
+  }
+  const clock = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+  /* Read text out loud. Resolves when finished, or after a safe delay if the voice never reports back. */
+  function speak(text, o) {
+    o = o || {};
+    return new Promise(res => {
+      const synth = window.speechSynthesis;
+      if (!synth || typeof window.SpeechSynthesisUtterance === 'undefined') { res(); return; }
+      try {
+        synth.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = o.rate || 0.95;
+        u.pitch = o.pitch || 1;
+        if (o.voice) u.voice = o.voice;
+        let done = false;
+        const fin = () => { if (!done) { done = true; res(); } };
+        u.onend = fin;
+        u.onerror = fin;
+        setTimeout(fin, 2000 + text.length * 85);
+        synth.speak(u);
+      } catch (e) { res(); }
+    });
+  }
+  function hush() { try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) { /* ignore */ } }
+  const canSpeak = () => !!(window.speechSynthesis && typeof window.SpeechSynthesisUtterance !== 'undefined');
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  /* Loose answer matching for typed guesses: ignores case, accents, articles, plurals and small typos. */
+  function normAnswer(s) {
+    return String(s == null ? '' : s).toLowerCase().normalize('NFD').replace(/[^a-z0-9 ]/g, '')
+      .replace(/\s+/g, ' ').trim().replace(/^(a|an|the) /, '');
+  }
+  function lev(a, b) {
+    const m = a.length, n = b.length;
+    if (!m || !n) return m || n;
+    let prev = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) {
+      const cur = [i];
+      for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = cur;
+    }
+    return prev[n];
+  }
+  function sameAnswer(a, b) {
+    const x = normAnswer(a), y = normAnswer(b);
+    if (!x || !y) return false;
+    if (x === y) return true;
+    const strip = s => s.replace(/(es|s)$/, '');
+    if (x.length > 3 && y.length > 3 && strip(x) === strip(y)) return true;
+    const L = Math.max(x.length, y.length);
+    return L >= 5 && lev(x, y) <= (L >= 10 ? 2 : 1);
+  }
+
   window.Party = {
     store, esc, plural, shuffle, pick, rand, possessive,
     cleanName, getRoster, setRoster, finalNames, playerEditor,
-    deck, sfx, soundToggle, stayAwake, vibrate, reducedMotion, confetti
+    deck, sfx, soundToggle, stayAwake, vibrate, reducedMotion, confetti,
+    header, seg, opt, listNames, passScreen, scoreList, splitTeams,
+    holdToReveal, countdown, clock, speak, hush, canSpeak, wait,
+    normAnswer, lev, sameAnswer
   };
 })();

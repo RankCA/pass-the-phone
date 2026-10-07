@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Brain Freeze | Pass the Phone</title>
+<meta name="description" content="Name three things in five seconds. Sounds easy until the clock starts. First to the goal wins.">
+<meta name="theme-color" content="#8fe6ff">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800&family=Titan+One&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: an ice cream headache. Cold cyan, strawberry pink, and one shrinking ring around the prompt that drains as you panic. */
+:root{
+  color-scheme:light;
+  --bg:#8fe6ff;
+  --fg:#16233f;
+  --muted:#35507a;
+  --panel:rgba(255,255,255,.7);
+  --panel-ink:#16233f;
+  --line:rgba(22,35,63,.24);
+  --field:#ffffff;
+  --field-ink:#16233f;
+  --accent:#ff5c8a;
+  --accent-ink:#ffffff;
+  --accent-shadow:#b72a55;
+  --mint:#5fe3b0;
+  --focus:#ff5c8a;
+  --f-display:"Titan One","Arial Rounded MT Bold",sans-serif;
+  --f-body:"Nunito",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(circle at 80% 10%,rgba(255,255,255,.8),transparent 35%),linear-gradient(180deg,#8fe6ff,#d9f6ff 70%,#fff);background-attachment:fixed}
+.title{letter-spacing:.01em;color:#fff;-webkit-text-stroke:3px var(--fg);text-shadow:5px 5px 0 var(--accent)}
+.cone{display:block;width:min(30vw,120px);height:auto;margin-top:8px}
+.panel{box-shadow:0 10px 0 rgba(22,35,63,.12)}
+.label,.pp-input{font-weight:800}
+.ringbox{position:relative;width:min(84vw,360px);aspect-ratio:1;margin:18px auto 0}
+.ringbox svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.ringbox .track{fill:#fff;stroke:rgba(22,35,63,.12);stroke-width:18}
+.ringbox .bar{fill:none;stroke:var(--accent);stroke-width:18;stroke-linecap:round;stroke-dasharray:565.5;stroke-dashoffset:0}
+.ringbox .bar.go{animation:drain var(--t) linear forwards}
+@keyframes drain{to{stroke-dashoffset:565.5;stroke:var(--fg)}}
+.ringtext{position:absolute;inset:16%;display:grid;place-items:center;align-content:center;gap:6px;text-align:center}
+.ringtext small{font-weight:800;font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.ringtext b{font-family:var(--f-display);font-weight:400;font-size:clamp(22px,6.4vw,32px);line-height:1.12;overflow-wrap:anywhere;text-wrap:balance}
+.frozen{animation:shake .35s linear 2}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.judge{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:480px;margin:22px auto 0}
+.judge button{min-height:84px;border:0;border-radius:22px;font-family:var(--f-display);font-size:26px;cursor:pointer;touch-action:manipulation}
+.judge .yes{background:var(--mint);color:var(--fg);box-shadow:0 6px 0 #2a9e74}
+.judge .no{background:#fff;color:var(--fg);box-shadow:0 6px 0 rgba(22,35,63,.25)}
+.judge button:active{transform:translateY(3px)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="../short-fuse/prompts.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const CATS = (window.FUSE_PROMPTS && window.FUSE_PROMPTS.categories) || ['Animals'];
+  const KEY = 'ptp.brainfreeze';
+  const app = document.getElementById('app');
+  const deck = P.deck('brainfreeze', CATS);
+  const CONE = '<svg class="cone" viewBox="0 0 100 130" aria-hidden="true"><path d="M26 58l24 66 24-66z" fill="#f2c879" stroke="#16233f" stroke-width="5" stroke-linejoin="round"/><path d="M34 70l30 16M30 82l26 14M66 70L40 98" stroke="#c99a4a" stroke-width="3"/><circle cx="50" cy="40" r="28" fill="#ff5c8a" stroke="#16233f" stroke-width="5"/><circle cx="34" cy="56" r="14" fill="#ff5c8a" stroke="#16233f" stroke-width="5"/><circle cx="66" cy="56" r="14" fill="#ff5c8a" stroke="#16233f" stroke-width="5"/><path d="M40 34l4 4M56 26l3-4M60 44l5 1" stroke="#fff" stroke-width="4" stroke-linecap="round"/></svg>';
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ secs: 5, goal: 5 }, saved.settings || {}),
+    screen: 'setup', players: [], turn: 0, prompt: '', scores: {}, used: 0, timer: null
+  };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const player = () => S.players[S.turn % S.players.length];
+  function promptOf(cat) {
+    const keepCap = /^(Halloween)\b/.test(cat);
+    return 'Name 3 ' + (keepCap ? cat : cat.charAt(0).toLowerCase() + cat.slice(1));
+  }
+
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Brain Freeze</h1>
+    ${CONE}
+    <p class="tagline">Name three things in five seconds. Easy, until the clock starts and your brain freezes.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Seconds per turn</span>${P.seg('secs', [[5, '5'], [7, '7'], [10, '10']], S.settings.secs)}</div>
+      <div class="sec"><span class="label">First to</span>${P.seg('goal', [[5, '5 points'], [7, '7 points'], [10, '10 points']], S.settings.goal)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Start</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>On your turn, tap Go. A category appears and the ring starts to shrink.</li>
+        <li>Shout three things that fit before the ring runs out. Tap Done if you make it early.</li>
+        <li>Everyone else decides if your three answers count.</li>
+        <li>Each success is a point. First to the goal wins.</li>
+      </ol>
+    </details>`;
+  }
+  function viewReady() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Turn ${S.turn + 1}</p>
+      <h2 class="big">${esc(player())}, you are up</h2>
+      <p class="lead">Hold the phone where everyone can see. Name three things before the ring runs out.</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="go">Go</button></div>
+      ${P.scoreList(S.players.map(n => [n, S.scores[n] || 0]))}
+    </section>`;
+  }
+  function viewLive() {
+    return `
+    <section class="center">
+      <p class="eyebrow">${esc(player())}</p>
+      <div class="ringbox" id="ring">
+        <svg viewBox="0 0 200 200" aria-hidden="true"><circle class="track" cx="100" cy="100" r="90"/><circle class="bar go" id="bar" cx="100" cy="100" r="90" style="--t:${S.settings.secs}s"/></svg>
+        <div class="ringtext"><small>Quick</small><b>${esc(S.prompt)}</b></div>
+      </div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="done">Done</button></div>
+    </section>`;
+  }
+  function viewJudge() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${S.used ? 'Done in ' + S.used.toFixed(1) + ' seconds' : "Time's up"}</p>
+      <h2 class="big">Did ${esc(player())} name 3?</h2>
+      <p class="lead">${esc(S.prompt)}</p>
+      <div class="judge"><button class="no" type="button" data-act="judge" data-v="0">Nope</button><button class="yes" type="button" data-act="judge" data-v="1">Yes</button></div>
+    </section>`;
+  }
+  function viewFinal() {
+    const rows = S.players.map(n => [n, S.scores[n] || 0]);
+    const w = rows.sort((a, b) => b[1] - a[1])[0][0];
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Game over</p>
+      <h2 class="big">${esc(w)} never froze</h2>
+      ${P.scoreList(S.players.map(n => [n, S.scores[n] || 0]))}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  function go() {
+    S.prompt = promptOf(deck.one());
+    S.used = 0;
+    S.screen = 'live';
+    render();
+    const t0 = performance.now();
+    S.started = t0;
+    clearTimeout(S.timer);
+    let lastSec = null;
+    S.ticker = setInterval(() => {
+      const left = Math.ceil(S.settings.secs - (performance.now() - t0) / 1000);
+      if (left !== lastSec && left > 0) { lastSec = left; sfx.tick(left <= 2 ? 1900 : 1400); }
+    }, 100);
+    S.timer = setTimeout(() => {
+      clearInterval(S.ticker);
+      sfx.buzz(0.8);
+      P.vibrate([200, 80, 200]);
+      const r = document.getElementById('ring');
+      if (r) r.classList.add('frozen');
+      setTimeout(() => { if (S.screen === 'live') { S.screen = 'judge'; render(); } }, 700);
+    }, S.settings.secs * 1000);
+  }
+  function done() {
+    if (S.screen !== 'live') return;
+    clearTimeout(S.timer);
+    clearInterval(S.ticker);
+    S.used = (performance.now() - S.started) / 1000;
+    sfx.ding();
+    S.screen = 'judge';
+    render();
+  }
+  function judge(ok) {
+    if (ok) { S.scores[player()] = (S.scores[player()] || 0) + 1; sfx.win(); } else sfx.lose();
+    if ((S.scores[player()] || 0) >= S.settings.goal) {
+      S.screen = 'final';
+      render();
+      P.confetti({ colors: ['#ff5c8a', '#8fe6ff', '#5fe3b0', '#ffffff', '#16233f'] });
+      return;
+    }
+    S.turn++;
+    S.screen = 'ready';
+    render();
+  }
+
+  const VIEWS = { setup: viewSetup, ready: viewReady, live: viewLive, judge: viewJudge, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 1, max: 12 });
+    if (S.screen !== shown || S.screen === 'ready') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': S.players = editor.get(); S.scores = {}; S.turn = 0; sfx.unlock(); P.stayAwake(); S.screen = 'ready'; render(); break;
+      case 'go': go(); break;
+      case 'done': done(); break;
+      case 'judge': judge(b.getAttribute('data-v') === '1'); break;
+      case 'again': S.scores = {}; S.turn = 0; S.screen = 'ready'; render(); break;
+      case 'setup': clearTimeout(S.timer); clearInterval(S.ticker); S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (S.screen === 'live' && (e.key === 'Enter' || e.key === ' ') && !(e.target.closest && e.target.closest('button'))) { e.preventDefault(); done(); }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.name === 'secs' || e.target.name === 'goal') { S.settings[e.target.name] = Number(e.target.value); persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

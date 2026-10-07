@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Art Fraud | Pass the Phone</title>
+<meta name="description" content="Everyone adds one line to a drawing of the secret word. One artist does not know the word and is faking it.">
+<meta name="theme-color" content="#efeeea">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700;1,800&family=Work+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: a gallery opening. Quiet wall, one gold frame, small engraved plaques; the drawing is the only loud thing in the room. */
+:root{
+  color-scheme:light;
+  --bg:#efeeea;
+  --fg:#1f1b1c;
+  --muted:#5e5658;
+  --panel:#ffffff;
+  --panel-ink:#1f1b1c;
+  --line:rgba(31,27,28,.22);
+  --field:#ffffff;
+  --field-ink:#1f1b1c;
+  --accent:#8b1e2d;
+  --accent-ink:#fff6f2;
+  --accent-shadow:#4f0f19;
+  --gold:#c9a54a;
+  --gold-hi:#efdc9c;
+  --gold-lo:#8a6a1f;
+  --focus:#c9a54a;
+  --f-display:"Playfair Display",Georgia,serif;
+  --f-body:"Work Sans",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(ellipse 70% 40% at 50% 0%,rgba(255,255,255,.9),transparent 70%),linear-gradient(180deg,#f3f2ee,#e3e1db);background-attachment:fixed}
+.title{font-style:italic;font-weight:800;letter-spacing:-.01em}
+.panel{box-shadow:0 14px 30px -22px rgba(0,0,0,.45),inset 0 0 0 1px var(--line)}
+.opt-box b,.label,.big,.btn{font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:42px;padding:6px 14px;border:0;border-radius:999px;background:#fff;color:var(--fg);box-shadow:inset 0 0 0 2px var(--line);font-weight:600;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--fg);color:#fff;box-shadow:none}
+.frame{margin:18px auto 0;max-width:640px;padding:clamp(10px,3vw,18px);border-radius:4px;background:linear-gradient(135deg,var(--gold-hi),var(--gold) 40%,var(--gold-lo) 75%,var(--gold));box-shadow:0 24px 40px -22px rgba(0,0,0,.6),inset 0 0 0 2px rgba(255,255,255,.45)}
+.frame canvas{display:block;width:100%;height:auto;aspect-ratio:4/3;background:#fff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+.frame canvas.live{touch-action:none;cursor:crosshair}
+.plaque{display:inline-block;margin-top:14px;padding:8px 18px;border-radius:3px;background:linear-gradient(180deg,#f2e3ac,#cfae55);color:#2a2012;font-family:var(--f-display);font-style:italic;font-weight:700;font-size:17px;box-shadow:0 4px 10px rgba(0,0,0,.18)}
+.turnbar{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:22px;flex-wrap:wrap}
+.ink{width:30px;height:30px;border-radius:50%;background:var(--c);box-shadow:0 0 0 3px #fff,0 0 0 5px var(--line)}
+.turnbar b{font-family:var(--f-display);font-size:clamp(24px,6vw,34px)}
+.turnbar span{color:var(--muted);font-weight:600}
+.reveal-front{background:var(--accent);color:var(--accent-ink);box-shadow:inset 0 0 0 8px #a83547,inset 0 0 0 10px var(--gold)}
+.reveal-front b{font-family:var(--f-display);font-style:italic;font-size:30px}
+.reveal-front small{font-weight:600;letter-spacing:.18em;text-transform:uppercase;font-size:13px}
+.reveal-back{background:#fff;color:var(--fg);box-shadow:inset 0 0 0 2px var(--line),0 20px 40px -24px rgba(0,0,0,.6)}
+.reveal-back small{font-weight:700;letter-spacing:.16em;text-transform:uppercase;font-size:13px;color:var(--muted)}
+.reveal-back b{font-family:var(--f-display);font-weight:800;font-size:clamp(34px,9vw,52px);line-height:1.05;overflow-wrap:anywhere}
+.reveal-back .stamp{padding:2px 14px;border:4px solid var(--accent);border-radius:6px;color:var(--accent);font-family:var(--f-display);font-style:italic;font-weight:800;font-size:clamp(34px,9vw,50px);transform:rotate(-6deg)}
+.reveal-back p{margin:6px 0 0;font-size:15px;color:var(--muted);max-width:24em}
+.verdict{margin:22px auto 0;max-width:520px;padding:18px;border-radius:14px;background:#fff;box-shadow:inset 0 0 0 1px var(--line)}
+.verdict p{margin:0;font-size:19px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="words.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const DATA = window.FRAUD_WORDS || { Things: ['Lamp'] };
+  const CATS = Object.keys(DATA);
+  const KEY = 'ptp.artfraud';
+  const INK = ['#1f1b1c', '#d7263d', '#1b6ca8', '#2a9d55', '#f08a24', '#7b3fb3', '#e05fa2', '#7a5230', '#11a3a3', '#c9a100'];
+  const CW = 900, CH = 675;
+  const app = document.getElementById('app');
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ laps: 2, cats: CATS.slice() }, saved.settings || {}),
+    scores: saved.scores || {},
+    screen: 'setup', players: [], cat: '', word: '', fraud: 0, deal: 0, peeked: false,
+    order: [], turn: 0, strokes: [], pending: false, accused: null, guessed: false, winner: null, roundNo: Number(saved.roundNo) || 0
+  };
+  S.settings.cats = (S.settings.cats || []).filter(c => DATA[c]);
+  if (!S.settings.cats.length) S.settings.cats = CATS.slice();
+  let editor = null, pad = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings, scores: S.scores, roundNo: S.roundNo }); }
+  const nameOf = i => S.players[i];
+  const totalTurns = () => S.order.length;
+  const turnPlayer = () => S.order[S.turn];
+
+  /* ---------- Canvas ---------- */
+  function mountPad(live) {
+    const cv = document.getElementById('art');
+    if (!cv) return;
+    cv.width = CW;
+    cv.height = CH;
+    pad = { cv, ctx: cv.getContext('2d'), cur: null };
+    redraw();
+    if (!live) return;
+    cv.addEventListener('pointerdown', down);
+    cv.addEventListener('pointermove', move);
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => cv.addEventListener(t, up));
+  }
+  function redraw() {
+    const c = pad.ctx;
+    c.fillStyle = '#ffffff';
+    c.fillRect(0, 0, CW, CH);
+    S.strokes.forEach(s => {
+      dot(s, s.pts[0]);
+      for (let i = 1; i < s.pts.length; i++) seg(s, i);
+      tail(s);
+    });
+  }
+  function dot(s, p) { const c = pad.ctx; c.fillStyle = s.c; c.beginPath(); c.arc(p[0], p[1], s.w / 2, 0, Math.PI * 2); c.fill(); }
+  function seg(s, i) {
+    const c = pad.ctx, pts = s.pts, p0 = pts[i - 2] || pts[i - 1], p1 = pts[i - 1], p2 = pts[i];
+    c.strokeStyle = s.c; c.lineWidth = s.w; c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath();
+    c.moveTo((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);
+    c.quadraticCurveTo(p1[0], p1[1], (p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2);
+    c.stroke();
+  }
+  function tail(s) {
+    const n = s.pts.length;
+    if (n < 2) return;
+    const c = pad.ctx, a = s.pts[n - 2], b = s.pts[n - 1];
+    c.strokeStyle = s.c; c.lineWidth = s.w; c.lineCap = 'round';
+    c.beginPath(); c.moveTo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2); c.lineTo(b[0], b[1]); c.stroke();
+  }
+  function posOf(e) { const r = pad.cv.getBoundingClientRect(); return [(e.clientX - r.left) * CW / r.width, (e.clientY - r.top) * CH / r.height]; }
+  function down(e) {
+    if (S.pending || pad.cur) return;
+    e.preventDefault();
+    try { pad.cv.setPointerCapture(e.pointerId); } catch (x) { /* older browsers */ }
+    const p = posOf(e);
+    pad.cur = { c: INK[turnPlayer() % INK.length], w: 11, pts: [p] };
+    S.strokes.push(pad.cur);
+    dot(pad.cur, p);
+  }
+  function move(e) {
+    if (!pad.cur) return;
+    const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    (list.length ? list : [e]).forEach(ev => {
+      const p = posOf(ev), pts = pad.cur.pts, last = pts[pts.length - 1];
+      if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 1.5) return;
+      pts.push(p);
+      seg(pad.cur, pts.length - 1);
+    });
+  }
+  function up() {
+    if (!pad || !pad.cur) return;
+    tail(pad.cur);
+    pad.cur = null;
+    S.pending = true;
+    sfx.pop();
+    paintControls();
+  }
+  function paintControls() {
+    const box = document.getElementById('lineCtl');
+    if (!box) return;
+    box.innerHTML = S.pending
+      ? '<button class="btn btn-alt" type="button" data-act="redo">Redo my line</button><button class="btn btn-main btn-big" type="button" data-act="keep">Keep it</button>'
+      : '<p class="lead">Draw one line without lifting your finger.</p>';
+  }
+
+  /* ---------- Views ---------- */
+  function viewSetup() {
+    const st = S.settings;
+    const hasScores = Object.values(S.scores).some(v => v > 0);
+    return P.header() + `
+    <h1 class="title">Art Fraud</h1>
+    <p class="tagline">Everyone adds one line to a drawing of the secret word. One artist has no idea what it is.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Artists</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Lines per artist</span>${P.seg('laps', [[1, 'One'], [2, 'Two']], st.laps)}</div>
+      <div class="sec"><span class="label">Categories</span><div class="chips">${CATS.map(c => `<button type="button" class="chip" data-cat="${esc(c)}" aria-pressed="${st.cats.includes(c)}">${esc(c)}</button>`).join('')}</div></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Open the gallery</button>${hasScores ? '<button class="btn btn-alt" type="button" data-act="reset">Reset scores</button>' : ''}</div>
+    </div>
+    ${hasScores ? P.scoreList(Object.entries(S.scores)) : ''}
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Pass the phone around. Each artist holds the ticket to see the category and the secret word. The fraud only sees the category.</li>
+        <li>Take turns adding a single line to the drawing, without lifting your finger.</li>
+        <li>Make your line show you know the word, but not so clearly that the fraud can copy you.</li>
+        <li>Vote for the fraud. If they are caught, they still win by naming the word.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    return P.header() + P.passScreen({ eyebrow: 'Ticket ' + (S.deal + 1) + ' of ' + S.players.length, name: nameOf(S.deal), lead: 'Only ' + esc(nameOf(S.deal)) + ' looks.' });
+  }
+  function viewTicket() {
+    const i = S.deal, fraud = i === S.fraud;
+    const back = fraud
+      ? `<small>Category: ${esc(S.cat)}</small><span class="stamp">Fraud</span><p>You do not know the word. Watch the others and fake it.</p>`
+      : `<small>Category: ${esc(S.cat)}</small><b>${esc(S.word)}</b><p>One artist does not know this. Do not make it too easy.</p>`;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">For ${esc(nameOf(i))} only</p>
+      <div class="reveal" id="ticket" tabindex="0" role="button" aria-label="Press and hold to read your ticket">
+        <div class="reveal-in">
+          <div class="reveal-face reveal-front"><small>Admit one</small><b>Gallery ticket</b><small>Press and hold</small></div>
+          <div class="reveal-face reveal-back">${back}</div>
+        </div>
+      </div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="seen" id="seenBtn"${S.peeked ? '' : ' disabled'}>${i < S.players.length - 1 ? 'Done. Pass it on' : 'Done'}</button></div>
+    </section>`;
+  }
+  function viewDraw() {
+    const p = turnPlayer();
+    return P.header() + `
+    <section class="center">
+      <div class="turnbar"><span class="ink" style="--c:${INK[p % INK.length]}"></span><b>${esc(nameOf(p))}</b><span>Line ${S.turn + 1} of ${totalTurns()}</span></div>
+      <div class="frame"><canvas id="art" class="live" aria-label="Drawing"></canvas></div>
+      <div class="plaque">Category: ${esc(S.cat)}</div>
+      <div class="actions center" id="lineCtl"></div>
+    </section>`;
+  }
+  function viewVote() {
+    return P.header() + `
+    <section class="center">
+      <div class="frame"><canvas id="art" aria-label="The finished drawing"></canvas></div>
+      <h2 class="big">Who is the fraud?</h2>
+      <p class="lead">Talk about who drew what. Then point on three.</p>
+      <div class="pick">${S.players.map((n, i) => `<button type="button" data-act="accuse" data-i="${i}">${esc(n)}</button>`).join('')}</div>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="accuse" data-i="-1">It was a tie</button></div>
+    </section>`;
+  }
+  function viewGuess() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Caught</p>
+      <h2 class="big">${esc(nameOf(S.fraud))} is the fraud</h2>
+      <p class="lead">One last chance. ${esc(nameOf(S.fraud))}, say what the drawing is. If you name the word, you still win.</p>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="guess" data-ok="1">They named it</button><button class="btn btn-main btn-big" type="button" data-act="guess" data-ok="0">Wrong</button></div>
+    </section>`;
+  }
+  function viewResult() {
+    const fraudWins = S.winner === 'fraud';
+    let how;
+    if (S.accused < 0) how = 'The vote was a tie, so the fraud slipped away.';
+    else if (S.accused !== S.fraud) how = 'You accused ' + nameOf(S.accused) + ', who knew the word all along.';
+    else if (S.guessed) how = nameOf(S.fraud) + ' was caught, but named the word.';
+    else how = 'You caught ' + nameOf(S.fraud) + '.';
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${fraudWins ? 'The fraud wins' : 'The artists win'}</p>
+      <div class="frame"><canvas id="art" aria-label="The finished drawing"></canvas></div>
+      <div class="plaque">${esc(S.word)}, by everyone. Forged by ${esc(nameOf(S.fraud))}</div>
+      <div class="verdict"><p>${esc(how)} ${fraudWins ? esc(nameOf(S.fraud)) + ' gets 2 points.' : 'Every real artist gets 1 point.'}</p></div>
+      ${P.scoreList(S.players.map(n => [n, S.scores[n] || 0]))}
+      <div class="actions center">
+        <button class="btn btn-alt" type="button" data-act="save">Save the art</button>
+        <button class="btn btn-alt" type="button" data-act="setup">Change setup</button>
+        <button class="btn btn-main btn-big" type="button" data-act="next">Next painting</button>
+      </div>
+      <p class="hint" id="saveNote" aria-live="polite"></p>
+    </section>`;
+  }
+
+  /* ---------- Flow ---------- */
+  function newRound() {
+    const items = [];
+    S.settings.cats.forEach(c => DATA[c].forEach(w => items.push({ c, w })));
+    const pick = P.deck('artfraud', items, x => x.c + '|' + x.w).one();
+    const n = S.players.length;
+    S.cat = pick.c;
+    S.word = pick.w;
+    S.fraud = Math.floor(Math.random() * n);
+    let start = S.roundNo % n;
+    if (start === S.fraud) start = (start + 1) % n;
+    const lap = Array.from({ length: n }, (_, k) => (start + k) % n);
+    S.order = S.settings.laps === 2 ? lap.concat(lap) : lap;
+    S.turn = 0;
+    S.strokes = [];
+    S.pending = false;
+    S.deal = 0;
+    S.peeked = false;
+    S.accused = null;
+    S.guessed = false;
+    S.roundNo++;
+    persist();
+    S.screen = 'pass';
+    render();
+  }
+  function finish(winner) {
+    S.winner = winner;
+    S.players.forEach((n, i) => {
+      if (winner === 'artists' && i !== S.fraud) S.scores[n] = (S.scores[n] || 0) + 1;
+      if (winner === 'fraud' && i === S.fraud) S.scores[n] = (S.scores[n] || 0) + 2;
+    });
+    persist();
+    S.screen = 'result';
+    render();
+    if (winner === 'artists') { sfx.win(); P.confetti({ colors: ['#c9a54a', '#8b1e2d', '#1b6ca8', '#2a9d55'] }); } else sfx.lose();
+  }
+  function saveArt() {
+    const note = document.getElementById('saveNote');
+    const cv = document.getElementById('art');
+    if (!cv) return;
+    cv.toBlob(async blob => {
+      if (!blob) return;
+      const file = new File([blob], 'art-fraud.png', { type: 'image/png' });
+      try {
+        if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Art Fraud' }); return; }
+      } catch (e) { if (e && e.name === 'AbortError') return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'art-fraud.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      if (note) note.textContent = 'Saved as art-fraud.png.';
+    }, 'image/png');
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, ticket: viewTicket, draw: viewDraw, vote: viewVote, guess: viewGuess, result: viewResult };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 4, max: 10 });
+    if (S.screen === 'ticket') P.holdToReveal(document.getElementById('ticket'), () => { S.peeked = true; document.getElementById('seenBtn').disabled = false; });
+    if (S.screen === 'draw') { mountPad(true); paintControls(); }
+    if (S.screen === 'vote' || S.screen === 'result') mountPad(false);
+    if (S.screen !== shown || S.screen === 'pass') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const cat = e.target.closest('[data-cat]');
+    if (cat) {
+      const c = cat.getAttribute('data-cat'), on = S.settings.cats.includes(c);
+      if (on && S.settings.cats.length === 1) return;
+      S.settings.cats = on ? S.settings.cats.filter(x => x !== c) : S.settings.cats.concat(c);
+      cat.setAttribute('aria-pressed', String(!on));
+      persist();
+      return;
+    }
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': S.players = editor.get(); sfx.unlock(); P.stayAwake(); newRound(); break;
+      case 'reset': S.scores = {}; persist(); render(); break;
+      case 'me': S.peeked = false; S.screen = 'ticket'; render(); break;
+      case 'seen':
+        S.deal++;
+        S.screen = S.deal < S.players.length ? 'pass' : 'draw';
+        render();
+        break;
+      case 'redo': S.strokes.pop(); S.pending = false; redraw(); paintControls(); break;
+      case 'keep':
+        S.pending = false;
+        S.turn++;
+        sfx.whoosh();
+        if (S.turn >= totalTurns()) { S.screen = 'vote'; render(); }
+        else render();
+        break;
+      case 'accuse': {
+        const i = Number(b.getAttribute('data-i'));
+        S.accused = i;
+        if (i === S.fraud) { S.screen = 'guess'; render(); }
+        else finish('fraud');
+        break;
+      }
+      case 'guess': S.guessed = b.getAttribute('data-ok') === '1'; finish(S.guessed ? 'fraud' : 'artists'); break;
+      case 'save': saveArt(); break;
+      case 'next': newRound(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.name === 'laps') { S.settings.laps = Number(e.target.value); persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

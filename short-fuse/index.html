@@ -49,10 +49,10 @@ button{font:inherit;color:inherit}
 .sec+.sec{margin-top:20px}
 .hint{margin:6px 0 0;font-size:16px;color:var(--muted)}
 
-.pp-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.pp-list{list-style:none;margin:0;padding:0;display:grid;gap:8px;grid-template-columns:minmax(0,1fr)}
 .pp-row{display:flex;align-items:center;gap:8px}
 .pp-num{display:grid;place-items:center;flex:none;width:32px;height:32px;border:3px solid var(--ink);border-radius:50%;background:var(--sun);font-family:var(--f-comic);font-size:18px}
-.pp-input{flex:1;min-width:0;height:48px;padding:0 12px;border:3px solid var(--ink);border-radius:6px;background:#fff;color:var(--ink);font:700 19px/1 var(--f-body)}
+.pp-input{flex:1;min-width:0;width:0;height:48px;padding:0 12px;border:3px solid var(--ink);border-radius:6px;background:#fff;color:var(--ink);font:700 19px/1 var(--f-body)}
 .pp-input::placeholder{color:#8d8592;font-weight:400}
 .pp-input:focus{outline:none;box-shadow:4px 4px 0 var(--blue)}
 .pp-remove{display:grid;place-items:center;flex:none;width:44px;height:44px;border:3px solid var(--ink);border-radius:50%;background:#fff;color:var(--ink);cursor:pointer}

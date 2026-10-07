@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Snowman | Pass the Phone</title>
+<meta name="description" content="Guess the secret word one letter at a time. Every wrong letter melts a little more of the snowman.">
+<meta name="theme-color" content="#cfeaff">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: a snowy yard. The snowman stands center stage and slowly melts; the keyboard sits below like footprints in the snow. */
+:root{
+  color-scheme:light;
+  --bg:#cfeaff;
+  --fg:#16324f;
+  --muted:#3d5d80;
+  --panel:rgba(255,255,255,.65);
+  --panel-ink:#16324f;
+  --line:rgba(22,50,79,.22);
+  --field:#ffffff;
+  --field-ink:#16324f;
+  --accent:#ff7a3d;
+  --accent-ink:#ffffff;
+  --accent-shadow:#b4471a;
+  --good:#2e9e6a;
+  --focus:#ff7a3d;
+  --f-display:"Fredoka","Arial Rounded MT Bold",sans-serif;
+  --f-body:"Fredoka","Arial Rounded MT Bold",sans-serif;
+}
+body{background:linear-gradient(180deg,#bfe2ff 0%,#e3f3ff 60%,#ffffff 100%);background-attachment:fixed}
+.snow{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.snow i{position:absolute;top:-10px;width:8px;height:8px;border-radius:50%;background:#fff;box-shadow:0 0 4px rgba(22,50,79,.15);animation:fall linear infinite}
+@keyframes fall{to{transform:translateY(105vh) translateX(30px)}}
+.title{font-weight:700}
+.label,.big,.btn,.seg span,.opt-box b{font-weight:600}
+.man{display:block;width:min(56vw,230px);height:auto;margin:10px auto 0;overflow:visible}
+.man .part{transition:opacity .5s ease,transform .6s ease;transform-box:fill-box;transform-origin:center}
+.man .gone{opacity:0;transform:translateY(30px) rotate(25deg)}
+.man .melt{transform:scaleY(.82) translateY(10px)}
+.puddle{transition:transform .6s ease;transform-box:fill-box;transform-origin:center}
+.word{display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(4px,1.5vw,8px);margin:16px auto 0;max-width:640px}
+.word .gap{width:16px}
+.word span{display:grid;place-items:center;width:clamp(26px,7vw,40px);height:clamp(38px,9vw,52px);border-bottom:4px solid var(--fg);font-weight:700;font-size:clamp(24px,6.5vw,34px);text-transform:uppercase}
+.word span.miss{color:var(--accent)}
+.keys{display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(36px,10vw,48px),1fr));gap:6px;max-width:560px;margin:18px auto 0}
+.keys button{min-height:48px;border:0;border-radius:12px;background:#fff;color:var(--fg);font:700 20px var(--f-body);box-shadow:0 4px 0 #9cc3e6;cursor:pointer;touch-action:manipulation}
+.keys button:active{transform:translateY(2px);box-shadow:0 2px 0 #9cc3e6}
+.keys button.hit{background:var(--good);color:#fff;box-shadow:none}
+.keys button.miss{background:#d5e2ee;color:#8aa0b5;box-shadow:none}
+.keys button:disabled{cursor:default}
+.left{margin-top:10px;font-weight:600;color:var(--muted)}
+.cat{display:inline-block;margin-top:12px;padding:5px 14px;border-radius:999px;background:#fff;font-weight:600}
+.err{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="snow" aria-hidden="true" id="snow"></div>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="words.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const DATA = window.SNOW_WORDS || { Things: ['Umbrella'] };
+  const CATS = Object.keys(DATA);
+  const KEY = 'ptp.snowman';
+  const MAX = 7;
+  const app = document.getElementById('app');
+
+  (function snow() {
+    let h = '';
+    for (let i = 0; i < 26; i++) {
+      const s = 4 + Math.random() * 7;
+      h += '<i style="left:' + (Math.random() * 100).toFixed(1) + '%;width:' + s.toFixed(0) + 'px;height:' + s.toFixed(0) + 'px;animation-duration:' + (7 + Math.random() * 9).toFixed(1) + 's;animation-delay:-' + (Math.random() * 14).toFixed(1) + 's"></i>';
+    }
+    document.getElementById('snow').innerHTML = h;
+  })();
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ mode: 'phone', cat: 'any' }, saved.settings || {}),
+    record: saved.record || { won: 0, lost: 0 },
+    screen: 'setup', word: '', cat: '', setter: null, guessed: [], err: ''
+  };
+  let shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings, record: S.record }); }
+  const letters = () => [...new Set(S.word.toUpperCase().replace(/[^A-Z]/g, '').split(''))];
+  const wrong = () => S.guessed.filter(l => !letters().includes(l));
+  const solved = () => letters().every(l => S.guessed.includes(l));
+
+  function manSVG(misses, lost) {
+    const order = ['hat', 'scarf', 'armL', 'armR', 'nose', 'buttons', 'head'];
+    const cls = part => (order.indexOf(part) < misses ? ' gone' : '');
+    return `<svg class="man" viewBox="0 0 200 240" role="img" aria-label="Snowman, ${MAX - misses} parts left">
+      <ellipse class="puddle" cx="100" cy="226" rx="${60 + misses * 8}" ry="${8 + misses * 1.6}" fill="#a9d4f5"/>
+      <g class="part${misses >= 4 ? ' melt' : ''}"><circle cx="100" cy="172" r="52" fill="#fff" stroke="#9cc3e6" stroke-width="4"/></g>
+      <g class="part${cls('buttons')}"><circle cx="100" cy="150" r="5" fill="#16324f"/><circle cx="100" cy="172" r="5" fill="#16324f"/><circle cx="100" cy="194" r="5" fill="#16324f"/></g>
+      <g class="part${cls('armL')}"><path d="M54 128L18 104M30 112l-6-14" stroke="#7a5230" stroke-width="6" stroke-linecap="round" fill="none"/></g>
+      <g class="part${cls('armR')}"><path d="M146 128l36-24M170 112l6-14" stroke="#7a5230" stroke-width="6" stroke-linecap="round" fill="none"/></g>
+      <g class="part${cls('head')}">
+        <circle cx="100" cy="86" r="36" fill="#fff" stroke="#9cc3e6" stroke-width="4"/>
+        <circle cx="88" cy="80" r="4.5" fill="#16324f"/><circle cx="112" cy="80" r="4.5" fill="#16324f"/>
+        <path d="M86 100q14 ${lost ? '-8' : '10'} 28 0" stroke="#16324f" stroke-width="4" fill="none" stroke-linecap="round"/>
+      </g>
+      <g class="part${cls('nose')}"><path d="M100 88l26 6-26 5z" fill="#ff7a3d"/></g>
+      <g class="part${cls('scarf')}"><path d="M68 116c20 10 44 10 64 0v14c-20 10-44 10-64 0z" fill="#e63946"/><path d="M118 124l10 30h-14l-6-26z" fill="#c1121f"/></g>
+      <g class="part${cls('hat')}"><rect x="72" y="44" width="56" height="10" rx="3" fill="#16324f"/><rect x="82" y="12" width="36" height="36" rx="4" fill="#16324f"/><rect x="82" y="38" width="36" height="7" fill="#e63946"/></g>
+    </svg>`;
+  }
+  function wordHTML(showAll) {
+    return `<div class="word" aria-label="${showAll ? esc(S.word) : 'Secret word'}">${S.word.split('').map(ch => {
+      if (ch === ' ') return '<i class="gap"></i>';
+      const up = ch.toUpperCase();
+      if (!/[A-Z]/.test(up)) return `<span>${esc(ch)}</span>`;
+      const known = S.guessed.includes(up);
+      return `<span class="${!known && showAll ? 'miss' : ''}">${known || showAll ? up : ''}</span>`;
+    }).join('')}</div>`;
+  }
+
+  function viewSetup() {
+    const st = S.settings;
+    return P.header() + `
+    <h1 class="title">Snowman</h1>
+    ${manSVG(0)}
+    <p class="tagline">Guess the secret word one letter at a time. Each wrong letter melts the snowman a little more.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Who picks the word?</span>
+        <div class="modes">
+          ${P.opt('mode', 'phone', 'The phone', 'Everyone guesses together. Pick a category below.', st.mode)}
+          ${P.opt('mode', 'player', 'A player', 'One person types a secret word, then hands the phone to the guessers.', st.mode)}
+        </div></div>
+      <div class="sec"${st.mode === 'phone' ? '' : ' hidden'}><span class="label">Category</span>${P.seg('cat', [['any', 'Surprise me']].concat(CATS.map(c => [c, c])), st.cat)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Build a snowman</button></div>
+      ${S.record.won + S.record.lost ? `<p class="hint">On this phone: ${P.plural(S.record.won, 'snowman', 'snowmen')} saved, ${S.record.lost} melted.</p>` : ''}
+    </div>`;
+  }
+  function viewSet() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Word setter only</p>
+      <h2 class="big">Type a secret word</h2>
+      <p class="lead">Letters and spaces only. A short phrase works too.</p>
+      <div class="field"><label for="secret">Secret word</label><input id="secret" type="password" maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Nobody peek"></div>
+      <div class="field"><label for="hintcat">Hint for the guessers, if you want</label><input id="hintcat" type="text" maxlength="24" autocomplete="off" placeholder="For example: an animal"></div>
+      <p class="err" id="err" aria-live="polite">${esc(S.err)}</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="set">Hide it and hand over</button></div>
+    </section>`;
+  }
+  function viewPlay() {
+    const w = wrong().length;
+    return P.header() + `
+    <section class="center">
+      ${S.cat ? `<span class="cat">${esc(S.cat)}</span>` : ''}
+      ${manSVG(w)}
+      <p class="left">${MAX - w > 0 ? P.plural(MAX - w, 'wrong guess', 'wrong guesses') + ' left' : ''}</p>
+      ${wordHTML(false)}
+      <div class="keys">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => {
+        const used = S.guessed.includes(l), hit = used && letters().includes(l);
+        return `<button type="button" data-key="${l}" class="${used ? (hit ? 'hit' : 'miss') : ''}"${used ? ' disabled' : ''} aria-label="${l}${used ? (hit ? ', in the word' : ', not in the word') : ''}">${l}</button>`;
+      }).join('')}</div>
+    </section>`;
+  }
+  function viewEnd() {
+    const won = solved();
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${won ? 'Saved' : 'Melted'}</p>
+      ${manSVG(won ? wrong().length : MAX, !won)}
+      <h2 class="big">${won ? 'You saved the snowman' : 'The snowman melted'}</h2>
+      ${wordHTML(true)}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Another word</button></div>
+    </section>`;
+  }
+
+  function startRound() {
+    sfx.unlock();
+    S.guessed = [];
+    S.err = '';
+    if (S.settings.mode === 'player') { S.word = ''; S.cat = ''; S.screen = 'set'; render(); return; }
+    const cats = S.settings.cat === 'any' || !DATA[S.settings.cat] ? CATS : [S.settings.cat];
+    const items = [];
+    cats.forEach(c => DATA[c].forEach(w => items.push({ c, w })));
+    const pick = P.deck('snowman', items, x => x.w).one();
+    S.word = pick.w;
+    S.cat = pick.c;
+    S.screen = 'play';
+    render();
+  }
+  function setWord() {
+    const v = (document.getElementById('secret').value || '').replace(/\s+/g, ' ').trim();
+    if (!/^[A-Za-z ]{2,24}$/.test(v) || !/[A-Za-z]/.test(v)) { S.err = 'Use letters and spaces only, at least 2 letters.'; render(); return; }
+    S.word = v;
+    S.cat = (document.getElementById('hintcat').value || '').trim().slice(0, 24);
+    S.screen = 'play';
+    render();
+  }
+  function guess(l) {
+    if (S.screen !== 'play' || S.guessed.includes(l)) return;
+    S.guessed.push(l);
+    if (letters().includes(l)) sfx.ding(); else { sfx.tone(260, { type: 'triangle', to: 140, dur: 0.35, gain: 0.14 }); P.vibrate(40); }
+    if (solved()) { S.record.won++; persist(); S.screen = 'end'; render(); sfx.win(); P.confetti({ colors: ['#ffffff', '#ff7a3d', '#e63946', '#16324f', '#a9d4f5'] }); return; }
+    if (wrong().length >= MAX) { S.record.lost++; persist(); S.screen = 'end'; render(); sfx.lose(); return; }
+    render();
+  }
+
+  const VIEWS = { setup: viewSetup, set: viewSet, play: viewPlay, end: viewEnd };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'set') { const i = document.getElementById('secret'); if (i) i.focus(); }
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const k = e.target.closest('[data-key]');
+    if (k && !k.disabled) { guess(k.getAttribute('data-key')); return; }
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': case 'again': startRound(); break;
+      case 'set': setWord(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (S.screen === 'play' && /^[a-zA-Z]$/.test(e.key) && !e.metaKey && !e.ctrlKey) guess(e.key.toUpperCase());
+    else if (S.screen === 'set' && e.key === 'Enter') { e.preventDefault(); setWord(); }
+  });
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'mode') { S.settings.mode = t.value; persist(); render(); }
+    else if (t.name === 'cat') { S.settings.cat = t.value; persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

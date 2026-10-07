@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Two Truths | Pass the Phone</title>
+<meta name="description" content="Everyone secretly writes two truths and a lie. The phone shuffles them, and the room has to find each lie.">
+<meta name="theme-color" content="#eef3e6">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Syne:wght@700;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: a lie detector printout. Green graph paper, a red needle line across the page, and statements laid out like readings. */
+:root{
+  color-scheme:light;
+  --bg:#eef3e6;
+  --fg:#16241a;
+  --muted:#46604c;
+  --panel:#ffffff;
+  --panel-ink:#16241a;
+  --line:rgba(22,36,26,.25);
+  --field:#ffffff;
+  --field-ink:#16241a;
+  --accent:#e0352b;
+  --accent-ink:#ffffff;
+  --accent-shadow:#8f1a13;
+  --grid:#c9dcc0;
+  --truth:#2e8b57;
+  --focus:#e0352b;
+  --radius:10px;
+  --btn-radius:10px;
+  --f-display:"Syne",system-ui,sans-serif;
+  --f-body:"IBM Plex Mono",ui-monospace,monospace;
+}
+body{background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px;background-attachment:fixed}
+.title{font-weight:800;letter-spacing:-.03em}
+.needle{display:block;width:100%;max-width:520px;height:60px;margin-top:6px}
+.label,.big,.btn,.opt-box b{font-weight:800}
+.panel{box-shadow:0 0 0 2px var(--fg)}
+.field label{font-family:var(--f-display)}
+.field label.lie{color:var(--accent)}
+.statements{list-style:none;margin:20px auto 0;padding:0;max-width:600px;display:grid;gap:12px;text-align:left}
+.statements li{display:flex;gap:14px;align-items:flex-start;padding:16px;border-radius:10px;background:#fff;box-shadow:0 0 0 2px var(--fg),6px 6px 0 rgba(22,36,26,.15)}
+.statements .n{flex:none;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:var(--fg);color:#fff;font-family:var(--f-display);font-weight:800;font-size:22px}
+.statements p{margin:0;font-size:clamp(18px,4.4vw,22px);line-height:1.35;overflow-wrap:anywhere}
+.statements li.lie{box-shadow:0 0 0 4px var(--accent),6px 6px 0 rgba(224,53,43,.2)}
+.statements li.lie .n{background:var(--accent)}
+.statements li.true{opacity:.55}
+.stamp{display:inline-block;margin-left:8px;padding:0 8px;border:3px solid var(--accent);border-radius:4px;color:var(--accent);font-family:var(--f-display);font-weight:800;font-size:15px;transform:rotate(-4deg)}
+.chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:16px}
+.chip{min-height:46px;padding:6px 16px;border:0;border-radius:999px;background:#fff;color:var(--fg);box-shadow:0 0 0 2px var(--fg);font:700 17px var(--f-body);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--truth);color:#fff;box-shadow:none}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.twotruths';
+  const app = document.getElementById('app');
+  const NEEDLE = '<svg class="needle" viewBox="0 0 520 60" aria-hidden="true"><path d="M0 30h60l10-6 10 12 10-20 10 30 10-28 10 22 10-10h80l8-4 8 8 8-26 10 46 10-40 8 30 8-14h70l10-8 10 16 10-6h120" fill="none" stroke="#e0352b" stroke-width="3" stroke-linejoin="round"/></svg>';
+
+  const S = { screen: 'setup', players: [], writer: 0, sets: [], spot: 0, order: [], found: [], scores: {}, revealed: false };
+  let editor = null, shown = null;
+  const nameOf = i => S.players[i];
+
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Two Truths</h1>
+    ${NEEDLE}
+    <p class="tagline">Everyone secretly writes two true things about themselves and one lie. The phone mixes them up. Can the room find every lie?</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Start the test</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Pass the phone. Everyone secretly writes two true facts about themselves and one believable lie.</li>
+        <li>Then each player takes a turn in the spotlight. The phone shows their three statements in a random order.</li>
+        <li>Everyone else asks questions, then holds up 1, 2 or 3 fingers for the lie.</li>
+        <li>Spot the lie for 1 point. The player in the spotlight gets 1 point for everyone they fooled.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    return P.header() + P.passScreen({ eyebrow: 'Writer ' + (S.writer + 1) + ' of ' + S.players.length, name: nameOf(S.writer), lead: 'Write where nobody can see.' });
+  }
+  function viewWrite() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(nameOf(S.writer))}, about you</p>
+      <h2 class="big">Two truths and a lie</h2>
+      <div class="field"><label for="t1">True thing</label><input id="t1" data-s type="text" maxlength="90" autocomplete="off" placeholder="I have been to Spain"></div>
+      <div class="field"><label for="t2">Another true thing</label><input id="t2" data-s type="text" maxlength="90" autocomplete="off" placeholder="I can juggle"></div>
+      <div class="field"><label for="lie" class="lie">A believable lie</label><input id="lie" data-s type="text" maxlength="90" autocomplete="off" placeholder="I once met a famous chef"></div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="save" id="saveBtn" disabled>Lock them in</button></div>
+    </section>`;
+  }
+  function viewSpot() {
+    const set = S.sets[S.spot];
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">In the spotlight ${S.order.indexOf(S.spot) + 1} of ${S.players.length}</p>
+      <h2 class="big">${esc(nameOf(S.spot))}</h2>
+      <ol class="statements">${set.items.map((it, k) => `<li class="${S.revealed ? (it.lie ? 'lie' : 'true') : ''}"><span class="n">${k + 1}</span><p>${esc(it.text)}${S.revealed && it.lie ? '<span class="stamp">Lie</span>' : ''}</p></li>`).join('')}</ol>
+      ${S.revealed ? revealBlock() : `<p class="lead">${esc(nameOf(S.spot))} reads them out loud. Ask questions, then everyone holds up 1, 2 or 3 fingers for the lie.</p>
+        <span class="label" style="margin-top:20px">Who found the lie?</span>
+        <div class="chips">${S.players.map((n, i) => i === S.spot ? '' : `<button class="chip" type="button" data-act="found" data-i="${i}" aria-pressed="${S.found.includes(i)}">${esc(n)}</button>`).join('')}</div>
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="reveal">Reveal the lie</button></div>`}
+    </section>`;
+  }
+  function revealBlock() {
+    const fooled = S.players.length - 1 - S.found.length;
+    const last = S.order.indexOf(S.spot) >= S.order.length - 1;
+    return `<p class="lead">${S.found.length ? esc(P.listNames(S.found.map(nameOf))) + ' found it.' : 'Nobody found it.'} ${esc(nameOf(S.spot))} fooled ${P.plural(fooled, 'player')}.</p>
+      ${P.scoreList(S.players.map(n => [n, S.scores[n] || 0]))}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="next">${last ? 'Final scores' : 'Next in the spotlight'}</button></div>`;
+  }
+  function viewFinal() {
+    const rows = S.players.map(n => [n, S.scores[n] || 0]).sort((a, b) => b[1] - a[1]);
+    const top = rows[0][1], winners = rows.filter(r => r[1] === top).map(r => r[0]);
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Test complete</p>
+      <h2 class="big">${esc(P.listNames(winners))} ${winners.length > 1 ? 'are the best liars and lie detectors' : 'is the best liar and lie detector'}</h2>
+      ${P.scoreList(rows)}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change players</button><button class="btn btn-main btn-big" type="button" data-act="again">New statements</button></div>
+    </section>`;
+  }
+
+  function start() {
+    S.players = editor.get();
+    S.sets = [];
+    S.writer = 0;
+    S.scores = {};
+    sfx.unlock();
+    P.stayAwake();
+    S.screen = 'pass';
+    render();
+  }
+  function save() {
+    const v = ['t1', 't2', 'lie'].map(id => document.getElementById(id).value.replace(/\s+/g, ' ').trim());
+    if (v.some(x => !x)) return;
+    S.sets[S.writer] = { items: P.shuffle([{ text: v[0], lie: false }, { text: v[1], lie: false }, { text: v[2], lie: true }]) };
+    S.writer++;
+    sfx.whoosh();
+    if (S.writer < S.players.length) { S.screen = 'pass'; render(); return; }
+    S.order = P.shuffle(S.players.map((_, i) => i));
+    S.spot = S.order[0];
+    S.found = [];
+    S.revealed = false;
+    S.screen = 'spot';
+    render();
+  }
+  function reveal() {
+    S.revealed = true;
+    S.found.forEach(i => { S.scores[nameOf(i)] = (S.scores[nameOf(i)] || 0) + 1; });
+    const fooled = S.players.length - 1 - S.found.length;
+    S.scores[nameOf(S.spot)] = (S.scores[nameOf(S.spot)] || 0) + fooled;
+    render();
+    sfx.tone(140, { type: 'sawtooth', to: 900, dur: 0.5, gain: 0.08, lowpass: 2000 });
+    setTimeout(() => (fooled > 0 ? sfx.buzz(0.4) : sfx.ding()), 450);
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, write: viewWrite, spot: viewSpot, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 3, max: 10 });
+    if (S.screen === 'write') { const i = document.getElementById('t1'); if (i) i.focus(); }
+    const key = S.screen + S.spot;
+    if (key !== shown || S.screen === 'pass') window.scrollTo(0, 0);
+    shown = key;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': start(); break;
+      case 'me': S.screen = 'write'; render(); break;
+      case 'save': save(); break;
+      case 'found': {
+        const i = Number(b.getAttribute('data-i'));
+        S.found = S.found.includes(i) ? S.found.filter(x => x !== i) : S.found.concat(i);
+        b.setAttribute('aria-pressed', String(S.found.includes(i)));
+        sfx.pop();
+        break;
+      }
+      case 'reveal': reveal(); break;
+      case 'next': {
+        const k = S.order.indexOf(S.spot) + 1;
+        if (k >= S.order.length) { S.screen = 'final'; render(); sfx.win(); P.confetti({ colors: ['#e0352b', '#2e8b57', '#16241a', '#ffffff'] }); break; }
+        S.spot = S.order[k];
+        S.found = [];
+        S.revealed = false;
+        render();
+        break;
+      }
+      case 'again': S.sets = []; S.writer = 0; S.scores = {}; S.screen = 'pass'; render(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('input', e => {
+    if (e.target.hasAttribute && e.target.hasAttribute('data-s')) {
+      document.getElementById('saveBtn').disabled = ['t1', 't2', 'lie'].some(id => !document.getElementById(id).value.trim());
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || !(e.target.hasAttribute && e.target.hasAttribute('data-s'))) return;
+    e.preventDefault();
+    const order = ['t1', 't2', 'lie'], k = order.indexOf(e.target.id);
+    if (k < 2) document.getElementById(order[k + 1]).focus(); else save();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

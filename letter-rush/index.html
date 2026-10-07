@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Letter Rush | Pass the Phone</title>
+<meta name="description" content="Roll a letter, beat the clock, and fill every category with an answer that starts with it. Then score together.">
+<meta name="theme-color" content="#1d6a47">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Source+Sans+3:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: a game table. Green felt, one big wooden letter tile, and the category list on a lined score pad. */
+:root{
+  color-scheme:dark;
+  --bg:#1d6a47;
+  --fg:#f4fbf6;
+  --muted:#bfe3cf;
+  --panel:rgba(5,38,24,.3);
+  --line:rgba(244,251,246,.34);
+  --field:#fffdf6;
+  --field-ink:#1e2a22;
+  --accent:#f2c879;
+  --accent-ink:#3a2408;
+  --accent-shadow:#a7792c;
+  --pad:#fffdf6;
+  --pad-ink:#1e2a22;
+  --pad-line:#d9e3dc;
+  --focus:#ffe08a;
+  --f-display:"Alfa Slab One",Rockwell,Georgia,serif;
+  --f-body:"Source Sans 3",system-ui,-apple-system,sans-serif;
+}
+body{background-color:#1d6a47;background-image:radial-gradient(ellipse 90% 60% at 50% 30%,rgba(255,255,255,.1),transparent 70%),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");background-attachment:fixed}
+.title{letter-spacing:.01em;text-shadow:0 5px 0 rgba(5,38,24,.45)}
+.tile{position:relative;display:grid;place-items:center;width:clamp(120px,34vw,190px);aspect-ratio:1;margin:18px auto 0;border-radius:18px;background:linear-gradient(145deg,#f7d89a,#e9b864 60%,#d49d43);color:#3a2408;font-family:var(--f-display);font-size:clamp(72px,22vw,120px);line-height:1;box-shadow:inset 0 -8px 0 rgba(0,0,0,.14),inset 0 3px 0 rgba(255,255,255,.5),0 16px 26px -12px rgba(0,0,0,.6)}
+.tile small{position:absolute;right:12px;bottom:8px;font-family:var(--f-display);font-size:20px}
+.tile.rolling{animation:wobble .14s linear infinite}
+@keyframes wobble{0%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}100%{transform:rotate(-4deg)}}
+.pad{margin:20px auto 0;max-width:520px;padding:16px 18px 18px;border-radius:12px;background:var(--pad);color:var(--pad-ink);box-shadow:0 18px 30px -16px rgba(0,0,0,.6);text-align:left}
+.pad ol{margin:0;padding-left:1.6em;display:grid;gap:0}
+.pad li{padding:7px 0 6px;border-bottom:1px solid var(--pad-line);font-weight:600;font-size:19px;line-height:1.3}
+.pad li::marker{font-family:var(--f-display);color:#1d6a47}
+.pad h3{margin:0 0 6px;font-family:var(--f-display);font-weight:400;font-size:20px}
+.cat{margin:20px auto 0;max-width:520px;padding:18px;border-radius:14px;background:var(--pad);color:var(--pad-ink);box-shadow:0 16px 28px -16px rgba(0,0,0,.6)}
+.cat small{display:block;font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:13px;color:#1d6a47}
+.cat b{display:block;margin-top:4px;font-family:var(--f-display);font-weight:400;font-size:clamp(24px,6vw,34px);line-height:1.15}
+.marks{list-style:none;margin:16px auto 0;padding:0;max-width:520px;display:grid;gap:8px}
+.marks button{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:56px;padding:8px 16px;border:0;border-radius:14px;background:var(--panel);color:var(--fg);font-weight:800;font-size:19px;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line);touch-action:manipulation}
+.marks button span:first-child{min-width:0;overflow-wrap:anywhere;text-align:left}
+.dots{display:flex;gap:6px;flex:none}
+.dots i{width:18px;height:18px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--accent)}
+.dots i.on{background:var(--accent)}
+.step{font-weight:800;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="categories.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const CATS = window.RUSH_CATEGORIES || [];
+  const KEY = 'ptp.rush';
+  const EASY = 'ABCDEFGHIJKLMNOPRSTW'.split('');
+  const ALL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const VALUES = { A: 1, B: 3, C: 3, D: 2, E: 1, F: 4, G: 2, H: 4, I: 1, J: 8, K: 5, L: 1, M: 3, N: 1, O: 1, P: 3, Q: 10, R: 1, S: 1, T: 1, U: 1, V: 4, W: 4, X: 8, Y: 4, Z: 10 };
+  const app = document.getElementById('app');
+  const deck = P.deck('rush', CATS);
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ count: 8, time: 120, letters: 'easy' }, saved.settings || {}),
+    screen: 'setup', players: [], letter: null, used: [], cats: [], round: 0, marks: [], k: 0, totals: {}
+  };
+  let editor = null, timer = null, shown = null, roller = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const tile = (l, rolling) => `<div class="tile${rolling ? ' rolling' : ''}" id="tile" aria-live="polite">${esc(l || '?')}<small>${l ? VALUES[l] : ''}</small></div>`;
+  const padHTML = () => `<div class="pad"><h3>Starts with ${esc(S.letter)}</h3><ol>${S.cats.map(c => `<li>${esc(c)}</li>`).join('')}</ol></div>`;
+
+  function viewSetup() {
+    const st = S.settings;
+    return P.header() + `
+    <h1 class="title">Letter Rush</h1>
+    ${tile('R')}
+    <p class="tagline center">Roll a letter. Everyone races to fill every category with an answer that starts with it.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players, for keeping score</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Categories per round</span>${P.seg('count', [[6, '6'], [8, '8'], [10, '10'], [12, '12']], st.count)}</div>
+      <div class="sec"><span class="label">Time</span>${P.seg('time', [[60, '1 min'], [90, '1:30'], [120, '2 min'], [180, '3 min']], st.time)}</div>
+      <div class="sec"><span class="label">Letters</span>${P.seg('letters', [['easy', 'Skip the hard ones'], ['all', 'All 26']], st.letters)}<p class="hint">Skipping drops Q, U, V, X, Y and Z.</p></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Grab paper and start</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Everyone grabs paper and a pen and numbers the lines.</li>
+        <li>Roll a letter. When the clock starts, write one answer per category. Every answer must start with that letter.</li>
+        <li>When time is up, go through the categories together. Read your answers out loud.</li>
+        <li>An answer scores a point if nobody else wrote the same thing. Tap a player to give them points.</li>
+      </ol>
+    </details>`;
+  }
+  function viewRoll() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Round ${S.round}</p>
+      ${tile(S.letter, !!roller)}
+      ${S.letter && !roller ? padHTML() + `<div class="actions center"><button class="btn btn-alt" type="button" data-act="reroll">Roll again</button><button class="btn btn-main btn-big" type="button" data-act="go">Start the clock</button></div>`
+        : '<p class="lead">Rolling...</p>'}
+    </section>`;
+  }
+  function viewPlay() {
+    return P.header() + `
+    <section class="center">
+      <div class="timer" id="timer" role="timer">${P.clock(timer ? timer.left : S.settings.time * 1000)}</div>
+      ${tile(S.letter)}
+      ${padHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="pause" id="pauseBtn">Pause</button><button class="btn btn-alt" type="button" data-act="stop">Pens down early</button></div>
+    </section>`;
+  }
+  function viewScore() {
+    const k = S.k, c = S.cats[k];
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Pens down. Scoring ${k + 1} of ${S.cats.length}</p>
+      <div class="cat"><small>Starts with ${esc(S.letter)}</small><b>${esc(c)}</b></div>
+      <p class="lead">Everyone reads their answer. Tap a player for each point: one for a unique answer, two if every word in it starts with ${esc(S.letter)}.</p>
+      <ul class="marks">${S.players.map((n, i) => {
+        const v = S.marks[k][i];
+        return `<li><button type="button" data-act="mark" data-i="${i}" aria-label="${esc(n)}: ${P.plural(v, 'point')}"><span>${esc(n)}</span><span class="dots"><i class="${v >= 1 ? 'on' : ''}"></i><i class="${v >= 2 ? 'on' : ''}"></i></span></button></li>`;
+      }).join('')}</ul>
+      <div class="actions center">
+        ${k > 0 ? '<button class="btn btn-alt" type="button" data-act="prev">Back</button>' : ''}
+        <button class="btn btn-main btn-big" type="button" data-act="nextcat">${k < S.cats.length - 1 ? 'Next category' : 'Add up the round'}</button>
+      </div>
+      <div class="actions center"><button class="textbtn" type="button" data-act="skip-score">We scored on paper. Skip this</button></div>
+    </section>`;
+  }
+  function viewTotals() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">After round ${S.round}</p>
+      <h2 class="big">Scoreboard</h2>
+      ${P.scoreList(S.players.map(n => [n, S.totals[n] || 0]))}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="round">Next letter</button></div>
+    </section>`;
+  }
+
+  function newRound() {
+    S.round++;
+    S.cats = deck.draw(S.settings.count);
+    S.marks = S.cats.map(() => S.players.map(() => 0));
+    S.k = 0;
+    roll();
+  }
+  function roll() {
+    const pool = (S.settings.letters === 'all' ? ALL : EASY).filter(l => !S.used.includes(l));
+    const choices = pool.length ? pool : (S.settings.letters === 'all' ? ALL : EASY);
+    if (!pool.length) S.used = [];
+    const final = P.pick(choices);
+    S.letter = null;
+    S.screen = 'roll';
+    clearTimeout(roller);
+    roller = 1;
+    render();
+    let n = 0, delay = 55;
+    const spin = () => {
+      const el = document.getElementById('tile');
+      n++;
+      if (n < 18) {
+        const l = P.pick(choices);
+        if (el) el.firstChild.nodeValue = l;
+        sfx.tick(900 + n * 40);
+        delay *= 1.12;
+        roller = setTimeout(spin, delay);
+      } else {
+        roller = null;
+        S.letter = final;
+        S.used.push(final);
+        sfx.ding();
+        render();
+      }
+    };
+    roller = setTimeout(spin, delay);
+  }
+  function go() {
+    S.screen = 'play';
+    if (timer) timer.stop();
+    timer = P.countdown(S.settings.time * 1000, {
+      tickLast: 10,
+      onTick: ms => { const el = document.getElementById('timer'); if (el) { el.textContent = P.clock(ms); el.classList.toggle('low', ms <= 10000); } },
+      onEnd: () => { sfx.buzz(1.2); P.vibrate([300, 100, 300]); S.screen = 'score'; render(); }
+    });
+    render();
+    timer.start();
+  }
+  function addUp() {
+    S.players.forEach((n, i) => { S.totals[n] = (S.totals[n] || 0) + S.marks.reduce((s, row) => s + row[i], 0); });
+    S.screen = 'totals';
+    render();
+    sfx.win();
+  }
+
+  const VIEWS = { setup: viewSetup, roll: viewRoll, play: viewPlay, score: viewScore, totals: viewTotals };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 1, max: 12 });
+    if (S.screen !== shown || S.screen === 'score') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start':
+        S.players = editor.get();
+        S.totals = {};
+        S.round = 0;
+        sfx.unlock();
+        P.stayAwake();
+        newRound();
+        break;
+      case 'reroll': S.used = S.used.filter(l => l !== S.letter); roll(); break;
+      case 'go': go(); break;
+      case 'pause':
+        if (!timer) break;
+        if (timer.running) timer.stop(); else timer.start();
+        b.textContent = timer.running ? 'Pause' : 'Resume';
+        break;
+      case 'stop': if (timer) timer.stop(); sfx.buzz(0.8); S.screen = 'score'; render(); break;
+      case 'mark': {
+        const i = Number(b.getAttribute('data-i')), row = S.marks[S.k];
+        row[i] = (row[i] + 1) % 3;
+        sfx.pop();
+        render();
+        break;
+      }
+      case 'prev': S.k = Math.max(0, S.k - 1); render(); break;
+      case 'nextcat': if (S.k < S.cats.length - 1) { S.k++; render(); } else addUp(); break;
+      case 'skip-score': S.marks = S.cats.map(() => S.players.map(() => 0)); addUp(); break;
+      case 'round': newRound(); break;
+      case 'setup': if (timer) timer.stop(); S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'count' || t.name === 'time') { S.settings[t.name] = Number(t.value); persist(); }
+    else if (t.name === 'letters') { S.settings.letters = t.value; persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

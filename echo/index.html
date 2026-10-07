@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Echo | Pass the Phone</title>
+<meta name="description" content="Repeat the pattern of lights and tones, add one more, and pass the phone. Miss a note and you lose a life.">
+<meta name="theme-color" content="#161a2b">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Audiowide&family=Exo+2:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: a glowing memory toy in a dark room. Four big pads own the screen; everything else is quiet text around them. */
+:root{
+  color-scheme:dark;
+  --bg:#161a2b;
+  --fg:#eef1ff;
+  --muted:#a6acd0;
+  --panel:rgba(255,255,255,.06);
+  --line:rgba(238,241,255,.26);
+  --field:#eef1ff;
+  --field-ink:#161a2b;
+  --accent:#ffd32a;
+  --accent-ink:#1b1600;
+  --accent-shadow:#a68500;
+  --g:#2ecc71;
+  --r:#ff4757;
+  --y:#ffd32a;
+  --b:#1e90ff;
+  --focus:#ffd32a;
+  --f-display:"Audiowide","Trebuchet MS",sans-serif;
+  --f-body:"Exo 2",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(circle at 50% 40%,#242a45,#161a2b 70%);background-attachment:fixed}
+.title{letter-spacing:.02em}
+.title span:nth-child(1){color:var(--g)}
+.title span:nth-child(2){color:var(--r)}
+.title span:nth-child(3){color:var(--y)}
+.title span:nth-child(4){color:var(--b)}
+.pads{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(10px,3vw,18px);width:min(86vw,420px);margin:20px auto 0;padding:clamp(10px,3vw,18px);border-radius:50%;background:#0c0e18;box-shadow:0 0 0 6px #262c48,0 30px 50px -24px rgba(0,0,0,.8);aspect-ratio:1}
+.pad{border:0;cursor:pointer;opacity:.38;transition:opacity .08s ease,filter .08s ease,box-shadow .08s ease;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.pad:disabled{cursor:default}
+.pad.lit{opacity:1;filter:brightness(1.25);box-shadow:0 0 40px var(--c)}
+.pad[data-k="0"]{--c:var(--g);background:var(--g);border-radius:100% 8px 8px 8px}
+.pad[data-k="1"]{--c:var(--r);background:var(--r);border-radius:8px 100% 8px 8px}
+.pad[data-k="2"]{--c:var(--y);background:var(--y);border-radius:8px 8px 8px 100%}
+.pad[data-k="3"]{--c:var(--b);background:var(--b);border-radius:8px 8px 100% 8px}
+.status{min-height:3.2em;margin:18px auto 0;max-width:30em;font-size:20px;font-weight:800;text-align:center}
+.status small{display:block;font-weight:600;font-size:16px;color:var(--muted)}
+.lives{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:16px}
+.lives span{display:flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);font-weight:700}
+.lives span.now{box-shadow:inset 0 0 0 2px var(--accent)}
+.lives span.out{opacity:.4;text-decoration:line-through}
+.lives i{width:10px;height:10px;border-radius:50%;background:var(--r)}
+.lives i.gone{background:transparent;box-shadow:inset 0 0 0 2px var(--r)}
+.len{font-family:var(--f-display);font-size:clamp(40px,12vw,72px);color:var(--accent);margin:18px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.echo';
+  const FREQ = [415.3, 311.1, 252, 209];
+  const NAMES = ['green', 'red', 'yellow', 'blue'];
+  const app = document.getElementById('app');
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ lives: 2, playback: true }, saved.settings || {}),
+    best: Number(saved.best) || 0,
+    screen: 'setup', players: [], lives: [], seq: [], cur: 0, step: 0, phase: 'idle', longest: 0, justFailed: null
+  };
+  let editor = null, shown = null, busy = false;
+  function persist() { P.store.set(KEY, { settings: S.settings, best: S.best }); }
+  const alive = () => S.players.map((_, i) => i).filter(i => S.lives[i] > 0);
+  const solo = () => S.players.length === 1;
+
+  function padsHTML(enabled) {
+    return `<div class="pads" role="group" aria-label="Pads">${[0, 1, 2, 3].map(k => `<button class="pad" type="button" data-k="${k}" aria-label="${NAMES[k]}"${enabled ? '' : ' disabled'}></button>`).join('')}</div>`;
+  }
+  function livesHTML() {
+    return `<div class="lives">${S.players.map((n, i) => `<span class="${i === S.cur ? 'now' : ''}${S.lives[i] <= 0 ? ' out' : ''}">${esc(n)}${Array.from({ length: S.settings.lives }, (_, k) => `<i class="${k < S.lives[i] ? '' : 'gone'}"></i>`).join('')}</span>`).join('')}</div>`;
+  }
+
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title"><span>E</span><span>c</span><span>h</span><span>o</span></h1>
+    <p class="tagline">Repeat the pattern, add one more note, pass the phone. Works for one player too.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Lives</span>${P.seg('lives', [[1, '1'], [2, '2'], [3, '3']], S.settings.lives)}</div>
+      <div class="sec"><span class="label">Help</span>${P.seg('playback', [['1', 'Play it back each turn'], ['0', 'Memory only']], S.settings.playback ? '1' : '0')}<p class="hint">Memory only is harder: watch the other players closely.</p></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Start</button></div>
+      ${S.best ? `<p class="hint">Longest pattern on this phone: ${S.best} notes.</p>` : ''}
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>The first player taps any pad. That is the pattern.</li>
+        <li>The next player repeats the whole pattern, then adds one more note, and passes the phone.</li>
+        <li>Miss a note and you lose a life. The pattern starts over with the next player.</li>
+        <li>Last player with lives left wins. Playing alone? See how long a pattern you can build.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    const n = S.players[S.cur];
+    const failed = S.justFailed != null ? `<p class="lead">Wrong note. ${esc(S.players[S.justFailed])} loses a life and the pattern starts over.</p>` : '';
+    if (solo()) return P.header() + `<section class="center">${failed}<p class="len">${S.seq.length}</p><p class="lead">${S.seq.length ? 'notes so far. The phone adds one more each round.' : 'The phone plays a note. Repeat it, then the pattern grows.'}</p><div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="me">${S.seq.length ? 'Next round' : 'Start'}</button></div>${livesHTML()}</section>`;
+    return P.header() + P.passScreen({ eyebrow: S.seq.length ? 'The pattern has ' + P.plural(S.seq.length, 'note') : 'New pattern', name: n, lead: S.seq.length ? 'Repeat all ' + P.plural(S.seq.length, 'note') + ', then add one.' : 'Start a new pattern with one note.', extra: failed + livesHTML() });
+  }
+  function viewPlay() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(S.players[S.cur])}</p>
+      ${padsHTML(false)}
+      <p class="status" id="status" aria-live="polite"></p>
+      ${livesHTML()}
+    </section>`;
+  }
+  function viewOver() {
+    const w = alive();
+    const head = solo() ? 'Game over' : (w.length === 1 ? esc(S.players[w[0]]) + ' wins' : 'Game over');
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Last echo</p>
+      <h2 class="big">${head}</h2>
+      <p class="len">${S.longest}</p>
+      <p class="lead">Longest pattern this game, in notes. ${S.longest >= S.best ? 'That is a new record for this phone.' : 'The record on this phone is ' + S.best + '.'}</p>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  function status(html) { const s = document.getElementById('status'); if (s) s.innerHTML = html; }
+  function enablePads(on) { document.querySelectorAll('.pad').forEach(p => { p.disabled = !on; }); }
+  function flash(k, ms) {
+    const pad = document.querySelector('.pad[data-k="' + k + '"]');
+    if (pad) pad.classList.add('lit');
+    sfx.tone(FREQ[k], { type: 'triangle', dur: ms / 1000, gain: 0.2, hold: Math.max(0.01, ms / 1000 - 0.08) });
+    setTimeout(() => { if (pad) pad.classList.remove('lit'); }, ms);
+  }
+  async function playback() {
+    busy = true;
+    status('Watch the pattern<small>' + P.plural(S.seq.length, 'note') + '</small>');
+    await P.wait(600);
+    const speed = Math.max(260, 560 - S.seq.length * 18);
+    for (const k of S.seq) {
+      if (S.screen !== 'play') return;
+      flash(k, speed);
+      await P.wait(speed + 140);
+    }
+    busy = false;
+  }
+  async function beginTurn() {
+    S.justFailed = null;
+    S.screen = 'play';
+    render();
+    S.step = 0;
+    if (solo()) {
+      S.seq.push(Math.floor(Math.random() * 4));
+      await playback();
+    } else if (S.seq.length && S.settings.playback) await playback();
+    if (S.screen !== 'play') return;
+    S.phase = S.seq.length ? 'repeat' : 'add';
+    status(S.phase === 'repeat' ? 'Your turn<small>Repeat all ' + P.plural(S.seq.length, 'note') + '</small>' : 'Add a note<small>Tap any pad</small>');
+    enablePads(true);
+  }
+  function press(k) {
+    if (busy || S.screen !== 'play') return;
+    flash(k, 260);
+    if (S.phase === 'repeat') {
+      if (k !== S.seq[S.step]) { fail(); return; }
+      S.step++;
+      if (S.step >= S.seq.length) {
+        S.longest = Math.max(S.longest, S.seq.length);
+        if (solo()) {
+          enablePads(false);
+          S.phase = 'done';
+          status('Correct<small>The pattern grows by one</small>');
+          setTimeout(() => nextPlayer(false), 700);
+          return;
+        }
+        S.phase = 'add';
+        status('Nice<small>Now add one more note</small>');
+      }
+    } else if (S.phase === 'add') {
+      S.seq.push(k);
+      S.longest = Math.max(S.longest, S.seq.length);
+      enablePads(false);
+      S.phase = 'done';
+      status('Added<small>' + (solo() ? 'Ready for the next round' : 'Pass the phone') + '</small>');
+      setTimeout(() => nextPlayer(false), 700);
+    }
+  }
+  function fail() {
+    enablePads(false);
+    busy = true;
+    sfx.buzz(0.7);
+    P.vibrate([150, 60, 150]);
+    const pad = document.querySelector('.pad[data-k="' + S.seq[S.step] + '"]');
+    if (pad) { pad.classList.add('lit'); setTimeout(() => pad.classList.remove('lit'), 900); }
+    status('Wrong note<small>It was ' + NAMES[S.seq[S.step]] + '</small>');
+    S.lives[S.cur]--;
+    setTimeout(() => { busy = false; S.justFailed = S.cur; S.seq = []; nextPlayer(true); }, 1300);
+  }
+  function nextPlayer(failed) {
+    if (S.longest > S.best) { S.best = S.longest; persist(); }
+    const left = alive();
+    if ((solo() && left.length === 0) || (!solo() && left.length <= 1)) { over(); return; }
+    if (!solo()) {
+      let n = S.cur;
+      do { n = (n + 1) % S.players.length; } while (S.lives[n] <= 0);
+      S.cur = n;
+    }
+    if (!failed) S.justFailed = null;
+    S.screen = 'pass';
+    render();
+  }
+  function over() {
+    S.screen = 'over';
+    render();
+    sfx.win();
+    P.confetti({ colors: ['#2ecc71', '#ff4757', '#ffd32a', '#1e90ff'] });
+  }
+  function start() {
+    S.lives = S.players.map(() => S.settings.lives);
+    S.seq = [];
+    S.cur = 0;
+    S.longest = 0;
+    S.justFailed = null;
+    sfx.unlock();
+    P.stayAwake();
+    S.screen = 'pass';
+    render();
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, play: viewPlay, over: viewOver };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 1, max: 8 });
+    if (S.screen !== shown || S.screen === 'pass') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('pointerdown', e => {
+    const pad = e.target.closest && e.target.closest('.pad');
+    if (!pad || pad.disabled) return;
+    e.preventDefault();
+    press(Number(pad.getAttribute('data-k')));
+  });
+  document.addEventListener('keydown', e => {
+    if (S.screen !== 'play') return;
+    const map = { '1': 0, '2': 1, '3': 2, '4': 3 };
+    if (e.key in map) { const pad = document.querySelector('.pad[data-k="' + map[e.key] + '"]'); if (pad && !pad.disabled) press(map[e.key]); }
+  });
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': S.players = editor.get(); start(); break;
+      case 'me': beginTurn(); break;
+      case 'again': start(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.name === 'lives') { S.settings.lives = Number(e.target.value); persist(); }
+    else if (e.target.name === 'playback') { S.settings.playback = e.target.value === '1'; persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -42,7 +42,7 @@ button{font:inherit;color:inherit}
 .ptp-sound svg{width:22px;height:22px}
 :is(.back,.ptp-sound,.btn,.pp-add,.pp-remove,.note-btn,.howto summary):focus-visible{outline:3px solid var(--ink);outline-offset:3px}
 
-.title{display:flex;align-items:center;gap:.16em;margin:22px 0 0;font-weight:800;font-size:clamp(58px,15vw,112px);line-height:.95;letter-spacing:-.02em;color:var(--cream);text-shadow:0 5px 0 var(--tang-deep)}
+.title{display:flex;flex-wrap:wrap;align-items:center;gap:.16em;margin:22px 0 0;font-weight:800;font-size:clamp(44px,14vw,112px);line-height:.95;letter-spacing:-.02em;color:var(--cream);text-shadow:0 5px 0 var(--tang-deep)}
 .title svg{width:.9em;height:.9em;flex:none}
 .tagline{margin:10px 0 0;font-size:20px;font-weight:700;color:var(--ink)}
 .box{margin-top:22px;padding:18px;border-radius:26px;background:var(--cream);box-shadow:0 10px 0 var(--tang-deep)}
@@ -50,10 +50,10 @@ button{font:inherit;color:inherit}
 .sec+.sec{margin-top:20px}
 .hint{margin:6px 0 0;color:var(--soft);font-size:16px}
 
-.pp-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.pp-list{list-style:none;margin:0;padding:0;display:grid;gap:8px;grid-template-columns:minmax(0,1fr)}
 .pp-row{display:flex;align-items:center;gap:8px}
 .pp-num{display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:50%;background:var(--n1);font-weight:800}
-.pp-input{flex:1;min-width:0;height:48px;padding:0 14px;border:2px solid #e7d6c2;border-radius:14px;background:#fff;color:var(--ink);font:700 19px/1 var(--f)}
+.pp-input{flex:1;min-width:0;width:0;height:48px;padding:0 14px;border:2px solid #e7d6c2;border-radius:14px;background:#fff;color:var(--ink);font:700 19px/1 var(--f)}
 .pp-input::placeholder{color:#b09780;font-weight:500}
 .pp-input:focus{outline:none;border-color:var(--tang)}
 .pp-remove{display:grid;place-items:center;flex:none;width:42px;height:42px;border:0;border-radius:50%;background:#f3e4d2;color:var(--ink);cursor:pointer}

@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mind Meld | Pass the Phone</title>
+<meta name="description" content="Everyone secretly types a word. Then everyone tries to find the word that links them, until you all say the same thing.">
+<meta name="theme-color" content="#ffd2c2">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: two soft circles drifting toward each other. Pastel peach meets periwinkle, and each round's words sit where they overlap. */
+:root{
+  color-scheme:light;
+  --bg:#ffd2c2;
+  --fg:#2b2350;
+  --muted:#5b5385;
+  --panel:rgba(255,255,255,.6);
+  --panel-ink:#2b2350;
+  --line:rgba(43,35,80,.22);
+  --field:#ffffff;
+  --field-ink:#2b2350;
+  --accent:#6c5ce7;
+  --accent-ink:#ffffff;
+  --accent-shadow:#3f31b5;
+  --peach:#ff9f80;
+  --peri:#8fa2ff;
+  --focus:#6c5ce7;
+  --radius:24px;
+  --f-display:"Quicksand",system-ui,sans-serif;
+  --f-body:"Quicksand",system-ui,sans-serif;
+}
+body{background:linear-gradient(160deg,#ffd2c2 0%,#f6d7f0 50%,#c9d4ff 100%);background-attachment:fixed}
+.title{font-weight:700;letter-spacing:-.02em}
+.venn{display:block;width:min(60vw,240px);height:auto;margin-top:10px}
+.venn circle{mix-blend-mode:multiply}
+.label,.big,.btn,.opt-box b,.seg span{font-weight:700}
+.links{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:18px}
+.links span{padding:8px 18px;border-radius:999px;background:#fff;font-weight:700;font-size:20px;box-shadow:0 6px 14px -8px rgba(43,35,80,.5)}
+.links .plus{background:transparent;box-shadow:none;color:var(--muted);padding:8px 0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:12px;max-width:640px;margin:22px auto 0}
+.card{perspective:900px;height:120px}
+.card-in{position:relative;height:100%;transform-style:preserve-3d;transition:transform .6s cubic-bezier(.3,1.3,.5,1);transition-delay:var(--d)}
+.card.flip .card-in{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;display:grid;place-items:center;padding:12px;border-radius:22px;-webkit-backface-visibility:hidden;backface-visibility:hidden;text-align:center}
+.face-front{background:linear-gradient(135deg,var(--peach),var(--peri));color:#fff;font-weight:700}
+.face-back{transform:rotateY(180deg);background:#fff;box-shadow:0 10px 20px -12px rgba(43,35,80,.6)}
+.face-back b{display:block;font-size:clamp(20px,5vw,28px);overflow-wrap:anywhere}
+.face-back small{display:block;font-size:14px;color:var(--muted)}
+.melded .face-back{box-shadow:0 0 0 4px var(--accent)}
+.verdict{margin:22px 0 0;font-weight:700;font-size:clamp(40px,11vw,74px);line-height:1}
+.used{margin-top:18px;font-size:15px;color:var(--muted)}
+.err{color:#c2185b}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.mindmeld';
+  const app = document.getElementById('app');
+  const VENN = '<svg class="venn" viewBox="0 0 240 120" aria-hidden="true"><circle cx="85" cy="60" r="52" fill="#ff9f80"/><circle cx="155" cy="60" r="52" fill="#8fa2ff"/></svg>';
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = { best: Number(saved.best) || 0, screen: 'setup', players: [], round: 0, words: [], last: [], used: [], typer: 0, err: '', melded: false };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { best: S.best }); }
+
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Mind Meld</h1>
+    ${VENN}
+    <p class="tagline">Everyone secretly picks a word. Then everyone hunts for the word that links them all, until you think the same thing.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div><p class="hint">Two players is classic. Up to six makes it much harder.</p></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Start melding</button></div>
+      ${S.best ? `<p class="hint">Best on this phone: melded in ${P.plural(S.best, 'round')}.</p>` : ''}
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Pass the phone. Everyone secretly types any word they like.</li>
+        <li>Reveal the words together.</li>
+        <li>Now everyone secretly types a word that connects all of those words. Fire and Ice might lead to Cold, or Element, or Water.</li>
+        <li>Keep going until everyone types the same word. No word can be used twice.</li>
+      </ol>
+    </details>`;
+  }
+  function linksHTML(words) {
+    return `<div class="links">${words.map((w, k) => (k ? '<span class="plus">and</span>' : '') + `<span>${esc(w)}</span>`).join('')}</div>`;
+  }
+  function viewRound() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Round ${S.round}</p>
+      ${S.last.length ? `<h2 class="big">Find the link</h2>${linksHTML(S.last)}<p class="lead">Everyone secretly types one word that connects these.</p>`
+        : '<h2 class="big">Any word at all</h2><p class="lead">Everyone secretly types any word that comes to mind.</p>'}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="type-start">Pass the phone</button></div>
+      ${S.used.length ? `<p class="used">Already used: ${esc(S.used.join(', '))}</p>` : ''}
+    </section>`;
+  }
+  function viewPass() {
+    return P.header() + P.passScreen({ eyebrow: 'Word ' + (S.typer + 1) + ' of ' + S.players.length, name: S.players[S.typer], lead: 'Type your word where nobody can see.' });
+  }
+  function viewType() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(S.players[S.typer])}, your secret word</p>
+      ${S.last.length ? linksHTML(S.last) : ''}
+      <div class="field"><label for="word">${S.last.length ? 'A word that links them' : 'Any word'}</label><input id="word" type="text" maxlength="30" autocomplete="off" autocapitalize="off" enterkeyhint="done" placeholder="One word"></div>
+      <p class="err" id="err" aria-live="polite">${esc(S.err)}</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="word" id="wordBtn" disabled>Lock it in</button></div>
+    </section>`;
+  }
+  function viewReveal() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Round ${S.round}</p>
+      <h2 class="big">Three, two, one</h2>
+      <div class="cards${S.melded ? ' melded' : ''}">${S.words.map((w, k) => `<div class="card" style="--d:${k * 160}ms"><div class="card-in"><div class="face face-front">${esc(S.players[k])}</div><div class="face face-back"><b>${esc(w)}</b><small>${esc(S.players[k])}</small></div></div></div>`).join('')}</div>
+      <div id="after" hidden>
+        ${S.melded ? `<p class="verdict">Mind meld!</p><p class="lead">You all said ${esc(S.words[0])} in ${P.plural(S.round, 'round')}.</p>
+          <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change players</button><button class="btn btn-main btn-big" type="button" data-act="again">Meld again</button></div>`
+        : `<p class="verdict">Not yet</p><p class="lead">Now find the word that links these.</p><div class="actions center"><button class="btn btn-alt" type="button" data-act="giveup">Give up</button><button class="btn btn-main btn-big" type="button" data-act="next">Next round</button></div>`}
+      </div>
+    </section>`;
+  }
+  function viewGiveUp() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Out of sync</p>
+      <h2 class="big">No meld this time</h2>
+      <p class="lead">You got through ${P.plural(S.round, 'round')} and ${P.plural(S.used.length, 'word')}.</p>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change players</button><button class="btn btn-main btn-big" type="button" data-act="again">Try again</button></div>
+    </section>`;
+  }
+
+  function newGame() { S.round = 1; S.last = []; S.used = []; S.melded = false; S.screen = 'round'; render(); }
+  function submitWord() {
+    const el = document.getElementById('word');
+    const v = (el ? el.value : '').replace(/\s+/g, ' ').trim().slice(0, 30);
+    if (!v) return;
+    if (S.used.some(u => P.sameAnswer(u, v))) { S.err = 'That word was already used. Pick a new one.'; sfx.buzz(0.3); render(); return; }
+    S.words[S.typer] = v;
+    S.err = '';
+    S.typer++;
+    sfx.whoosh();
+    if (S.typer < S.players.length) { S.screen = 'pass'; render(); return; }
+    S.melded = S.words.every(w => P.sameAnswer(w, S.words[0]));
+    S.screen = 'reveal';
+    render();
+    playReveal();
+  }
+  function playReveal() {
+    let n = 3;
+    const big = app.querySelector('.big');
+    const step = () => {
+      if (n > 0) { if (big) big.textContent = n; sfx.beep(false); n--; setTimeout(step, 600); return; }
+      if (big) big.textContent = S.melded ? 'In sync' : 'Reveal';
+      sfx.beep(true);
+      app.querySelectorAll('.card').forEach(c => c.classList.add('flip'));
+      setTimeout(() => {
+        const after = document.getElementById('after');
+        if (after) after.hidden = false;
+        if (S.melded) {
+          sfx.win();
+          P.confetti({ colors: ['#ff9f80', '#8fa2ff', '#6c5ce7', '#ffffff'] });
+          if (!S.best || S.round < S.best) { S.best = S.round; persist(); }
+        } else sfx.tone(330, { type: 'triangle', to: 220, dur: 0.4, gain: 0.12 });
+      }, 900 + S.words.length * 160);
+    };
+    if (P.reducedMotion()) { n = 0; }
+    step();
+  }
+
+  const VIEWS = { setup: viewSetup, round: viewRound, pass: viewPass, type: viewType, reveal: viewReveal, giveup: viewGiveUp };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 2, max: 6 });
+    if (S.screen === 'type') { const i = document.getElementById('word'); if (i) i.focus(); }
+    if (S.screen !== shown || S.screen === 'pass') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': S.players = editor.get(); sfx.unlock(); newGame(); break;
+      case 'type-start': S.words = []; S.typer = 0; S.err = ''; S.screen = 'pass'; render(); break;
+      case 'me': S.screen = 'type'; render(); break;
+      case 'word': submitWord(); break;
+      case 'next':
+        S.used = S.used.concat(S.words);
+        S.last = S.words.slice();
+        S.round++;
+        S.screen = 'round';
+        render();
+        break;
+      case 'giveup': S.used = S.used.concat(S.words); S.screen = 'giveup'; render(); break;
+      case 'again': newGame(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('input', e => {
+    if (e.target.id === 'word') { document.getElementById('wordBtn').disabled = !e.target.value.trim(); const er = document.getElementById('err'); if (er) er.textContent = ''; }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.id === 'word') { e.preventDefault(); submitWord(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

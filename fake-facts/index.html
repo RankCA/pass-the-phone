@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fake Facts | Pass the Phone</title>
+<meta name="description" content="Fill in the blank of a strange but true fact with a believable fake. Fool your friends, and find the truth.">
+<meta name="theme-color" content="#efeae0">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=PT+Serif:ital,wght@0,400;0,700;1,400&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: a tabloid front page. Newsprint, heavy headlines, rules between columns, and a red stamp for anything shocking. */
+:root{
+  color-scheme:light;
+  --bg:#ece7dc;
+  --fg:#161412;
+  --muted:#5a534a;
+  --panel:#faf7f0;
+  --panel-ink:#161412;
+  --line:rgba(22,20,18,.28);
+  --field:#ffffff;
+  --field-ink:#161412;
+  --accent:#d8261b;
+  --accent-ink:#ffffff;
+  --accent-shadow:#7e130c;
+  --focus:#d8261b;
+  --radius:4px;
+  --btn-radius:4px;
+  --f-display:"Abril Fatface",Georgia,serif;
+  --f-body:"PT Serif",Georgia,serif;
+}
+body{background-color:#ece7dc;background-image:radial-gradient(rgba(22,20,18,.06) 1px,transparent 1.4px);background-size:5px 5px}
+.mast{margin-top:20px;padding-bottom:10px;border-bottom:6px double var(--fg)}
+.mast .title{margin:0;font-size:clamp(54px,15vw,112px);line-height:.9;letter-spacing:-.01em}
+.mast-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px;font-style:italic;color:var(--muted);flex-wrap:wrap}
+.extra{display:inline-block;padding:2px 10px;background:var(--accent);color:#fff;font-family:var(--f-display);font-size:20px;transform:rotate(-3deg)}
+.panel{box-shadow:inset 0 0 0 1px var(--line)}
+.label{font-family:var(--f-display)}
+.story{margin:20px auto 0;max-width:620px;padding:18px 18px 20px;border-top:3px solid var(--fg);border-bottom:1px solid var(--fg);text-align:left}
+.story small{display:block;font-weight:700;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.story h2{margin:6px 0 0;font-family:var(--f-display);font-weight:400;font-size:clamp(28px,7vw,44px);line-height:1.12;overflow-wrap:anywhere}
+.blank{display:inline-block;min-width:3.2em;border-bottom:4px solid var(--accent);color:var(--accent)}
+.opts{list-style:none;margin:18px auto 0;padding:0;max-width:620px;display:grid;gap:8px;text-align:left;counter-reset:o}
+.opts li,.opts button{display:flex;align-items:baseline;gap:12px;width:100%;padding:12px 14px;border:0;border-bottom:1px solid var(--line);background:var(--panel);color:var(--fg);font:700 20px/1.25 var(--f-body);text-align:left;overflow-wrap:anywhere}
+.opts button{min-height:56px;cursor:pointer;box-shadow:inset 0 0 0 1px var(--line)}
+.opts button:hover{box-shadow:inset 0 0 0 2px var(--fg)}
+.opts button:disabled{opacity:.4;cursor:default}
+.opts .n{flex:none;font-family:var(--f-display);font-weight:400;color:var(--accent);min-width:1.4em}
+.clips{display:grid;gap:12px;max-width:620px;margin:20px auto 0;text-align:left}
+.clip{padding:14px 16px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);animation:pin .35s ease}
+@keyframes pin{from{opacity:0;transform:translateY(8px) rotate(-1deg)}}
+.clip b{display:block;font-family:var(--f-display);font-weight:400;font-size:clamp(24px,6vw,32px);overflow-wrap:anywhere}
+.clip p{margin:4px 0 0;color:var(--muted)}
+.clip.truth{background:#fff;box-shadow:inset 0 0 0 3px var(--accent)}
+.clip.truth b::before{content:"True: ";color:var(--accent)}
+.err{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script src="facts.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const FACTS = window.FAKE_FACTS || [];
+  const KEY = 'ptp.fakefacts';
+  const app = document.getElementById('app');
+  const deck = P.deck('fakefacts', FACTS, f => f.q);
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ count: 6 }, saved.settings || {}),
+    screen: 'setup', players: [], facts: [], idx: 0, order: [], writer: 0, fakes: [], options: [], votes: [], voter: 0, reveal: 0, scores: {}, err: ''
+  };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const fact = () => S.facts[S.idx];
+  const nameOf = i => S.players[i];
+  const factHTML = (kicker, fill) => `<div class="story"><small>${kicker}</small><h2>${esc(fact().q).replace('___', fill ? `<span class="blank">${esc(fill)}</span>` : '<span class="blank">&nbsp;</span>')}</h2></div>`;
+
+  function viewSetup() {
+    return P.header() + `
+    <div class="mast"><h1 class="title">Fake Facts</h1><div class="mast-row"><span>Strange but true. Or is it?</span><span class="extra">Extra!</span></div></div>
+    <p class="tagline">Each round has a real fact with a word missing. Write a fake answer good enough to fool your friends, then try to spot the truth.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Facts per game</span>${P.seg('count', [[4, '4'], [6, '6'], [8, '8']], S.settings.count)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Stop the presses</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Read the fact out loud. One word or phrase is missing.</li>
+        <li>Pass the phone. Everyone secretly writes a fake answer that sounds true.</li>
+        <li>All the answers appear in a list with the real one hidden among them. Pass the phone again and secretly pick the one you believe.</li>
+        <li>Find the truth for 2 points. Earn 1 point for every player your fake fools.</li>
+      </ol>
+    </details>`;
+  }
+  function viewFact() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Fact ${S.idx + 1} of ${S.facts.length}</p>
+      ${factHTML('Did you know')}
+      <p class="lead">Read it out loud. Everyone will write a fake answer for the blank.</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="write-start">Write the fakes</button></div>
+      <div class="actions center"><button class="textbtn" type="button" data-act="skip">Somebody already knows this one</button></div>
+    </section>`;
+  }
+  function viewPass() {
+    const writing = S.screen === 'passWrite';
+    const i = writing ? S.order[S.writer] : S.order[S.voter];
+    return P.header() + P.passScreen({ eyebrow: writing ? 'Fake ' + (S.writer + 1) + ' of ' + S.order.length : 'Vote ' + (S.voter + 1) + ' of ' + S.order.length, name: nameOf(i), lead: writing ? 'Write your fake where nobody can see.' : 'Pick the answer you believe, in secret.' });
+  }
+  function viewWrite() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(nameOf(S.order[S.writer]))}, write a fake</p>
+      ${factHTML('Fill in the blank')}
+      <div class="field"><label for="fake">Your fake answer</label><input id="fake" type="text" maxlength="40" autocomplete="off" enterkeyhint="done" placeholder="Make it believable"></div>
+      <p class="err" id="err" aria-live="polite">${esc(S.err)}</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="fake" id="fakeBtn" disabled>Lock it in</button></div>
+    </section>`;
+  }
+  function optionsList(buttons, me) {
+    return `<ol class="opts">${S.options.map((o, k) => {
+      const mine = me != null && o.by.includes(me);
+      return buttons
+        ? `<li style="padding:0;border:0"><button type="button" data-act="pick" data-k="${k}"${mine ? ' disabled' : ''}><span class="n">${k + 1}</span><span>${esc(o.text)}${mine ? ' (yours)' : ''}</span></button></li>`
+        : `<li><span class="n">${k + 1}</span><span>${esc(o.text)}</span></li>`;
+    }).join('')}</ol>`;
+  }
+  function viewOptions() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">One of these is true</p>
+      ${factHTML('Fill in the blank')}
+      ${optionsList(false)}
+      <p class="lead">Read every answer out loud with a straight face. Then everyone votes in secret.</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="vote-start">Vote in secret</button></div>
+    </section>`;
+  }
+  function viewPick() {
+    const me = S.order[S.voter];
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(nameOf(me))}, which one is true?</p>
+      ${factHTML('Fill in the blank')}
+      ${optionsList(true, me)}
+    </section>`;
+  }
+  function clipHTML(o) {
+    const fooled = S.players.map((_, v) => v).filter(v => S.votes[v] === S.options.indexOf(o));
+    if (o.truth) return `<div class="clip truth"><b>${esc(o.text)}</b><p>${fooled.length ? 'Found by ' + esc(P.listNames(fooled.map(nameOf))) + '. Two points each.' : 'Nobody found the truth.'}</p></div>`;
+    return `<div class="clip"><b>${esc(o.text)}</b><p>Written by ${esc(P.listNames(o.by.map(nameOf)))}. ${fooled.length ? 'Fooled ' + esc(P.listNames(fooled.map(nameOf))) + '.' : 'Fooled nobody.'}</p></div>`;
+  }
+  function revealOrder() {
+    const fakes = S.options.filter(o => !o.truth);
+    return fakes.concat(S.options.filter(o => o.truth));
+  }
+  function viewReveal() {
+    const list = revealOrder(), done = S.reveal >= list.length;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">The truth comes out</p>
+      ${factHTML(done ? 'The real answer' : 'Fill in the blank', done ? fact().a : '')}
+      <div class="clips">${list.slice(0, S.reveal).map(clipHTML).join('')}</div>
+      ${done ? P.scoreList(S.players.map(n => [n, S.scores[n] || 0])) + `<div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="next">${S.idx >= S.facts.length - 1 ? 'Final scores' : 'Next fact'}</button></div>`
+        : `<div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="more">${S.reveal === list.length - 1 ? 'Reveal the truth' : 'Next answer'}</button></div>`}
+    </section>`;
+  }
+  function viewFinal() {
+    const rows = S.players.map(n => [n, S.scores[n] || 0]).sort((a, b) => b[1] - a[1]);
+    const top = rows[0][1], winners = rows.filter(r => r[1] === top).map(r => r[0]);
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Final edition</p>
+      <h2 class="big">${esc(P.listNames(winners))} ${winners.length > 1 ? 'share the front page' : 'makes the front page'}</h2>
+      ${P.scoreList(rows)}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  function startGame() {
+    S.players = editor.get();
+    S.facts = deck.draw(S.settings.count);
+    S.idx = 0;
+    S.scores = {};
+    sfx.unlock();
+    P.stayAwake();
+    S.screen = 'fact';
+    render();
+  }
+  function rotation() {
+    const n = S.players.length, off = S.idx % n;
+    return Array.from({ length: n }, (_, k) => (off + k) % n);
+  }
+  function submitFake() {
+    const el = document.getElementById('fake');
+    const v = (el ? el.value : '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (!v) return;
+    if (P.sameAnswer(v, fact().a)) {
+      S.err = 'That is the real answer! Keep it secret and write a fake one.';
+      sfx.buzz(0.3);
+      render();
+      return;
+    }
+    const me = S.order[S.writer];
+    const same = S.fakes.find(f => P.normAnswer(f.text) === P.normAnswer(v));
+    if (same) same.by.push(me); else S.fakes.push({ text: v, by: [me] });
+    S.err = '';
+    S.writer++;
+    sfx.whoosh();
+    if (S.writer < S.order.length) { S.screen = 'passWrite'; render(); return; }
+    const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+    S.options = S.fakes.map(f => ({ text: cap(f.text), by: f.by, truth: false })).concat([{ text: cap(fact().a), by: [], truth: true }]);
+    S.options.sort((a, b) => a.text.toLowerCase().localeCompare(b.text.toLowerCase()));
+    S.screen = 'options';
+    render();
+  }
+  function castVote(k) {
+    const me = S.order[S.voter];
+    S.votes[me] = k;
+    S.voter++;
+    sfx.pop();
+    if (S.voter < S.order.length) { S.screen = 'passVote'; render(); return; }
+    S.players.forEach((_, v) => {
+      const o = S.options[S.votes[v]];
+      if (!o) return;
+      if (o.truth) S.scores[nameOf(v)] = (S.scores[nameOf(v)] || 0) + 2;
+      else o.by.forEach(a => { S.scores[nameOf(a)] = (S.scores[nameOf(a)] || 0) + 1; });
+    });
+    S.reveal = 0;
+    S.screen = 'reveal';
+    render();
+  }
+
+  const VIEWS = { setup: viewSetup, fact: viewFact, passWrite: viewPass, write: viewWrite, options: viewOptions, passVote: viewPass, pick: viewPick, reveal: viewReveal, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 3, max: 8 });
+    if (S.screen === 'write') { const i = document.getElementById('fake'); if (i) i.focus(); }
+    if (S.screen !== shown || S.screen.startsWith('pass')) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': startGame(); break;
+      case 'skip': S.facts[S.idx] = deck.one(S.facts); render(); break;
+      case 'write-start': S.order = rotation(); S.writer = 0; S.fakes = []; S.err = ''; S.screen = 'passWrite'; render(); break;
+      case 'me': S.screen = S.screen === 'passWrite' ? 'write' : 'pick'; render(); break;
+      case 'fake': submitFake(); break;
+      case 'vote-start': S.votes = []; S.voter = 0; S.screen = 'passVote'; render(); break;
+      case 'pick': castVote(Number(b.getAttribute('data-k'))); break;
+      case 'more': {
+        S.reveal++;
+        const list = revealOrder(), o = list[S.reveal - 1];
+        if (o && o.truth) { sfx.win(); } else sfx.tone(300, { type: 'square', dur: 0.12, gain: 0.08 });
+        render();
+        break;
+      }
+      case 'next':
+        if (S.idx >= S.facts.length - 1) { S.screen = 'final'; render(); sfx.win(); P.confetti({ colors: ['#d8261b', '#161412', '#ece7dc', '#ffffff'] }); }
+        else { S.idx++; S.screen = 'fact'; render(); }
+        break;
+      case 'again': S.facts = deck.draw(S.settings.count); S.idx = 0; S.scores = {}; S.screen = 'fact'; render(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('input', e => {
+    if (e.target.id === 'fake') { document.getElementById('fakeBtn').disabled = !e.target.value.trim(); const er = document.getElementById('err'); if (er) er.textContent = ''; }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.id === 'fake') { e.preventDefault(); submitFake(); }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.name === 'count') { S.settings.count = Number(e.target.value); persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

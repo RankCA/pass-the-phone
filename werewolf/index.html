@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Werewolf | Pass the Phone</title>
+<meta name="description" content="The phone deals secret roles and reads the night out loud. Find the werewolves before they find you.">
+<meta name="theme-color" content="#0e1330">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Spectral:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="../shared/base.css">
+<style>
+/* Layout: a moonlit village. Night screens are mostly sky so nothing glows in a dark room; day brings the sun up over the same trees. */
+:root{
+  color-scheme:dark;
+  --bg:#0e1330;
+  --fg:#f3ecd8;
+  --muted:#b8b5cf;
+  --panel:rgba(243,236,216,.08);
+  --line:rgba(243,236,216,.3);
+  --field:#f3ecd8;
+  --field-ink:#151833;
+  --accent:#f0c75e;
+  --accent-ink:#1a1530;
+  --accent-shadow:#8f7024;
+  --wolf:#e85a5a;
+  --focus:#f0c75e;
+  --f-display:"Cinzel","Times New Roman",serif;
+  --f-body:"Spectral",Georgia,serif;
+}
+body{background:linear-gradient(180deg,#0a0e2a 0%,#151c49 55%,#231b45 100%);background-attachment:fixed;transition:background .8s ease}
+body.day{--fg:#20182e;--muted:#4c4258;--line:rgba(32,24,46,.32);--panel:rgba(255,255,255,.5);--field:#ffffff;--accent:#5b3fa0;--accent-ink:#fff6e0;--accent-shadow:#33215f;--focus:#5b3fa0;
+  background:linear-gradient(180deg,#ffb36b 0%,#ffd99a 42%,#a9cce6 100%);background-attachment:fixed}
+.sky{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.sky svg{position:absolute;left:0;bottom:0;width:100%;height:100%}
+.star{fill:#fff;animation:twinkle 3s ease-in-out infinite alternate}
+@keyframes twinkle{from{opacity:.25}to{opacity:.9}}
+body.day .star{opacity:0!important;animation:none}
+.orb{transition:fill .8s ease}
+body.day .orb{fill:#fff3b0}
+.trees{fill:#070a1f;transition:fill .8s ease}
+body.day .trees{fill:#2f4a3b}
+.title{font-weight:800;letter-spacing:.04em;font-size:clamp(40px,12vw,96px);text-shadow:0 0 30px rgba(240,199,94,.35)}
+.panel{box-shadow:inset 0 0 0 1px var(--line)}
+.pp-input{font-family:var(--f-body)}
+.seg span,.opt-box b,.pick button,.btn{font-family:var(--f-display)}
+.btn{font-weight:600;letter-spacing:.04em}
+.night-word{margin:40px 0 0;font-family:var(--f-display);font-weight:800;font-size:clamp(42px,11vw,84px);line-height:1.05;letter-spacing:.03em;text-wrap:balance}
+.whisper{margin:14px auto 0;max-width:28em;font-size:20px;color:var(--muted)}
+.moonbig{display:block;width:min(46vw,200px);height:auto;margin:30px auto 0;filter:drop-shadow(0 0 40px rgba(240,199,94,.45))}
+.role-art{width:44%;max-width:160px;height:auto}
+.reveal-front{background:radial-gradient(circle at 50% 35%,#2b3570,#141a44 70%);box-shadow:inset 0 0 0 3px var(--accent);color:var(--fg)}
+.reveal-front b{font-family:var(--f-display);font-size:22px;letter-spacing:.08em}
+.reveal-front small{font-size:16px;color:var(--muted)}
+.reveal-back{background:linear-gradient(180deg,#f7efd9,#e8dcbc);color:#1d1830;box-shadow:inset 0 0 0 3px var(--accent)}
+.reveal-back.wolf{background:linear-gradient(180deg,#3a1420,#1c0b16);color:#ffe9e9;box-shadow:inset 0 0 0 3px var(--wolf)}
+.role-name{margin:0;font-family:var(--f-display);font-weight:800;font-size:clamp(30px,8vw,44px);letter-spacing:.04em;line-height:1}
+.role-text{margin:6px 0 0;font-size:16px;line-height:1.35;max-width:24em}
+.role-team{margin:4px 0 0;font-weight:700;font-size:15px}
+.result-card{margin:26px auto 0;max-width:460px;padding:22px;border-radius:var(--radius);background:var(--panel);box-shadow:inset 0 0 0 2px var(--line)}
+.result-card.bad{box-shadow:inset 0 0 0 3px var(--wolf)}
+.result-card p{margin:0;font-size:22px}
+.cast{list-style:none;margin:22px auto 0;padding:0;max-width:520px;display:grid;gap:6px;text-align:left}
+.cast li{display:flex;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:12px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);font-weight:700}
+.cast li.dead span:first-child{text-decoration:line-through;opacity:.6}
+.cast li .wolfname{color:var(--wolf)}
+body.day .cast li .wolfname{color:#a32424}
+.alive-row{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:20px}
+.alive-row span{padding:4px 12px;border-radius:999px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);font-weight:700}
+.alive-row span.dead{opacity:.45;text-decoration:line-through}
+</style>
+</head>
+<body>
+<div class="sky" aria-hidden="true"><svg id="sky" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMax slice"></svg></div>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.werewolf';
+  const app = document.getElementById('app');
+
+  const ART = {
+    wolf: '<svg class="role-art" viewBox="0 0 100 100" aria-hidden="true"><path d="M18 30L30 6l14 22h12L70 6l12 24-4 24-14 18-6 18H42l-6-18-14-18z" fill="#2a1018" stroke="#e85a5a" stroke-width="3" stroke-linejoin="round"/><path d="M34 44l10 6-10 2zM66 44l-10 6 10 2z" fill="#f0c75e"/><path d="M44 74h12l-6 8z" fill="#e85a5a"/></svg>',
+    seer: '<svg class="role-art" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="44" r="32" fill="#c9d6ff" stroke="#1d1830" stroke-width="3"/><path d="M26 44c8-12 40-12 48 0-8 12-40 12-48 0z" fill="#fff" stroke="#1d1830" stroke-width="3"/><circle cx="50" cy="44" r="8" fill="#5b3fa0"/><path d="M30 76h40l6 14H24z" fill="#8f7024" stroke="#1d1830" stroke-width="3" stroke-linejoin="round"/></svg>',
+    doctor: '<svg class="role-art" viewBox="0 0 100 100" aria-hidden="true"><path d="M40 8h20v18l16 22v34a10 10 0 0 1-10 10H34a10 10 0 0 1-10-10V48l16-22z" fill="#d7f5e6" stroke="#1d1830" stroke-width="3" stroke-linejoin="round"/><path d="M45 48h10v10h10v10H55v10H45V68H35V58h10z" fill="#e85a5a"/></svg>',
+    villager: '<svg class="role-art" viewBox="0 0 100 100" aria-hidden="true"><path d="M14 46L50 14l36 32" fill="none" stroke="#1d1830" stroke-width="4" stroke-linejoin="round"/><path d="M22 42h56v46H22z" fill="#f0c75e" stroke="#1d1830" stroke-width="3"/><path d="M42 88V64h16v24" fill="#8a5a3c" stroke="#1d1830" stroke-width="3"/><rect x="30" y="52" width="10" height="10" fill="#fff" stroke="#1d1830" stroke-width="2"/><rect x="60" y="52" width="10" height="10" fill="#fff" stroke="#1d1830" stroke-width="2"/></svg>'
+  };
+  const ROLES = {
+    wolf: { name: 'Werewolf', team: 'Werewolf team', text: 'Each night, wake up with the other werewolves and choose someone to attack. By day, act like a normal villager.' },
+    seer: { name: 'Seer', team: 'Village team', text: 'Each night, wake up and check one player. The phone tells you if they are a werewolf.' },
+    doctor: { name: 'Doctor', team: 'Village team', text: 'Each night, choose one player to protect. If the werewolves pick them, they live. You can pick yourself.' },
+    villager: { name: 'Villager', team: 'Village team', text: 'No special power. Talk, watch closely, and vote out the werewolves.' }
+  };
+  const MOON = '<svg class="moonbig" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" fill="#f3ecd8"/><circle cx="36" cy="38" r="8" fill="#d9cfb2"/><circle cx="62" cy="58" r="11" fill="#d9cfb2"/><circle cx="58" cy="30" r="5" fill="#d9cfb2"/></svg>';
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ wolves: 0, seer: true, doctor: true, reveal: true, voice: P.canSpeak(), talk: 180 }, saved.settings || {}),
+    screen: 'setup', players: [], roles: [], alive: [], deal: 0, peeked: false,
+    night: 0, gen: 0, step: 'sleep', narration: '', target: null, pending: null, check: null, save: null,
+    died: null, exiled: null, winner: null, resolve: null
+  };
+  let editor = null, shown = null, talk = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const nameOf = i => S.players[i];
+  const roleOf = i => S.roles[i];
+  const aliveIdx = () => S.players.map((_, i) => i).filter(i => S.alive[i]);
+
+  /* ---------- Sky ---------- */
+  (function drawSky() {
+    const svg = document.getElementById('sky');
+    let stars = '';
+    for (let i = 0; i < 70; i++) {
+      const x = Math.random() * 1000, y = Math.random() * 640, r = Math.random() * 1.8 + 0.6;
+      stars += '<circle class="star" cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="' + r.toFixed(1) + '" style="animation-delay:' + (Math.random() * 3).toFixed(2) + 's"/>';
+    }
+    let trees = '';
+    for (let x = -20; x < 1040; x += 46 + Math.random() * 30) {
+      const h = 90 + Math.random() * 120, w = 40 + Math.random() * 26;
+      trees += '<path d="M' + x.toFixed(0) + ' 1000L' + (x + w / 2).toFixed(0) + ' ' + (1000 - h).toFixed(0) + 'L' + (x + w).toFixed(0) + ' 1000z"/>';
+    }
+    svg.innerHTML = stars + '<circle class="orb" cx="820" cy="150" r="60" fill="#f3ecd8"/><g class="trees">' + trees + '<rect x="0" y="985" width="1000" height="20"/></g>';
+  })();
+
+  /* ---------- Rules ---------- */
+  function wolfCount(n) {
+    const max = Math.max(1, Math.floor((n - 1) / 3));
+    if (S.settings.wolves > 0) return Math.min(S.settings.wolves, max);
+    return n <= 6 ? 1 : n <= 10 ? 2 : 3;
+  }
+  function deal() {
+    const n = S.players.length, k = wolfCount(n);
+    const roles = [];
+    for (let i = 0; i < k; i++) roles.push('wolf');
+    if (S.settings.seer) roles.push('seer');
+    if (S.settings.doctor) roles.push('doctor');
+    while (roles.length < n) roles.push('villager');
+    S.roles = P.shuffle(roles.slice(0, n));
+    S.alive = S.players.map(() => true);
+  }
+  function winnerNow() {
+    const alive = aliveIdx();
+    const wolves = alive.filter(i => roleOf(i) === 'wolf').length;
+    if (wolves === 0) return 'village';
+    if (wolves >= alive.length - wolves) return 'wolves';
+    return null;
+  }
+
+  /* ---------- Narration ---------- */
+  function chime() { sfx.tone(523.25, { type: 'sine', dur: 0.9, gain: 0.07 }); sfx.tone(784, { type: 'sine', at: 0.12, dur: 1.1, gain: 0.05 }); }
+  async function say(text, gen) {
+    if (gen !== S.gen) return;
+    if (S.settings.voice && P.canSpeak()) { await P.speak(text, { rate: 0.92, pitch: 0.9 }); return; }
+    S.step = 'narrate';
+    S.narration = text;
+    render();
+    await action(gen);
+    if (gen === S.gen) { S.step = 'sleep'; render(); }
+  }
+  function action(gen) {
+    return new Promise(res => { S.resolve = v => { S.resolve = null; res(v); }; if (gen !== S.gen) res(null); });
+  }
+  function act(v) { if (S.resolve) S.resolve(v); }
+
+  async function runNight() {
+    const gen = ++S.gen;
+    S.night++;
+    S.target = null; S.save = null; S.check = null; S.pending = null;
+    document.body.classList.remove('day');
+    S.screen = 'night';
+    S.step = 'sleep';
+    render();
+    chime();
+    await say('Night falls on the village. Everyone, close your eyes.', gen);
+    if (gen !== S.gen) return;
+    await P.wait(2500);
+    await phase('wolf', gen,
+      'Werewolves, open your eyes. Pick up the phone and choose who to attack.',
+      'Werewolves, put the phone down and close your eyes.');
+    if (S.settings.seer) await phase('seer', gen,
+      'Seer, open your eyes. Pick up the phone and choose someone to check.',
+      'Seer, put the phone down and close your eyes.');
+    if (S.settings.doctor) await phase('doctor', gen,
+      'Doctor, open your eyes. Pick up the phone and choose someone to protect.',
+      'Doctor, put the phone down and close your eyes.');
+    if (gen !== S.gen) return;
+    morning(gen);
+  }
+  async function phase(role, gen, wake, sleep) {
+    if (gen !== S.gen) return;
+    S.step = 'sleep';
+    render();
+    await P.wait(1800);
+    if (gen !== S.gen) return;
+    chime();
+    await say(wake, gen);
+    if (gen !== S.gen) return;
+    const someone = aliveIdx().some(i => roleOf(i) === role);
+    if (someone) {
+      S.step = role;
+      render();
+      await action(gen);
+    } else {
+      S.step = 'waiting';
+      S.narration = ROLES[role].name;
+      render();
+      await P.wait(6000 + Math.random() * 4000);
+    }
+    if (gen !== S.gen) return;
+    S.step = 'sleep';
+    render();
+    await say(sleep, gen);
+    await P.wait(1200);
+  }
+  async function morning(gen) {
+    const died = S.target != null && S.target !== S.save ? S.target : null;
+    S.died = died;
+    if (died != null) S.alive[died] = false;
+    document.body.classList.add('day');
+    S.winner = winnerNow();
+    S.screen = 'morning';
+    render();
+    sfx.win();
+    let line = 'Everyone, wake up. ';
+    line += died != null ? 'Last night, ' + nameOf(died) + ' was attacked by the werewolves.' : 'Last night, nobody was hurt.';
+    if (died != null && S.settings.reveal) line += ' ' + nameOf(died) + ' was ' + (roleOf(died) === 'wolf' ? 'a werewolf.' : 'the ' + ROLES[roleOf(died)].name.toLowerCase() + '.');
+    if (S.settings.voice && P.canSpeak()) await P.speak(line, { rate: 0.92, pitch: 0.9 });
+  }
+
+  /* ---------- Views ---------- */
+  function viewSetup() {
+    const st = S.settings;
+    return P.header() + `
+    <h1 class="title">Werewolf</h1>
+    <p class="tagline">The phone deals secret roles and reads the night out loud. Nobody has to sit out as the narrator.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Villagers</span><div id="players"></div><p class="hint" id="pnote"></p></div>
+      <div class="sec"><span class="label">Werewolves</span>${P.seg('wolves', [[0, 'Auto'], [1, '1'], [2, '2'], [3, '3']], st.wolves)}<p class="hint">Auto picks 1 for up to 6 players, 2 for up to 10, then 3.</p></div>
+      <div class="sec"><span class="label">Special roles</span>
+        <label class="check"><input type="checkbox" id="seer"${st.seer ? ' checked' : ''}> Seer: checks one player each night</label>
+        <label class="check" style="margin-top:10px"><input type="checkbox" id="doctor"${st.doctor ? ' checked' : ''}> Doctor: protects one player each night</label>
+      </div>
+      <div class="sec"><span class="label">Rules</span>
+        <label class="check"><input type="checkbox" id="reveal"${st.reveal ? ' checked' : ''}> Show the role of anyone who is out</label>
+        <label class="check" style="margin-top:10px"><input type="checkbox" id="voice"${st.voice ? ' checked' : ''}${P.canSpeak() ? '' : ' disabled'}> The phone reads the night out loud</label>
+        <p class="hint">${P.canSpeak() ? 'Turn this off if a person who is not playing wants to narrate.' : 'This browser cannot talk, so a person who is not playing reads the night from the screen.'}</p>
+      </div>
+      <div class="sec"><span class="label">Talk time each day</span>${P.seg('talk', [[0, 'No timer'], [120, '2 min'], [180, '3 min'], [300, '5 min']], st.talk)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Deal the roles</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Pass the phone around. Each player presses and holds the card to see their secret role.</li>
+        <li>At night everyone closes their eyes and the phone calls each role in turn. Whoever is called opens their eyes, picks up the phone, taps a name and puts it back.</li>
+        <li>In the morning the phone announces who was attacked. Everyone talks it over and votes someone out.</li>
+        <li>The village wins when every werewolf is gone. The werewolves win when they match the village in number.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    const i = S.deal;
+    return P.header() + P.passScreen({ eyebrow: 'Role ' + (i + 1) + ' of ' + S.players.length, name: nameOf(i), lead: 'Only ' + esc(nameOf(i)) + ' looks at the screen.' });
+  }
+  function viewCard() {
+    const i = S.deal, r = roleOf(i), R = ROLES[r];
+    const others = r === 'wolf' ? S.players.map((n, k) => k).filter(k => k !== i && roleOf(k) === 'wolf').map(nameOf) : [];
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">For ${esc(nameOf(i))} only</p>
+      <div class="reveal" id="card" tabindex="0" role="button" aria-label="Press and hold to see your role">
+        <div class="reveal-in">
+          <div class="reveal-face reveal-front">${MOON.replace('moonbig', 'role-art')}<b>Your role</b><small>Press and hold</small></div>
+          <div class="reveal-face reveal-back${r === 'wolf' ? ' wolf' : ''}">${ART[r]}<p class="role-name">${R.name}</p><p class="role-team">${R.team}</p><p class="role-text">${R.text}</p>
+            ${r === 'wolf' ? `<p class="role-team">${others.length ? 'Your pack: ' + esc(P.listNames(others)) : 'You hunt alone.'}</p>` : ''}</div>
+        </div>
+      </div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="seen" id="seenBtn"${S.peeked ? '' : ' disabled'}>${i < S.players.length - 1 ? 'Done. Pass it on' : 'Done'}</button></div>
+      <p class="lead">Let go to hide it again. The button unlocks after you look.</p>
+    </section>`;
+  }
+  function viewDealt() {
+    return P.header() + `
+    <section class="center">
+      ${MOON}
+      <h2 class="big">Everyone has a role</h2>
+      <p class="lead">Put the phone in the middle where everyone can reach it. When the phone says so, close your eyes.</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="night">Start the first night</button></div>
+    </section>`;
+  }
+  function choose(list, act, extra) {
+    return `<div class="pick">${list.map(i => `<button type="button" data-act="${act}" data-i="${i}">${esc(nameOf(i))}${extra ? extra(i) : ''}</button>`).join('')}</div>`;
+  }
+  function viewNight() {
+    const st = S.step;
+    if (st === 'narrate') {
+      return `<section class="center"><p class="eyebrow">Narrator, read this out loud</p><p class="night-word">${esc(S.narration)}</p>
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="next">Next</button></div></section>`;
+    }
+    if (st === 'wolf') {
+      if (S.pending != null) {
+        return `<section class="center"><p class="eyebrow">Werewolves</p><h2 class="big">Attack ${esc(nameOf(S.pending))}?</h2>
+          <div class="actions center"><button class="btn btn-alt" type="button" data-act="wolf-back">Pick again</button><button class="btn btn-main btn-big" type="button" data-act="wolf-yes">Yes</button></div></section>`;
+      }
+      const prey = aliveIdx().filter(i => roleOf(i) !== 'wolf');
+      return `<section class="center"><p class="eyebrow">Werewolves only</p><h2 class="big">Who do you attack?</h2><p class="lead">Agree by pointing, then one of you taps.</p>${choose(prey, 'wolf-pick')}</section>`;
+    }
+    if (st === 'seer') {
+      if (S.check != null) {
+        const bad = roleOf(S.check) === 'wolf';
+        return `<section class="center"><p class="eyebrow">Seer only</p><div class="result-card${bad ? ' bad' : ''}"><p><b>${esc(nameOf(S.check))}</b> ${bad ? 'is a werewolf.' : 'is not a werewolf.'}</p></div>
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="seer-done">Got it</button></div></section>`;
+      }
+      const me = aliveIdx().find(i => roleOf(i) === 'seer');
+      return `<section class="center"><p class="eyebrow">Seer only</p><h2 class="big">Who do you check?</h2>${choose(aliveIdx().filter(i => i !== me), 'seer-pick')}</section>`;
+    }
+    if (st === 'doctor') {
+      return `<section class="center"><p class="eyebrow">Doctor only</p><h2 class="big">Who do you protect?</h2>${choose(aliveIdx(), 'doc-pick', i => roleOf(i) === 'doctor' ? ' (you)' : '')}</section>`;
+    }
+    if (st === 'waiting') {
+      return `<section class="center">${MOON}<p class="night-word">Eyes closed</p><p class="whisper">The ${esc(S.narration.toLowerCase())} is taking a turn.</p></section>`;
+    }
+    return `<section class="center">${MOON}<p class="night-word">Eyes closed</p><p class="whisper">Night ${S.night}. Only open your eyes when the phone calls your role.</p>
+      <div class="actions center"><button class="textbtn" type="button" data-act="quit">Stop the game</button></div></section>`;
+  }
+  function aliveRow() {
+    return `<div class="alive-row">${S.players.map((n, i) => `<span class="${S.alive[i] ? '' : 'dead'}">${esc(n)}</span>`).join('')}</div>`;
+  }
+  function viewMorning() {
+    const d = S.died;
+    let body;
+    if (d == null) body = '<h2 class="big">Nobody was hurt</h2><p class="lead">The werewolves struck, but someone was protected. Or they missed.</p>';
+    else body = `<h2 class="big">${esc(nameOf(d))} was attacked</h2><p class="lead">${S.settings.reveal ? esc(nameOf(d)) + ' was ' + (roleOf(d) === 'wolf' ? 'a werewolf.' : 'the ' + ROLES[roleOf(d)].name.toLowerCase() + '.') : esc(nameOf(d)) + ' is out of the game.'} ${esc(nameOf(d))} can watch but must stay quiet.</p>`;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Morning ${S.night}</p>
+      ${body}
+      ${aliveRow()}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="${S.winner ? 'end' : 'talk'}">${S.winner ? 'See who won' : 'Start talking'}</button></div>
+    </section>`;
+  }
+  function viewDay() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Day ${S.night}</p>
+      <h2 class="big">Who is a werewolf?</h2>
+      <p class="lead">Share what you know, accuse, defend yourself. Then vote someone out.</p>
+      ${S.settings.talk ? `<div class="timer" id="timer" role="timer">${P.clock(talk ? talk.left : S.settings.talk * 1000)}</div>
+        <div class="actions center"><button class="btn btn-alt" type="button" data-act="pause" id="pauseBtn">${talk && talk.running ? 'Pause' : 'Start timer'}</button></div>` : ''}
+      ${aliveRow()}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="vote">Time to vote</button></div>
+    </section>`;
+  }
+  function viewVote() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">The vote</p>
+      <h2 class="big">Point on three</h2>
+      <p class="lead">Count down out loud. Whoever gets the most fingers is voted out.</p>
+      ${choose(aliveIdx(), 'exile')}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="exile" data-i="-1">It was a tie. Nobody goes</button></div>
+    </section>`;
+  }
+  function viewExile() {
+    const e = S.exiled;
+    let body;
+    if (e < 0) body = '<h2 class="big">Nobody was voted out</h2><p class="lead">The village could not agree.</p>';
+    else body = `<h2 class="big">${esc(nameOf(e))} is out</h2><p class="lead">${S.settings.reveal ? esc(nameOf(e)) + ' was ' + (roleOf(e) === 'wolf' ? 'a werewolf.' : 'the ' + ROLES[roleOf(e)].name.toLowerCase() + '.') : 'Their role stays secret until the end.'}</p>`;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">The village has spoken</p>
+      ${body}
+      ${aliveRow()}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="${S.winner ? 'end' : 'night'}">${S.winner ? 'See who won' : 'Night falls'}</button></div>
+    </section>`;
+  }
+  function viewEnd() {
+    const wolvesWin = S.winner === 'wolves';
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Game over</p>
+      <h2 class="big">${wolvesWin ? 'The werewolves win' : 'The village wins'}</h2>
+      <p class="lead">${wolvesWin ? 'The werewolves now match the village. Nobody is safe.' : 'Every werewolf has been found. The village sleeps soundly.'}</p>
+      <ul class="cast">${S.players.map((n, i) => `<li class="${S.alive[i] ? '' : 'dead'}"><span>${esc(n)}</span><span class="${roleOf(i) === 'wolf' ? 'wolfname' : ''}">${ROLES[roleOf(i)].name}</span></li>`).join('')}</ul>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  /* ---------- Render and events ---------- */
+  const VIEWS = { setup: viewSetup, pass: viewPass, card: viewCard, dealt: viewDealt, night: viewNight, morning: viewMorning, day: viewDay, vote: viewVote, exile: viewExile, end: viewEnd };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') {
+      editor = P.playerEditor(document.getElementById('players'), { min: 5, max: 16, onChange: note });
+      note();
+    }
+    if (S.screen === 'card') P.holdToReveal(document.getElementById('card'), () => { S.peeked = true; document.getElementById('seenBtn').disabled = false; });
+    const key = S.screen + (S.screen === 'night' ? S.step : '');
+    if (key !== shown) window.scrollTo(0, 0);
+    shown = key;
+  }
+  function note() {
+    const n = editor ? editor.count() : 0, el = document.getElementById('pnote');
+    if (el) el.textContent = 'With ' + n + ' players: ' + P.plural(wolfCount(n), 'werewolf', 'werewolves') + '.';
+  }
+  function startTalk() {
+    if (talk) talk.stop();
+    talk = S.settings.talk ? P.countdown(S.settings.talk * 1000, {
+      tickLast: 10,
+      onTick: ms => { const t = document.getElementById('timer'); if (t) { t.textContent = P.clock(ms); t.classList.toggle('low', ms <= 10000); } },
+      onEnd: () => { sfx.buzz(0.8); const b = document.getElementById('pauseBtn'); if (b) b.textContent = 'Time is up'; }
+    }) : null;
+  }
+  function startGame() {
+    S.players = editor.get();
+    deal();
+    S.night = 0;
+    S.deal = 0;
+    S.peeked = false;
+    S.winner = null;
+    sfx.unlock();
+    if (S.settings.voice) P.speak(' ', {});
+    P.stayAwake();
+    document.body.classList.remove('day');
+    S.screen = 'pass';
+    render();
+  }
+  function quit() {
+    S.gen++;
+    P.hush();
+    if (talk) talk.stop();
+    document.body.classList.remove('day');
+    S.screen = 'setup';
+    render();
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    const i = Number(b.getAttribute('data-i'));
+    switch (b.getAttribute('data-act')) {
+      case 'start': startGame(); break;
+      case 'me': S.peeked = false; S.screen = 'card'; render(); break;
+      case 'seen':
+        S.deal++;
+        S.screen = S.deal < S.players.length ? 'pass' : 'dealt';
+        render();
+        break;
+      case 'night': if (talk) talk.stop(); runNight(); break;
+      case 'next': act(true); break;
+      case 'wolf-pick': S.pending = i; render(); break;
+      case 'wolf-back': S.pending = null; render(); break;
+      case 'wolf-yes': S.target = S.pending; S.pending = null; act(true); break;
+      case 'seer-pick': S.check = i; render(); break;
+      case 'seer-done': S.check = null; act(true); break;
+      case 'doc-pick': S.save = i; act(true); break;
+      case 'talk': startTalk(); S.screen = 'day'; render(); break;
+      case 'pause':
+        if (!talk) break;
+        if (talk.running) talk.stop(); else talk.start();
+        b.textContent = talk.running ? 'Pause' : 'Resume';
+        break;
+      case 'vote': if (talk) talk.stop(); S.screen = 'vote'; render(); break;
+      case 'exile':
+        S.exiled = i;
+        if (i >= 0) S.alive[i] = false;
+        S.winner = winnerNow();
+        S.screen = 'exile';
+        render();
+        sfx.tone(110, { to: 55, dur: 0.6, gain: 0.3 });
+        if (S.settings.voice && P.canSpeak()) P.speak(i >= 0 ? 'The village has voted out ' + nameOf(i) + '.' : 'The village could not agree.', { rate: 0.92, pitch: 0.9 });
+        break;
+      case 'end':
+        S.screen = 'end';
+        render();
+        sfx.win();
+        P.confetti({ colors: S.winner === 'wolves' ? ['#e85a5a', '#2a1018', '#f0c75e'] : ['#f0c75e', '#f3ecd8', '#5b3fa0', '#a9cce6'] });
+        if (S.settings.voice && P.canSpeak()) P.speak(S.winner === 'wolves' ? 'The werewolves win.' : 'The village wins.', { rate: 0.92, pitch: 0.9 });
+        break;
+      case 'again': startGame(); break;
+      case 'setup': quit(); break;
+      case 'quit': quit(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'wolves' || t.name === 'talk') { S.settings[t.name] = Number(t.value); persist(); note(); }
+    else if (['seer', 'doctor', 'reveal', 'voice'].includes(t.id)) { S.settings[t.id] = t.checked; persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
