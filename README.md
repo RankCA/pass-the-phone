@@ -2,13 +2,15 @@
 
 Party games for one phone and a room full of people. Open the site on one phone, pick a game and pass it around.
 
+Some games also play online, with each player on their own phone. See [Online play](#online-play).
+
 ## Games
 
 | Game | Players | How it works |
 | --- | --- | --- |
 | Fast Money | 2 to 8 | A host reads survey questions while everyone else wears headphones, then reveals the board. |
 | Landlord | 2 to 6 | Buy streets, build houses and collect rent. The phone is the board, the bank and the dice, and the game saves as you go. |
-| Flock | 3 to 16 | Everyone answers the same question in secret. The most popular answer scores, and a lone answer earns the black sheep. |
+| Flock | 3 to 16 | Everyone answers the same question in secret. The most popular answer scores, and a lone answer earns the black sheep. Plays online too. |
 | Shade Hunt | 3 to 10 | One player sees a secret colour and gives a one-word clue. Everyone hunts for it on a grid of 240 shades. |
 | Liar's Dice | 2 to 6 | Peek at your own dice, then bid on what is under every cup. Raise the bid or call liar. |
 | Farkle | 1 to 10 | Roll six dice, keep what scores and push your luck. Scoring rules live in `farkle/scoring.js`. |
@@ -22,10 +24,10 @@ Party games for one phone and a room full of people. Open the site on one phone,
 | Snake Pit | 3 to 6 | Hide gems and a snake in a secret pile, then bid on how many gems you can dig up without finding a snake. |
 | Yacht | 1 to 6 | The classic dice game. Roll five dice up to three times, then fill one of twelve boxes. Scoring lives in `yacht/rules.js`. |
 | Dots and Boxes | 2 to 4 | Take turns joining two dots. Close a box and it is yours, and you go again. |
-| Four in a Row | 2 | Take turns dropping discs. Line up four across, down or diagonally to win. |
+| Four in a Row | 2 | Take turns dropping discs. Line up four across, down or diagonally to win. Plays online too. |
 | Sea Battle | 2 | Hide your fleet, then take turns firing at each other's. The phone keeps each fleet secret. |
 | Mancala | 2 | The ancient game of sowing seeds, played with Kalah rules. |
-| Impostor | 3 to 12 | Everyone reads a secret word except the impostor. One-word clues, then a vote. |
+| Impostor | 3 to 12 | Everyone reads a secret word except the impostor. One-word clues, then a vote. Plays online too. |
 | Werewolf | 5 to 16 | The phone deals secret roles and reads the night out loud, so nobody has to sit out as narrator. |
 | Tune In | 2 to 12 | One player sees a hidden target on a dial and gives a clue. The rest turn the dial. |
 | Short Fuse | 2 to 12 | Say a word that fits the prompt, then hand off the bomb before it blows. |
@@ -73,11 +75,36 @@ python3 tools/stamp.py
 
 It adds a version tag to every script and stylesheet link, so a phone never mixes a new page with an old copy of a shared file.
 
+## Online play
+
+Four in a Row, Flock and Impostor can also be played online. Each player uses their own phone, and the one-phone version of every game works exactly as before, with no account.
+
+- A player taps "Make an online game" on a game's setup screen and gets a five letter code. Friends open the link, or type the code on the Online page (`online/`).
+- Players start as guests with just a name. A guest can add an email later to keep their account, and their friends, on any phone. Sign-in uses a six digit code sent by email, so there are no passwords.
+- Friends swap six letter friend codes on the Online page. After that they can invite each other into a game's waiting room.
+- The host's browser runs the game. Other players send their moves to the host, and the host saves the game after each change. If the host drops out, another player can take over and carry on from the last save.
+
+The backend is a free Supabase project (`dmfduvttrdyzkmrulbyp`, London). Everything it needs is in `supabase/migrations/`: the tables, the row level security that limits what each player can read, the database functions that do every write, and scheduled jobs that tidy up old games and guest accounts and keep the free project awake. The page only holds the publishable key, which is meant to be public. Row level security and the functions decide what each player can do.
+
+Settings that live in the Supabase dashboard:
+
+1. Authentication, Sign In / Providers: allow anonymous sign-ins and manual linking.
+2. Authentication, URL Configuration: site URL `https://rankca.github.io/pass-the-phone/`.
+3. Authentication, Emails, Templates: the Magic Link, Confirm signup and Change Email Address emails show `{{ .Token }}`, the six digit code.
+4. Authentication, Emails, SMTP Settings: Supabase's built-in email only reaches members of the Supabase team, so email codes need your own SMTP provider before other people can use them. Guests do not need email.
+
+To try online play on your own computer, open the local server in two tabs and add `&as=2` to the second tab's address. Each number gets its own guest account, but only on `localhost`.
+
+To add online play to another game, pass `Online.room()` a description of the game. The comment at the top of `shared/online.js` lists what it needs, and the three online games are working examples.
+
 ## Layout
 
 - `index.html` is the home page with the game grid, the filters and the shared player list.
 - `shared/party.js` holds helpers every game uses: storage, the player list, sounds, timers, hold-to-reveal cards, spoken narration, answer matching, the screen wake lock and confetti.
 - `shared/base.css` is the base stylesheet for the newer games. Each game sets its own colors and fonts on top.
+- `shared/online.js` runs online play: accounts, waiting rooms and the host loop. It only loads the Supabase library when a page goes online.
+- `online/` is the Online page: join with a code, invites, friends and your account.
+- `supabase/migrations/` holds the database schema for online play.
 - Each game lives in its own folder with an `index.html` and, where it needs one, a data file of questions, words or prompts.
 - `tools/make_icons.py` redraws the app icons. `tools/serve.py` is a local server with caching turned off. `tools/stamp.py` adds version tags to script and stylesheet links.
 

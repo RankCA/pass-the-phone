@@ -77,6 +77,13 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font
 .tags{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
 .tags li{font-size:13px;font-weight:700;padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--tag-ink)}
 
+.online{display:flex;align-items:center;flex-wrap:wrap;gap:12px 20px;margin-top:16px;padding:16px 18px;border-radius:22px;background:#15131a;color:#fff}
+.online div{flex:1 1 260px;min-width:0}
+.online h2{margin:0;font-size:21px;font-weight:800;letter-spacing:-.01em}
+.online p{margin:4px 0 0;color:#d9d6e3;font-size:16px}
+.online .go{display:inline-flex;align-items:center;gap:10px;min-height:48px;padding:0 20px;border-radius:14px;background:#fff;color:#15131a;font-weight:800;font-size:17px;text-decoration:none}
+.online .go:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.badge{display:grid;place-items:center;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:#ff4f6d;color:#fff;font-size:14px;font-weight:800}
 .foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px 24px;margin-top:52px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:15px}
 .foot p{margin:0}
 .foot a{color:var(--ink);font-weight:700}
@@ -118,6 +125,14 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font
     <p class="note">Add everyone once and every game starts with these names. They stay on this phone.</p>
   </section>
 
+  <section class="online" aria-labelledby="online-h">
+    <div>
+      <h2 id="online-h">Play online</h2>
+      <p>Each player on their own phone. Make a game, send the code, and play from anywhere.</p>
+    </div>
+    <a class="go" href="online/">Go online<span class="badge" id="onlineBadge" hidden></span></a>
+  </section>
+
   <nav class="filters" id="filters" aria-label="Filter games">
     <button class="filter" type="button" data-filter="all" aria-pressed="true">All 42 games</button>
     <button class="filter" type="button" data-filter="bluff" aria-pressed="false">Bluffing</button>
@@ -128,6 +143,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font
     <button class="filter" type="button" data-filter="quick" aria-pressed="false">Quick</button>
     <button class="filter" type="button" data-filter="board" aria-pressed="false">Board and dice</button>
     <button class="filter" type="button" data-filter="two" aria-pressed="false">Two players</button>
+    <button class="filter" type="button" data-filter="online" aria-pressed="false">Online</button>
   </nav>
   <main class="grid" aria-label="Games" id="grid">
     <a class="card" href="fast-money/" data-tags="words">
@@ -165,14 +181,14 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font
         <ul class="tags"><li>2 to 6</li><li>Board game</li></ul>
       </div>
     </a>
-    <a class="card" href="flock/" data-tags="words">
+    <a class="card" href="flock/" data-tags="words online">
       <div class="art" style="--bg:#dff0ff">
         <svg viewBox="0 0 320 200" aria-hidden="true"><circle cx="270" cy="40" r="20" fill="#ffd23f"/><rect x="0" y="152" width="320" height="48" fill="#7fc36b"/><g transform="translate(18 66) scale(1.05)"><g fill="#3b3b3b"><rect x="34" y="62" width="8" height="22" rx="3"/><rect x="54" y="64" width="8" height="22" rx="3"/><rect x="72" y="64" width="8" height="22" rx="3"/><rect x="88" y="62" width="8" height="22" rx="3"/></g><path d="M30 50a14 14 0 0 1 10-24 16 16 0 0 1 26-8 16 16 0 0 1 26 6 14 14 0 0 1 8 26 13 13 0 0 1-14 18 16 16 0 0 1-26 2 15 15 0 0 1-24-2 13 13 0 0 1-6-18z" fill="#fff" stroke="#1f2a1b" stroke-width="4"/><ellipse cx="22" cy="42" rx="15" ry="18" fill="#3b3b3b" stroke="#1f2a1b" stroke-width="4"/><circle cx="17" cy="39" r="3" fill="#fff"/><circle cx="26" cy="39" r="3" fill="#fff"/><path d="M8 30q-6-2-8 4M34 28q6-4 9 1" stroke="#1f2a1b" stroke-width="4" fill="none" stroke-linecap="round"/></g><g transform="translate(176 66) scale(1.05)"><g fill="#3b3b3b"><rect x="34" y="62" width="8" height="22" rx="3"/><rect x="54" y="64" width="8" height="22" rx="3"/><rect x="72" y="64" width="8" height="22" rx="3"/><rect x="88" y="62" width="8" height="22" rx="3"/></g><path d="M30 50a14 14 0 0 1 10-24 16 16 0 0 1 26-8 16 16 0 0 1 26 6 14 14 0 0 1 8 26 13 13 0 0 1-14 18 16 16 0 0 1-26 2 15 15 0 0 1-24-2 13 13 0 0 1-6-18z" fill="#fff" stroke="#1f2a1b" stroke-width="4"/><ellipse cx="22" cy="42" rx="15" ry="18" fill="#3b3b3b" stroke="#1f2a1b" stroke-width="4"/><circle cx="17" cy="39" r="3" fill="#fff"/><circle cx="26" cy="39" r="3" fill="#fff"/><path d="M8 30q-6-2-8 4M34 28q6-4 9 1" stroke="#1f2a1b" stroke-width="4" fill="none" stroke-linecap="round"/></g><g transform="translate(108 86) scale(.9)"><g fill="#111"><rect x="34" y="62" width="8" height="22" rx="3"/><rect x="54" y="64" width="8" height="22" rx="3"/><rect x="72" y="64" width="8" height="22" rx="3"/><rect x="88" y="62" width="8" height="22" rx="3"/></g><path d="M30 50a14 14 0 0 1 10-24 16 16 0 0 1 26-8 16 16 0 0 1 26 6 14 14 0 0 1 8 26 13 13 0 0 1-14 18 16 16 0 0 1-26 2 15 15 0 0 1-24-2 13 13 0 0 1-6-18z" fill="#2b2b2b" stroke="#1f2a1b" stroke-width="4"/><ellipse cx="22" cy="42" rx="15" ry="18" fill="#111" stroke="#1f2a1b" stroke-width="4"/><circle cx="17" cy="39" r="3" fill="#fff"/><circle cx="26" cy="39" r="3" fill="#fff"/><path d="M8 30q-6-2-8 4M34 28q6-4 9 1" stroke="#1f2a1b" stroke-width="4" fill="none" stroke-linecap="round"/></g></svg>
       </div>
       <div class="meta">
         <h2>Flock</h2>
         <p>Everyone answers the same question in secret. Match the most popular answer, but stand alone and you get the black sheep.</p>
-        <ul class="tags"><li>3 to 16</li><li>Think alike</li></ul>
+        <ul class="tags"><li>3 to 16</li><li>Think alike</li><li>Online</li></ul>
       </div>
     </a>
     <a class="card" href="shade-hunt/" data-tags="words">
@@ -305,14 +321,14 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font
         <ul class="tags"><li>2 to 4</li><li>Pen and paper</li></ul>
       </div>
     </a>
-    <a class="card" href="four-in-a-row/" data-tags="board two">
+    <a class="card" href="four-in-a-row/" data-tags="board two online">
       <div class="art" style="--bg:#1d1235">
         <svg viewBox="0 0 320 200" aria-hidden="true"><rect x="44" y="28" width="232" height="146" rx="18" fill="#4b2a99"/><circle cx="70" cy="52" r="15" fill="#1d1235"/><circle cx="70" cy="84" r="15" fill="#1d1235"/><circle cx="70" cy="116" r="15" fill="#1d1235"/><circle cx="70" cy="148" r="15" fill="#1d1235"/><circle cx="100" cy="52" r="15" fill="#1d1235"/><circle cx="100" cy="84" r="15" fill="#1d1235"/><circle cx="100" cy="116" r="15" fill="#1d1235"/><circle cx="100" cy="148" r="15" fill="#ff5d8f"/><circle cx="130" cy="52" r="15" fill="#1d1235"/><circle cx="130" cy="84" r="15" fill="#1d1235"/><circle cx="130" cy="116" r="15" fill="#25c2d3"/><circle cx="130" cy="148" r="15" fill="#ff5d8f"/><circle cx="160" cy="52" r="15" fill="#1d1235"/><circle cx="160" cy="84" r="15" fill="#25c2d3"/><circle cx="160" cy="116" r="15" fill="#25c2d3"/><circle cx="160" cy="148" r="15" fill="#ff5d8f"/><circle cx="190" cy="52" r="15" fill="#1d1235"/><circle cx="190" cy="84" r="15" fill="#1d1235"/><circle cx="190" cy="116" r="15" fill="#1d1235"/><circle cx="190" cy="148" r="15" fill="#ff5d8f"/><circle cx="220" cy="52" r="15" fill="#1d1235"/><circle cx="220" cy="84" r="15" fill="#1d1235"/><circle cx="220" cy="116" r="15" fill="#1d1235"/><circle cx="220" cy="148" r="15" fill="#25c2d3"/><circle cx="250" cy="52" r="15" fill="#1d1235"/><circle cx="250" cy="84" r="15" fill="#1d1235"/><circle cx="250" cy="116" r="15" fill="#1d1235"/><circle cx="250" cy="148" r="15" fill="#1d1235"/><path d="M85 148h90" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".8"/></svg>
       </div>
       <div class="meta">
         <h2>Four in a Row</h2>
         <p>Take turns dropping discs into the grid. Line up four across, down or diagonally to win.</p>
-        <ul class="tags"><li>2 players</li><li>Classic</li></ul>
+        <ul class="tags"><li>2 players</li><li>Classic</li><li>Online</li></ul>
       </div>
     </a>
     <a class="card" href="sea-battle/" data-tags="board two">
@@ -335,7 +351,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font
         <ul class="tags"><li>2 players</li><li>Classic</li></ul>
       </div>
     </a>
-    <a class="card" href="impostor/" data-tags="bluff">
+    <a class="card" href="impostor/" data-tags="bluff online">
       <div class="art" style="--bg:#24212b">
         <svg viewBox="0 0 320 200" aria-hidden="true">
           <g stroke="#15131a" stroke-width="6">
@@ -362,7 +378,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font
       <div class="meta">
         <h2>Impostor</h2>
         <p>Everyone sees the secret word except the impostor. Give one-word clues and find who is faking it.</p>
-        <ul class="tags"><li>3 to 12 players</li><li>Pass it around</li></ul>
+        <ul class="tags"><li>3 to 12 players</li><li>Pass it around</li><li>Online</li></ul>
       </div>
     </a>
     <a class="card" href="werewolf/" data-tags="bluff vote">
@@ -670,12 +686,13 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font
   </main>
 
   <footer class="foot">
-    <p>Every game runs on one phone. No accounts, nothing to install.</p>
+    <p>Every game runs on one phone with no account and nothing to install. Some also play online.</p>
     <p><a href="https://github.com/RankCA/pass-the-phone">Source on GitHub</a></p>
   </footer>
 </div>
 
 <script src="shared/party.js?v=ab12cd68"></script>
+<script src="shared/online.js?v=b1765b27"></script>
 <script>
 (function () {
   'use strict';
@@ -726,6 +743,19 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font
   }
   filters.addEventListener('click', e => { const b = e.target.closest('[data-filter]'); if (b) applyFilter(b.getAttribute('data-filter')); });
   applyFilter(P.store.get('ptp.hubFilter', 'all'));
+
+  // Signed-in players see a count of invites and friend requests.
+  if (window.Online && Online.hasSession()) {
+    setTimeout(() => {
+      Online.rpc('me').then(p => {
+        const n = (p.invites || 0) + (p.requests || 0), b = document.getElementById('onlineBadge');
+        if (!n || !b) return;
+        b.textContent = n;
+        b.setAttribute('aria-label', n + ' new');
+        b.hidden = false;
+      }).catch(() => {});
+    }, 800);
+  }
 })();
 </script>
 </body>

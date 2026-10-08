@@ -58,6 +58,7 @@ body{background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(165,120,255,.18),
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=b1765b27"></script>
 <script>
 (function () {
   'use strict';
@@ -76,18 +77,19 @@ body{background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(165,120,255,.18),
     S.screen = 'play';
     render();
   }
-  function fourFrom(r, c) {
-    const k = S.grid[r][c];
+  function fourIn(grid, r, c) {
+    const k = grid[r][c];
     for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
       const cells = [[r, c]];
       for (const s of [1, -1]) {
         let rr = r + dr * s, cc = c + dc * s;
-        while (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && S.grid[rr][cc] === k) { cells.push([rr, cc]); rr += dr * s; cc += dc * s; }
+        while (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && grid[rr][cc] === k) { cells.push([rr, cc]); rr += dr * s; cc += dc * s; }
       }
       if (cells.length >= 4) return cells;
     }
     return null;
   }
+  const fourFrom = (r, c) => fourIn(S.grid, r, c);
   function drop(c) {
     if (S.screen !== 'play') return;
     let r = ROWS - 1;
@@ -111,20 +113,24 @@ body{background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(165,120,255,.18),
     render();
   }
 
-  function boardHTML(play) {
+  // attr(c) gives the button's action attributes, or '' to leave the column disabled.
+  function gridHTML(grid, line, last, animate, attr) {
     let h = '<div class="board" role="grid" aria-label="Seven columns">';
     for (let c = 0; c < COLS; c++) {
-      const full = S.grid[0][c] >= 0;
-      h += `<button type="button" class="col" data-act="drop" data-c="${c}"${play && !full ? '' : ' disabled'} aria-label="Column ${c + 1}${full ? ', full' : ''}">`;
+      const full = grid[0][c] >= 0, a = full ? '' : attr(c);
+      h += `<button type="button" class="col" ${a || 'disabled'} aria-label="Column ${c + 1}${full ? ', full' : ''}">`;
       for (let r = 0; r < ROWS; r++) {
-        const k = S.grid[r][c];
-        const win = S.line.some(([a, b]) => a === r && b === c);
-        const drop = S.last && S.last[0] === r && S.last[1] === c && S.screen === 'play';
+        const k = grid[r][c];
+        const win = line.some(([x, y]) => x === r && y === c);
+        const drop = animate && last && last[0] === r && last[1] === c;
         h += `<span class="hole${k >= 0 ? ' p' + k : ''}${win ? ' win' : ''}${drop ? ' drop' : ''}"></span>`;
       }
       h += '</button>';
     }
     return h + '</div>';
+  }
+  function boardHTML(play) {
+    return gridHTML(S.grid, S.line, S.last, S.screen === 'play', c => (play ? `data-act="drop" data-c="${c}"` : ''));
   }
   function scoreHTML() {
     return `<div class="score">${S.players.map((n, k) => `<span style="--c:var(--p${k})"><i></i>${esc(n)} ${S.wins[k]}</span>`).join('')}</div>`;
@@ -137,6 +143,11 @@ body{background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(165,120,255,.18),
     <div class="panel">
       <div class="sec"><span class="label">Two players</span><div id="players"></div></div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Drop the first disc</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Each player uses their own phone. Make a game, then send the code to a friend.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -188,7 +199,79 @@ body{background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(165,120,255,.18),
     if (S.screen === 'play' && /^[1-7]$/.test(e.key)) drop(Number(e.key) - 1);
   });
 
-  render();
+  /* ---------- Online: each player on their own phone ---------- */
+  function fresh(o) {
+    return {
+      players: o.players, wins: o.wins, first: o.first, game: o.game,
+      grid: Array.from({ length: ROWS }, () => Array(COLS).fill(-1)),
+      turn: o.first, moves: 0, line: [], last: null, over: false, draw: false, winner: -1
+    };
+  }
+  const ONLINE = {
+    game: 'four-in-a-row', title: 'Four in a Row', min: 2, max: 2,
+    start(players, opts, prev) {
+      const same = prev && prev.players && players.length >= 2 && prev.players.every((p, i) => players[i] && players[i].id === p.id);
+      return fresh({ players: players.slice(0, 2), wins: same ? prev.wins : [0, 0], first: same ? 1 - prev.first : 0, game: ((prev && prev.game) || 0) + 1 });
+    },
+    act(F, from, a) {
+      const k = F.players.findIndex(p => p.id === from);
+      if (k < 0) return false;
+      if (a.t === 'drop' && !F.over && k === F.turn && a.m === F.moves) {
+        const c = Number(a.c);
+        if (!(c >= 0 && c < COLS)) return false;
+        let r = ROWS - 1;
+        while (r >= 0 && F.grid[r][c] >= 0) r--;
+        if (r < 0) return false;
+        F.grid[r][c] = k;
+        F.last = [r, c];
+        F.moves++;
+        const line = fourIn(F.grid, r, c);
+        if (line) { F.line = line; F.wins[k]++; F.over = true; F.winner = k; }
+        else if (F.grid.every(row => row.every(x => x >= 0))) { F.over = true; F.draw = true; }
+        else F.turn = 1 - k;
+        return true;
+      }
+      if (a.t === 'again' && F.over && a.g === F.game) {
+        Object.assign(F, fresh({ players: F.players, wins: F.wins, first: 1 - F.first, game: F.game + 1 }));
+        return true;
+      }
+      return false;
+    },
+    leave(F, ids) { if (F.players.some(p => !ids.includes(p.id))) return 'open'; },
+    render(v) {
+      const F = v.pub, me = F.players.findIndex(p => p.id === v.me);
+      const who = k => (k === me ? 'You' : esc(F.players[k].name));
+      const myTurn = !F.over && me === F.turn && !v.pending;
+      const score = `<div class="score">${F.players.map((p, k) => `<span style="--c:var(--p${k})"><i></i>${esc(p.name)}${k === me ? ' (you)' : ''} ${F.wins[k]}</span>`).join('')}</div>`;
+      const grid = gridHTML(F.grid, F.line, F.last, !F.over, c => (myTurn ? Online.sendAttr({ t: 'drop', c, m: F.moves }) : ''));
+      if (!F.over) {
+        return `<section>
+          <p class="turn" style="--c:var(--p${F.turn})"><i></i>${me === F.turn ? 'Your turn' : esc(F.players[F.turn].name) + "'s turn"}</p>
+          ${grid}${score}
+        </section>`;
+      }
+      return `<section class="center">
+        <p class="eyebrow">${F.draw ? 'The grid is full' : 'Four in a row'}</p>
+        <h2 class="big">${F.draw ? "It's a draw" : who(F.winner) + (F.winner === me ? ' win' : ' wins')}</h2>
+        ${grid}${score}
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div>
+      </section>`;
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || F.game !== B.game) return;
+      if (F.moves > B.moves && F.last) sfx.tone(300 + F.last[0] * 40, { type: 'triangle', dur: 0.12, gain: 0.14 });
+      if (F.over && !B.over) {
+        const me = F.players.findIndex(p => p.id === v.me);
+        if (F.draw) sfx.pop();
+        else if (F.winner === me) { sfx.win(); P.confetti({ colors: ['#ff5d8f', '#25c2d3', '#ffffff'] }); }
+        else sfx.lose();
+      }
+    }
+  };
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Play online | Pass the Phone</title>
+<meta name="description" content="Play Pass the Phone games online, each on your own phone. Join with a code, add friends and invite them to games.">
+<meta name="theme-color" content="#f6f7fb">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap">
+<style>
+/* Layout: the hub's shelf, with one card per job: join, invites, make, friends, account. */
+:root{
+  color-scheme:light;
+  --paper:#f6f7fb;
+  --card:#ffffff;
+  --ink:#15131a;
+  --muted:#5f5c6b;
+  --line:#e3e3ec;
+  --soft:#f0f0f5;
+  --good:#127a3a;
+  --bad:#b4232e;
+  --f:"Bricolage Grotesque",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html{background:var(--paper)}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font-size:17px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:760px;margin:0 auto;padding-top:max(16px,env(safe-area-inset-top));padding-bottom:max(48px,env(safe-area-inset-bottom));padding-left:max(16px,env(safe-area-inset-left));padding-right:max(16px,env(safe-area-inset-right))}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+
+.back{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:6px 16px 6px 12px;border-radius:999px;color:var(--ink);text-decoration:none;font-weight:700;font-size:15px;box-shadow:inset 0 0 0 2px var(--line);background:var(--card)}
+.back svg{width:16px;height:16px}
+.title{margin:22px 0 0;font-size:clamp(44px,10vw,84px);font-weight:800;font-variation-settings:"opsz" 96;letter-spacing:-.045em;line-height:.95}
+.intro{margin:12px 0 0;max-width:32em;font-size:clamp(18px,2.3vw,21px);line-height:1.4;color:var(--muted)}
+
+.box{margin-top:22px;padding:18px;border-radius:22px;background:var(--card);box-shadow:0 0 0 1px var(--line)}
+.box h2{margin:0;font-size:23px;font-weight:800;letter-spacing:-.015em;line-height:1.15}
+.box > p{margin:6px 0 0;color:var(--muted)}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.field{display:grid;gap:4px;flex:1 1 200px;min-width:0}
+.field label{font-size:15px;font-weight:700}
+.input{width:100%;min-width:0;height:52px;padding:0 14px;border-radius:14px;border:2px solid var(--line);background:#fff;color:var(--ink);font:600 18px/1 var(--f)}
+.input:focus{outline:none;border-color:var(--ink)}
+.input.code{font-weight:800;letter-spacing:.2em;text-transform:uppercase}
+.input.code::placeholder{letter-spacing:normal;text-transform:none}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:52px;padding:0 22px;border-radius:14px;border:0;background:var(--ink);color:#fff;font:700 17px/1.1 var(--f);text-decoration:none;cursor:pointer;touch-action:manipulation}
+.btn.alt{background:var(--card);color:var(--ink);box-shadow:inset 0 0 0 2px var(--ink)}
+.btn.small{min-height:42px;padding:0 16px;font-size:15px;border-radius:12px}
+.btn:disabled{opacity:.55;cursor:default}
+.row .btn{align-self:end}
+.msg{min-height:1.5em;margin:10px 0 0;font-weight:700;font-size:16px}
+.msg.good{color:var(--good)}
+.msg.bad{color:var(--bad)}
+.textbtn{padding:8px 4px;border:0;background:none;color:var(--ink);font:700 15px/1.2 var(--f);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+
+.games{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:10px}
+.games li{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding:12px 14px;border-radius:16px;background:var(--soft)}
+.games b{display:block;font-size:19px}
+.games span{flex:1 1 220px;min-width:0;color:var(--muted);font-size:16px}
+.games span b{color:var(--ink)}
+
+.people{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+.people li{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:10px 12px;border-radius:14px;box-shadow:inset 0 0 0 2px var(--line)}
+.who{flex:1 1 150px;min-width:0;font-weight:700;overflow-wrap:anywhere}
+.who small{display:block;font-weight:500;font-size:14px;color:var(--muted)}
+.dot{flex:none;width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 2px #8a8798}
+.dot.on{background:#18a249;box-shadow:none}
+.sub{margin:18px 0 0;font-size:15px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.fcode{display:flex;align-items:center;flex-wrap:wrap;gap:10px 16px;margin-top:12px;padding:12px 14px;border-radius:16px;background:var(--soft)}
+.fcode b{font-size:30px;font-weight:800;letter-spacing:.14em}
+.fcode span{flex:1 1 140px;color:var(--muted);font-size:15px}
+.invite{background:#fff6d6;box-shadow:0 0 0 2px #f1c541}
+.invite .people li{background:#fff;box-shadow:none}
+.danger{color:var(--bad)}
+.foot{margin-top:40px;color:var(--muted);font-size:15px}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><a class="back" href="../"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>All games</a></header>
+  <h1 class="title">Play online</h1>
+  <p class="intro">Everyone plays on their own phone, in the same room or miles apart. Make a game and send the code, or join a friend's game.</p>
+  <div id="app"><p class="msg">Loading.</p></div>
+  <p class="foot">Guest accounts live on this device. Add your email to keep yours on any phone.</p>
+</div>
+
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=b1765b27"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, O = window.Online, esc = P.esc;
+  const app = document.getElementById('app');
+  const S = {
+    state: 'loading', user: null, profile: null, friends: [], invites: [], games: [],
+    msg: {}, step: {}, email: '', busy: false, armed: ''
+  };
+  let lastHTML = '';
+
+  const say = (where, text, good) => { S.msg[where] = { text, good: !!good }; draw(); };
+  const msg = where => {
+    const m = S.msg[where];
+    return `<p class="msg${m ? (m.good ? ' good' : ' bad') : ''}" role="status">${m ? esc(m.text) : ''}</p>`;
+  };
+  const cleanCode = (t, n) => String(t || '').replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, n);
+  const ago = t => {
+    if (!t) return '';
+    const min = Math.round((Date.now() - new Date(t).getTime()) / 60000);
+    if (min < 2) return 'Online now';
+    if (min < 60) return 'Seen ' + min + ' min ago';
+    const h = Math.round(min / 60);
+    if (h < 24) return 'Seen ' + P.plural(h, 'hour') + ' ago';
+    return 'Seen ' + P.plural(Math.round(h / 24), 'day') + ' ago';
+  };
+  const gameUrl = (game, code) => O.gameUrl(game, code) + (O.AS ? (code ? '&' : '?') + 'as=' + O.AS : '');
+
+  /* ---------- Data ---------- */
+  async function load() {
+    let s = null;
+    try { s = await O.getSession(); } catch (e) { S.state = 'offline'; draw(); return; }
+    if (!s) { S.state = 'out'; S.user = null; draw(); return; }
+    S.user = s.user;
+    try {
+      S.profile = await O.rpc('me');
+      S.state = 'in';
+      await Promise.all([loadFriends(), loadInvites(), loadGames()]);
+      watch();
+    } catch (e) {
+      S.state = O.problemKey(e) === 'offline' ? 'offline' : 'out';
+    }
+    draw();
+  }
+  async function loadFriends() {
+    try { S.friends = (await O.rpc('my_friends')) || []; } catch (e) { /* keep the old list */ }
+  }
+  async function loadGames() {
+    try { S.games = ((await O.rpc('my_lobbies')) || []).filter(g => O.GAMES[g.game]); } catch (e) { /* keep the old list */ }
+  }
+  async function loadInvites() {
+    try {
+      const sb = await O.client();
+      const { data } = await sb.from('invites').select('id,code,game,from_name,created_at').eq('to_id', S.user.id).order('created_at', { ascending: false });
+      S.invites = (data || []).filter(i => O.GAMES[i.game]);
+    } catch (e) { /* keep the old list */ }
+  }
+  let watching = false;
+  function watch() {
+    if (watching) return;
+    watching = true;
+    O.watchInvites(S.user.id, () => { loadInvites().then(draw); P.sfx.ding(); }).catch(() => { watching = false; });
+    setInterval(() => {
+      if (document.hidden || S.state !== 'in') return;
+      O.rpc('me').then(p => { S.profile = p; }).catch(() => {});
+      Promise.all([loadFriends(), loadInvites(), loadGames()]).then(draw);
+    }, 30000);
+  }
+
+  /* ---------- Views ---------- */
+  function joinBox() {
+    const out = S.state !== 'in';
+    return `<section class="box" aria-labelledby="join-h">
+      <h2 id="join-h">Join a game</h2>
+      <p>Type the five letter code from the person who made the game.</p>
+      <div class="row">
+        ${out ? `<div class="field"><label for="join-name">Your name</label><input class="input" id="join-name" type="text" maxlength="18" autocomplete="nickname" autocapitalize="words" value="${esc(S.joinName != null ? S.joinName : (P.getRoster()[0] || ''))}"></div>` : ''}
+        <div class="field"><label for="join-code">Game code</label><input class="input code" id="join-code" type="text" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" placeholder="ABCDE"></div>
+        <button class="btn" type="button" data-do="join"${S.busy ? ' disabled' : ''}>Join</button>
+      </div>
+      ${msg('join')}
+    </section>`;
+  }
+  function invitesBox() {
+    if (!S.invites.length) return '';
+    return `<section class="box invite" aria-labelledby="inv-h">
+      <h2 id="inv-h">${S.invites.length === 1 ? 'You have an invite' : 'You have ' + S.invites.length + ' invites'}</h2>
+      <ul class="people">${S.invites.map(i => `<li><span class="who">${esc(i.from_name)} invited you to ${esc(O.GAMES[i.game].title)}<small>Code ${esc(i.code)}</small></span>
+        <button class="btn small" type="button" data-do="accept-invite" data-code="${esc(i.code)}">Join</button>
+        <button class="btn small alt" type="button" data-do="dismiss" data-id="${i.id}">Dismiss</button></li>`).join('')}</ul>
+      ${msg('invites')}
+    </section>`;
+  }
+  function gamesBox() {
+    if (!S.games.length) return '';
+    return `<section class="box" aria-labelledby="mine-h">
+      <h2 id="mine-h">Your games</h2>
+      <p>Games you are still in. Go back any time.</p>
+      <ul class="people">${S.games.map(g => `<li><span class="who">${esc(O.GAMES[g.game].title)}<small>Code ${esc(g.code)}. ${g.status === 'playing' ? 'In progress' : 'Waiting to start'}. ${P.plural(g.players, 'player')}${g.host ? '. You are the host' : ''}.</small></span>
+        <a class="btn small" href="${esc(gameUrl(g.game, g.code))}">Go back</a></li>`).join('')}</ul>
+    </section>`;
+  }
+  function makeBox() {
+    return `<section class="box" aria-labelledby="make-h">
+      <h2 id="make-h">Make a game</h2>
+      <p>You get a code to send to friends. These games work online so far. Every game still works on one phone.</p>
+      <ul class="games">${Object.keys(O.GAMES).map(g => { const x = O.GAMES[g]; return `<li><span><b>${esc(x.title)}</b>${esc(x.blurb)} ${x.min === x.max ? x.min : x.min + ' to ' + x.max} players.</span>
+        <a class="btn small" href="${esc(gameUrl(g, 'new'))}">Make a game</a></li>`; }).join('')}</ul>
+    </section>`;
+  }
+  function friendsBox() {
+    const f = S.friends;
+    const got = f.filter(x => x.status === 'received'), sent = f.filter(x => x.status === 'sent');
+    const mates = f.filter(x => x.status === 'friend').sort((a, b) => new Date(b.last_seen || 0) - new Date(a.last_seen || 0));
+    const on = x => x.last_seen && Date.now() - new Date(x.last_seen).getTime() < 120000;
+    const code = S.profile ? S.profile.friend_code : '';
+    return `<section class="box" aria-labelledby="fr-h">
+      <h2 id="fr-h">Friends</h2>
+      <p>Swap friend codes once. After that you can invite each other to games.</p>
+      <div class="fcode"><span>Your friend code</span><b aria-label="${esc(O.spaced(code))}">${esc(code.slice(0, 3) + ' ' + code.slice(3))}</b><button class="btn small alt" type="button" data-do="copy-code">Copy</button></div>
+      <div class="row">
+        <div class="field"><label for="friend-code">Add a friend by their code</label><input class="input code" id="friend-code" type="text" maxlength="7" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go" placeholder="ABC DEF"></div>
+        <button class="btn" type="button" data-do="add-friend">Add</button>
+      </div>
+      ${msg('friends')}
+      ${got.length ? `<p class="sub">Asking to be friends</p><ul class="people">${got.map(x => `<li><span class="who">${esc(x.name)}</span>
+        <button class="btn small" type="button" data-do="answer" data-id="${x.id}" data-yes="1">Accept</button>
+        <button class="btn small alt" type="button" data-do="answer" data-id="${x.id}" data-yes="0">Decline</button></li>`).join('')}</ul>` : ''}
+      ${mates.length ? `<p class="sub">Your friends</p><ul class="people">${mates.map(x => `<li><span class="dot${on(x) ? ' on' : ''}" aria-hidden="true"></span><span class="who">${esc(x.name)}<small>${esc(ago(x.last_seen))}</small></span>
+        <button class="btn small alt" type="button" data-do="unfriend" data-id="${x.id}">${S.armed === 'unfriend:' + x.id ? 'Tap again to remove' : 'Remove'}</button></li>`).join('')}</ul>` : ''}
+      ${sent.length ? `<p class="sub">Waiting for them to accept</p><ul class="people">${sent.map(x => `<li><span class="who">${esc(x.name)}</span>
+        <button class="btn small alt" type="button" data-do="unfriend" data-id="${x.id}">${S.armed === 'unfriend:' + x.id ? 'Tap again to cancel' : 'Cancel'}</button></li>`).join('')}</ul>` : ''}
+      ${!f.length ? '<p class="msg">No friends yet. Share your code, or add someone from a game you played together.</p>' : ''}
+    </section>`;
+  }
+  function emailSteps(kind) {
+    // kind: 'keep' adds an email to this guest account, 'in' signs in to an account.
+    const st = S.step[kind];
+    if (st === 'code') {
+      return `<p>We sent a code to <b>${esc(S.email)}</b>. It can take a minute. Check your spam folder too.</p>
+        <div class="row"><div class="field"><label for="${kind}-otp">Code from the email</label><input class="input code" id="${kind}-otp" type="text" inputmode="numeric" maxlength="10" autocomplete="one-time-code" enterkeyhint="done"></div>
+        <button class="btn" type="button" data-do="${kind}-check"${S.busy ? ' disabled' : ''}>${kind === 'keep' ? 'Confirm' : 'Sign in'}</button></div>
+        <button class="textbtn" type="button" data-do="${kind}-restart">Use a different email</button>`;
+    }
+    return `<div class="row"><div class="field"><label for="${kind}-email">Email</label><input class="input" id="${kind}-email" type="email" autocomplete="email" enterkeyhint="send" value="${esc(S.email)}"></div>
+      <button class="btn" type="button" data-do="${kind}-send"${S.busy ? ' disabled' : ''}>Send me a code</button></div>`;
+  }
+  function accountBox() {
+    const u = S.user, guest = !u || u.is_anonymous || !u.email;
+    const name = S.profile ? S.profile.name : '';
+    const renaming = S.step.rename;
+    return `<section class="box" aria-labelledby="me-h">
+      <h2 id="me-h">You</h2>
+      ${renaming ? `<div class="row"><div class="field"><label for="my-name">Your name</label><input class="input" id="my-name" type="text" maxlength="18" autocomplete="nickname" autocapitalize="words" enterkeyhint="done" value="${esc(name)}"></div>
+          <button class="btn" type="button" data-do="save-name">Save</button></div>`
+        : `<div class="row" style="align-items:center"><span class="who" style="font-size:22px">${esc(name)}</span><button class="btn small alt" type="button" data-do="rename">Change name</button></div>`}
+      ${msg('name')}
+      ${guest ? `<p class="sub">Guest account</p>
+        <p style="margin:6px 0 0;color:var(--muted)">This account lives on this device. Add your email to keep it, and your friends, on any phone.</p>
+        ${emailSteps('keep')}${msg('keep')}`
+        : `<p class="sub">Signed in</p><p style="margin:6px 0 0">${esc(u.email)}</p>`}
+      <div class="row">
+        ${guest ? '<button class="textbtn" type="button" data-do="show-signin">Sign in to a different account</button>' : ''}
+        <button class="textbtn" type="button" data-do="signout">${S.armed === 'signout' ? (guest ? 'Tap again. This guest account will be lost' : 'Tap again to sign out') : 'Sign out'}</button>
+        <button class="textbtn danger" type="button" data-do="delete">${S.armed === 'delete' ? 'Tap again to delete everything' : 'Delete my account'}</button>
+      </div>
+      ${S.step.showSignin ? `<p class="sub">Sign in to another account</p><p style="margin:6px 0 0;color:var(--muted)">This guest account stays behind on this device.</p>${emailSteps('in')}${msg('in')}` : ''}
+      ${msg('account')}
+    </section>`;
+  }
+  function outBox() {
+    return `<section class="box" aria-labelledby="in-h">
+      <h2 id="in-h">Have an account?</h2>
+      <p>Sign in with your email. We send you a code, so there is no password.</p>
+      ${emailSteps('in')}${msg('in')}
+    </section>`;
+  }
+  function draw() {
+    let html;
+    if (S.state === 'loading') html = '<p class="msg">Loading.</p>';
+    else if (S.state === 'offline') html = '<section class="box"><h2>Cannot connect</h2><p>Could not reach the game server. Check your connection and try again.</p><div class="row"><button class="btn" type="button" data-do="reload">Try again</button></div></section>';
+    else if (S.state === 'out') html = joinBox() + makeBox() + outBox();
+    else html = invitesBox() + gamesBox() + joinBox() + makeBox() + friendsBox() + accountBox();
+    if (html === lastHTML) return;
+    const keep = {};
+    app.querySelectorAll('input[id]').forEach(el => { keep[el.id] = { v: el.value, f: document.activeElement === el }; });
+    app.innerHTML = html;
+    lastHTML = html;
+    Object.keys(keep).forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.value = keep[id].v;
+      if (keep[id].f) el.focus({ preventScroll: true });
+    });
+  }
+
+  /* ---------- Actions ---------- */
+  const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  async function join(code) {
+    code = cleanCode(code, 5);
+    if (code.length !== 5) { say('join', 'A game code has five letters.'); return; }
+    S.busy = true;
+    say('join', 'Joining.', true);
+    try {
+      if (S.state !== 'in') {
+        const name = P.cleanName(val('join-name'));
+        if (!name) { S.busy = false; say('join', 'Type your name first.'); return; }
+        S.joinName = name;
+        await O.guest(name);
+      }
+      const r = await O.rpc('join_lobby', { p_code: code });
+      if (r.error) { S.busy = false; say('join', O.problem(r.error)); load(); return; }
+      if (!O.GAMES[r.game]) { S.busy = false; say('join', 'That game cannot be played online yet.'); return; }
+      location.href = gameUrl(r.game, r.code);
+    } catch (e) {
+      S.busy = false;
+      say('join', O.problem(e));
+    }
+  }
+  async function emailSend(kind) {
+    const email = val(kind + '-email').trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { say(kind, 'That does not look like an email address.'); return; }
+    S.email = email;
+    S.busy = true;
+    say(kind, 'Sending.', true);
+    try {
+      if (kind === 'keep') await O.addEmail(email);
+      else await O.sendCode(email, P.getRoster()[0] || '');
+      S.step[kind] = 'code';
+      S.busy = false;
+      say(kind, 'Code sent.', true);
+    } catch (e) {
+      S.busy = false;
+      say(kind, O.problem(e));
+    }
+  }
+  async function emailCheck(kind) {
+    const code = val(kind + '-otp').replace(/\D/g, '');
+    if (code.length < 6) { say(kind, 'Type the code from the email.'); return; }
+    S.busy = true;
+    say(kind, 'Checking.', true);
+    try {
+      await O.checkCode(S.email, code, kind === 'keep' ? 'email_change' : 'email');
+      S.busy = false;
+      S.step = {};
+      S.msg = {};
+      await load();
+      say('account', kind === 'keep' ? 'Saved. You can now sign in with this email on any phone.' : 'You are signed in.', true);
+    } catch (e) {
+      S.busy = false;
+      say(kind, O.problem(e));
+    }
+  }
+  function arm(key) {
+    if (S.armed === key) { S.armed = ''; return true; }
+    S.armed = key;
+    draw();
+    setTimeout(() => { if (S.armed === key) { S.armed = ''; draw(); } }, 3000);
+    return false;
+  }
+
+  app.addEventListener('click', async e => {
+    const b = e.target.closest('[data-do]');
+    if (!b || b.disabled) return;
+    P.sfx.unlock();
+    const id = b.getAttribute('data-id');
+    switch (b.getAttribute('data-do')) {
+      case 'reload': location.reload(); break;
+      case 'join': join(val('join-code')); break;
+      case 'accept-invite': join(b.getAttribute('data-code')); break;
+      case 'dismiss':
+        S.invites = S.invites.filter(i => String(i.id) !== id);
+        draw();
+        O.rpc('dismiss_invite', { p_id: Number(id) }).catch(() => {});
+        break;
+      case 'copy-code': {
+        const code = S.profile ? S.profile.friend_code : '';
+        const done = () => say('friends', 'Copied your friend code.', true);
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done, () => {});
+        break;
+      }
+      case 'add-friend': {
+        const code = cleanCode(val('friend-code'), 6);
+        if (code.length !== 6) { say('friends', 'A friend code has six letters.'); break; }
+        try {
+          const r = await O.rpc('add_friend', { p_code: code });
+          const text = { sent: 'Request sent. They need to accept it.', accepted: 'You are now friends.', already: 'You are already friends.', self: 'That is your own code.', not_found: 'No one has that code.' }[r] || 'Done.';
+          const el = document.getElementById('friend-code');
+          if (el && (r === 'sent' || r === 'accepted')) el.value = '';
+          await loadFriends();
+          say('friends', text, r === 'sent' || r === 'accepted' || r === 'already');
+        } catch (err) { say('friends', O.problem(err)); }
+        break;
+      }
+      case 'answer':
+        try {
+          await O.rpc('answer_friend', { p_user: id, p_accept: b.getAttribute('data-yes') === '1' });
+          await loadFriends();
+          draw();
+        } catch (err) { say('friends', O.problem(err)); }
+        break;
+      case 'unfriend':
+        if (!arm('unfriend:' + id)) break;
+        try { await O.rpc('remove_friend', { p_user: id }); await loadFriends(); draw(); } catch (err) { say('friends', O.problem(err)); }
+        break;
+      case 'rename': S.step.rename = true; draw(); { const f = document.getElementById('my-name'); if (f) { f.focus(); f.select(); } } break;
+      case 'save-name': {
+        const n = P.cleanName(val('my-name'));
+        S.step.rename = false;
+        if (!n) { draw(); break; }
+        try { const saved = await O.rpc('set_name', { p_name: n }); S.profile.name = saved; say('name', 'Name saved.', true); } catch (err) { say('name', O.problem(err)); }
+        break;
+      }
+      case 'keep-send': emailSend('keep'); break;
+      case 'keep-check': emailCheck('keep'); break;
+      case 'keep-restart': S.step.keep = null; S.msg.keep = null; draw(); break;
+      case 'in-send': emailSend('in'); break;
+      case 'in-check': emailCheck('in'); break;
+      case 'in-restart': S.step.in = null; S.msg.in = null; draw(); break;
+      case 'show-signin': S.step.showSignin = !S.step.showSignin; draw(); break;
+      case 'signout':
+        if (!arm('signout')) break;
+        try { await O.signOut(); } catch (err) { /* signed out locally anyway */ }
+        S.step = {};
+        S.msg = {};
+        load();
+        break;
+      case 'delete':
+        if (!arm('delete')) break;
+        try {
+          await O.rpc('delete_my_account');
+          try { await O.signOut(); } catch (err) { /* the account is already gone */ }
+          S.step = {};
+          S.msg = {};
+          await load();
+          say('in', 'Your account is deleted.', true);
+        } catch (err) { say('account', O.problem(err)); }
+        break;
+    }
+  });
+  app.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || !e.target.id) return;
+    const map = { 'join-code': 'join', 'join-name': 'join', 'friend-code': 'add-friend', 'my-name': 'save-name', 'keep-email': 'keep-send', 'keep-otp': 'keep-check', 'in-email': 'in-send', 'in-otp': 'in-check' };
+    const act = map[e.target.id];
+    if (!act) return;
+    e.preventDefault();
+    const b = app.querySelector('[data-do="' + act + '"]');
+    if (b) b.click();
+  });
+  app.addEventListener('input', e => {
+    if (e.target.id === 'join-code') e.target.value = cleanCode(e.target.value, 5);
+  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && S.state === 'in') load(); });
+
+  // A shared link like online/?code=ABCDE fills in the code.
+  const pre = cleanCode(new URLSearchParams(location.search).get('code'), 5);
+  load().then(() => {
+    const f = document.getElementById('join-code');
+    if (f && pre) f.value = pre;
+  });
+})();
+</script>
+</body>
+</html>

@@ -43,6 +43,7 @@ body{background:linear-gradient(180deg,#dff0ff 0,#eef6ef 220px,var(--bg) 420px)}
 .grp{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:12px;width:100%;padding:12px 14px;border:0;border-radius:18px;background:#fff;color:var(--fg);font:inherit;text-align:left;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
 .grp[aria-pressed="true"]{background:#e3f2df;box-shadow:inset 0 0 0 3px var(--accent)}
 .grp.win{box-shadow:inset 0 0 0 3px var(--accent);background:#e3f2df}
+div.grp{cursor:default}
 .grp .n{display:grid;place-items:center;min-width:44px;height:44px;padding:0 8px;border-radius:14px;background:var(--fg);color:#fff;font-family:var(--f-display);font-weight:900;font-size:22px}
 .grp b{display:block;font-family:var(--f-display);font-weight:900;font-size:22px;line-height:1.15;overflow-wrap:anywhere}
 .grp small{display:block;margin-top:2px;font-size:15px;color:var(--muted);overflow-wrap:anywhere}
@@ -62,6 +63,7 @@ body{background:linear-gradient(180deg,#dff0ff 0,#eef6ef 220px,var(--bg) 420px)}
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=b1765b27"></script>
 <script src="questions.js?v=d3ce72d7"></script>
 <script>
 (function () {
@@ -160,6 +162,11 @@ body{background:linear-gradient(180deg,#dff0ff 0,#eef6ef 220px,var(--bg) 420px)}
       <div class="sec"><span class="label">First to</span>${P.seg('goal', [[5, '5 points'], [8, '8 points'], [10, '10 points']], S.settings.goal)}</div>
       <div class="sec"><span class="label">Black sheep</span>${P.seg('sheep', [['yes', 'On'], ['no', 'Off']], S.settings.sheep)}<p class="hint">Anyone left alone with an answer takes the black sheep. You cannot win while you hold it.</p></div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Round them up</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone answers on their own phone. Make a game, then send the code to your friends.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -306,7 +313,234 @@ body{background:linear-gradient(180deg,#dff0ff 0,#eef6ef 220px,var(--bg) 420px)}
     if (e.target.name === 'sheep') { S.settings.sheep = e.target.value; persist(); }
   });
 
-  render();
+  /* ---------- Online: everyone answers on their own phone ---------- */
+  const cleanAns = t => String(t == null ? '' : t).replace(/\s+/g, ' ').trim().slice(0, 32);
+  function newQuestion(F) {
+    F.round++;
+    F.qid++;
+    F.q = deck.one([F.q]);
+    F.answers = {};
+    F.groups = [];
+    F.phase = 'answer';
+  }
+  function revealAll(F) {
+    const gs = [];
+    F.players.forEach(p => {
+      const a = F.answers[p.id];
+      if (!a) return;
+      const g = gs.find(x => x.keys.some(k => P.sameAnswer(k, a)));
+      if (g) { g.ids.push(p.id); g.keys.push(a); } else gs.push({ label: a, keys: [a], ids: [p.id] });
+    });
+    F.groups = gs.sort((a, b) => b.ids.length - a.ids.length);
+    F.phase = 'reveal';
+  }
+  function scoreOnline(F) {
+    const gs = F.groups;
+    const top = gs.length ? gs[0].ids.length : 0;
+    const tied = gs.filter(g => g.ids.length === top).length > 1;
+    const winners = !tied && top > 1 ? gs[0].ids.slice() : [];
+    winners.forEach(id => { F.scores[id] = (F.scores[id] || 0) + 1; });
+    let lone = null;
+    if (F.sheepOn) {
+      const loners = gs.filter(g => g.ids.length === 1);
+      if (loners.length === 1) lone = loners[0].ids[0];
+    }
+    const passedFrom = lone && F.sheep && F.sheep !== lone ? F.sheep : null;
+    if (lone) F.sheep = lone;
+    F.last = { winners, tied, top, lone, passedFrom, label: gs.length ? gs[0].label : '' };
+    const eligible = F.players.filter(p => (F.scores[p.id] || 0) >= F.goal && p.id !== F.sheep);
+    if (eligible.length) {
+      const best = Math.max(...eligible.map(p => F.scores[p.id]));
+      F.winner = eligible.filter(p => F.scores[p.id] === best).map(p => p.id);
+      F.phase = 'final';
+    } else F.phase = 'score';
+  }
+  function onlineBoard(F, me) {
+    const rows = F.players.map(p => [p, F.scores[p.id] || 0]).sort((a, b) => b[1] - a[1]);
+    const top = rows.length ? rows[0][1] : 0;
+    return '<ol class="board">' + rows.map(([p, n]) => '<li' + (top > 0 && n === top ? ' class="top"' : '') + '><span>' + esc(p.name) + (p.id === me ? ' (you)' : '') + '</span>' +
+      (F.sheep === p.id ? '<span class="bs">' + BLACK + 'Black sheep</span>' : '') + '<b>' + n + '</b></li>').join('') + '</ol>';
+  }
+  const ONLINE = {
+    game: 'flock', title: 'Flock', min: 3, max: 12,
+    options() {
+      return `<p class="label">First to</p>${P.seg('o-goal', [[5, '5 points'], [8, '8 points'], [10, '10 points']], S.settings.goal)}
+        <p class="label" style="margin-top:18px">Black sheep</p>${P.seg('o-sheep', [['yes', 'On'], ['no', 'Off']], S.settings.sheep)}`;
+    },
+    readOptions() { return { goal: S.settings.goal, sheep: S.settings.sheep }; },
+    start(players, o) {
+      const F = { players, goal: o.goal, sheepOn: o.sheep === 'yes', scores: {}, sheep: null, round: 0, qid: 0, game: 1, q: '', answers: {}, groups: [], last: null, winner: [], phase: 'answer' };
+      newQuestion(F);
+      return F;
+    },
+    view(F) {
+      const v = Object.assign({}, F);
+      v.answered = F.players.filter(p => F.answers[p.id]).map(p => p.id);
+      delete v.answers;
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach(p => { out[p.id] = { q: F.qid, a: F.answers[p.id] || '' }; });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(p => p.id === from)) return false;
+      const host = from === ctx.host;
+      if (a.t === 'again') {
+        if (F.phase !== 'final' || a.g !== F.game) return false;
+        F.scores = {};
+        F.sheep = null;
+        F.round = 0;
+        F.game++;
+        F.winner = [];
+        F.last = null;
+        newQuestion(F);
+        return true;
+      }
+      if (a.q !== F.qid) return false;
+      switch (a.t) {
+        case 'answer': {
+          const ans = cleanAns(a.a);
+          if (F.phase !== 'answer' || !ans) return false;
+          F.answers[from] = ans;
+          if (F.players.every(p => F.answers[p.id])) revealAll(F);
+          return true;
+        }
+        case 'reveal':
+          if (!host || F.phase !== 'answer' || Object.keys(F.answers).length < 2) return false;
+          revealAll(F);
+          return true;
+        case 'skip':
+          if (!host || F.phase !== 'answer') return false;
+          F.round--;
+          newQuestion(F);
+          return true;
+        case 'merge': {
+          if (!host || F.phase !== 'reveal' || !Array.isArray(a.sel)) return false;
+          const idx = [...new Set(a.sel.map(Number))].filter(i => i >= 0 && i < F.groups.length);
+          if (idx.length < 2) return false;
+          const picked = idx.map(i => F.groups[i]).sort((x, y) => y.ids.length - x.ids.length);
+          const into = picked[0];
+          picked.slice(1).forEach(g => { into.ids.push(...g.ids); into.keys.push(...g.keys); });
+          F.groups = F.groups.filter(g => !picked.slice(1).includes(g)).sort((x, y) => y.ids.length - x.ids.length);
+          return true;
+        }
+        case 'score':
+          if (!host || F.phase !== 'reveal') return false;
+          scoreOnline(F);
+          return true;
+        case 'next':
+          if (F.phase !== 'score') return false;
+          newQuestion(F);
+          return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      if (F.players.length < 3) return 'open';
+      gone.forEach(id => { delete F.answers[id]; delete F.scores[id]; if (F.sheep === id) F.sheep = null; });
+      F.groups = F.groups.map(g => {
+        const keep = g.ids.map((id, i) => [id, g.keys[i]]).filter(x => !gone.includes(x[0]));
+        return { label: g.label, ids: keep.map(x => x[0]), keys: keep.map(x => x[1]) };
+      }).filter(g => g.ids.length).sort((x, y) => y.ids.length - x.ids.length);
+      if (F.phase === 'answer' && F.players.every(p => F.answers[p.id])) revealAll(F);
+    },
+    render(v) {
+      const F = v.pub, me = v.me;
+      const nm = id => { const p = F.players.find(x => x.id === id); return p ? p.name : 'Someone'; };
+      const names = ids => esc(P.listNames(ids.map(nm)));
+      const playing = F.players.some(p => p.id === me);
+      const head = `<p class="eyebrow">Question ${F.round}</p>`;
+      if (F.phase === 'answer') {
+        const mine = v.mine && v.mine.q === F.qid ? v.mine.a : '';
+        const editing = v.local.flockEdit === F.qid;
+        const waiting = F.players.filter(p => !F.answered.includes(p.id)).map(p => p.id);
+        let body;
+        if (!playing) body = '<p class="lead">You are watching this round.</p>';
+        else if (mine && !editing) body = `<p class="lead">Your answer is <b>${esc(mine)}</b>.</p><div class="actions center"><button class="btn btn-alt" type="button" data-ui="edit">Change it</button></div>`;
+        else {
+          body = `<div class="field"><label for="oans-${F.qid}">Your answer</label><input id="oans-${F.qid}" data-keep data-enter="lock" type="text" maxlength="32" autocomplete="off" autocapitalize="sentences" enterkeyhint="done" placeholder="Think like the flock" value="${esc(mine)}"></div>
+            <div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="lock"${v.pending ? ' disabled' : ''}>Lock it in</button></div>`;
+        }
+        const status = waiting.length ? 'Waiting for ' + names(waiting) + '.' : 'Everyone has answered.';
+        const hostBtns = v.host ? `<div class="actions center"><button class="btn btn-alt" type="button" ${Online.sendAttr({ t: 'skip', q: F.qid })}>Another question</button>${F.answered.length >= 2 && waiting.length ? `<button class="btn btn-alt" type="button" ${Online.sendAttr({ t: 'reveal', q: F.qid })}>Show answers now</button>` : ''}</div>` : '';
+        return `<section class="center">${head}<p class="q">${esc(F.q)}</p>${body}<p class="note">${status}</p>${hostBtns}${onlineBoard(F, me)}</section>`;
+      }
+      if (F.phase === 'reveal') {
+        const s = v.local.flockSel;
+        const sel = s && s.q === F.qid && s.n === F.groups.length ? s.list : [];
+        const groups = F.groups.map((g, i) => {
+          const inner = `<span class="n">${g.ids.length}</span><span><b>${esc(g.label)}</b><small>${names(g.ids)}</small></span>`;
+          return v.host ? `<button type="button" class="grp" data-ui="pick" data-i="${i}" aria-pressed="${sel.includes(i)}">${inner}</button>` : `<div class="grp">${inner}</div>`;
+        }).join('');
+        const foot = v.host
+          ? `<div class="actions center merge">${sel.length >= 2 ? `<button class="btn btn-alt" type="button" data-ui="merge">Merge these ${sel.length}</button>` : ''}<button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'score', q: F.qid })}>Score the round</button></div>`
+          : `<p class="note">${esc(v.nameOf(v.hostId))} is checking the answers. Say so if two groups mean the same thing.</p>`;
+        return `<section class="center">${head}<p class="q small">${esc(F.q)}</p>${v.host ? '<p class="note">Tap groups that mean the same thing, then merge them.</p>' : ''}<div class="groups">${groups}</div>${foot}</section>`;
+      }
+      if (F.phase === 'score') {
+        const L = F.last;
+        let title, line;
+        if (L.winners.length) { title = 'The flock said ' + L.label; line = P.listNames(L.winners.map(nm)) + (L.winners.length === 1 ? ' scores a point.' : ' score a point each.'); }
+        else if (L.tied) { title = 'Split flock'; line = 'Two groups tied for biggest, so nobody scores.'; }
+        else { title = 'No flock at all'; line = 'Everyone said something different, so nobody scores.'; }
+        const sheep = L.lone ? esc(nm(L.lone)) + ' stood alone and takes the black sheep' + (L.passedFrom ? ' from ' + esc(nm(L.passedFrom)) : '') + '.' : '';
+        return `<section class="center">${head}<h2 class="verdict">${esc(title)}</h2><p class="lead">${esc(line)}</p>
+          ${sheep ? `<p class="lead"><span class="bs">${BLACK}Black sheep</span> ${sheep}</p>` : ''}
+          ${onlineBoard(F, me)}
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'next', q: F.qid })}>Next question</button></div></section>`;
+      }
+      const w = F.winner.map(nm);
+      return `<section class="center"><p class="eyebrow">Game over</p>
+        <h2 class="big">${esc(P.listNames(w))} ${w.length > 1 ? 'win' : 'wins'}</h2>
+        <p class="lead">Nobody thinks like the flock quite like ${w.length > 1 ? 'them' : esc(w[0])}.</p>
+        ${onlineBoard(F, me)}
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div></section>`;
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'lock') {
+        const f = document.getElementById('oans-' + F.qid);
+        const a = cleanAns(f ? f.value : '');
+        if (!a) { if (f) f.focus(); return; }
+        v.local.flockEdit = null;
+        v.send({ t: 'answer', q: F.qid, a });
+        sfx.pop();
+      } else if (name === 'edit') {
+        v.local.flockEdit = F.qid;
+        v.redraw();
+      } else if (name === 'pick') {
+        let s = v.local.flockSel;
+        if (!s || s.q !== F.qid || s.n !== F.groups.length) s = v.local.flockSel = { q: F.qid, n: F.groups.length, list: [] };
+        const i = Number(el.getAttribute('data-i'));
+        const at = s.list.indexOf(i);
+        if (at >= 0) s.list.splice(at, 1); else s.list.push(i);
+        v.redraw();
+      } else if (name === 'merge') {
+        const s = v.local.flockSel;
+        if (s && s.list.length >= 2) { v.send({ t: 'merge', q: F.qid, sel: s.list.slice() }); s.list = []; sfx.pop(); }
+      }
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.phase === 'answer' && B.phase === 'answer' && F.qid === B.qid && F.answered.length > B.answered.length) sfx.tick();
+      if (F.phase === 'reveal' && B.phase !== 'reveal') sfx.whoosh();
+      if (F.phase === 'score' && B.phase !== 'score') { if (F.last.winners.length) sfx.ding(); else sfx.lose(); }
+      if (F.phase === 'final' && B.phase !== 'final') { sfx.win(); P.confetti({ colors: ['#2d7a34', '#ffffff', '#7fc36b', '#ffd23f', '#1f2a1b'] }); }
+    }
+  };
+  document.addEventListener('change', e => {
+    if (e.target.name === 'o-goal') { S.settings.goal = Number(e.target.value); persist(); }
+    if (e.target.name === 'o-sheep') { S.settings.sheep = e.target.value; persist(); }
+  });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

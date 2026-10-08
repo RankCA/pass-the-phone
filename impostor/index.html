@@ -30,6 +30,8 @@
   --f-stamp:"Big Shoulders Stencil Display","Impact","Arial Narrow Bold",sans-serif;
   --f-head:"Big Shoulders Display","Impact","Arial Narrow Bold",sans-serif;
   --f-type:"Courier Prime","Courier New",ui-monospace,monospace;
+  --ol-display:var(--f-stamp);
+  --ol-line:rgba(241,235,224,.3);
 }
 *,*::before,*::after{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -161,6 +163,16 @@ button{font:inherit;color:inherit}
 .howto summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-family:var(--f-head);font-weight:900;font-size:17px;letter-spacing:.18em;text-transform:uppercase;color:var(--chalk)}
 .howto ol{margin:4px 0 0;padding-left:1.3em;display:grid;gap:8px}
 
+/* Online screens */
+.folder{--ol-line:rgba(28,25,21,.3)}
+.folder .label{margin-top:0}
+.online{margin-top:26px;padding:16px 18px;border-radius:10px;box-shadow:inset 0 0 0 1px rgba(241,235,224,.3)}
+.online p{margin:0 0 4px;color:var(--muted);font-size:16px}
+.online .label-desk{margin:0 0 6px}
+.voted{list-style:none;margin:14px auto 0;padding:0;max-width:440px;display:grid;gap:4px;text-align:left}
+.voted li{display:flex;justify-content:space-between;gap:12px;padding:6px 4px;border-bottom:1px dashed rgba(241,235,224,.2);font-weight:700}
+.tag[aria-pressed="true"]{background:var(--red);color:#fff8ee;transform:rotate(0deg)}
+
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
 }
@@ -169,6 +181,7 @@ button{font:inherit;color:inherit}
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=b1765b27"></script>
 <script src="words.js?v=b5d26bc0"></script>
 <script>
 (function () {
@@ -260,6 +273,11 @@ button{font:inherit;color:inherit}
         <button class="btn btn-ink btn-big" type="button" data-act="start">Deal the words</button>
         ${hasScores ? '<button class="btn btn-plain" type="button" data-act="reset-scores">Reset scores</button>' : ''}
       </div>
+    </div>
+    <div class="online">
+      <span class="label-desk">Play online</span>
+      <p>Everyone reads their secret and votes on their own phone. Make a game, then send the code to your friends.</p>
+      <div class="actions"><a class="btn btn-line" href="?lobby=new">Make an online game</a><a class="btn btn-line" href="../online/">Join with a code</a></div>
     </div>
     ${scoreboard()}
     <details class="howto">
@@ -511,6 +529,9 @@ button{font:inherit;color:inherit}
   function bindDossier() {
     const d = document.getElementById('dossier'), done = document.getElementById('doneBtn');
     if (!d) return;
+    holdOpen(d, () => { if (!S.R.peeked) { S.R.peeked = true; done.disabled = false; } });
+  }
+  function holdOpen(d, onOpen) {
     let isOpen = false;
     const open = v => {
       if (v === isOpen) return;
@@ -518,7 +539,7 @@ button{font:inherit;color:inherit}
       d.classList.toggle('open', v);
       if (v) {
         paperSound();
-        if (!S.R.peeked) { S.R.peeked = true; done.disabled = false; }
+        onOpen();
       }
     };
     d.addEventListener('pointerdown', e => {
@@ -591,7 +612,331 @@ button{font:inherit;color:inherit}
     else if (t.id === 'hint') { S.settings.hint = t.checked; persist(); }
   });
 
-  render();
+  /* ---------- Online: secrets and votes on everyone's own phone ---------- */
+  function onlineDeal(F) {
+    const items = [];
+    F.set.cats.forEach(c => (DATA[c] || []).forEach(p => items.push({ cat: c, a: p[0], b: p[1] })));
+    const card = P.deck('impostor', items, x => x.a + '|' + x.b).one();
+    const flip = Math.random() < 0.5;
+    const ids = F.players.map(p => p.id);
+    const k = F.set.impostors === 2 && ids.length >= 5 ? 2 : 1;
+    const all = P.shuffle(ids.slice());
+    const fresh = all.filter(id => !F.lastImps.includes(id));
+    const imps = (fresh.length >= k ? fresh : all).slice(0, k);
+    F.lastImps = imps;
+    const off = F.roundNo % ids.length;
+    const order = ids.map((_, i) => ids[(i + off) % ids.length]);
+    F.R = {
+      n: (F.R ? F.R.n : 0) + 1, cat: card.cat, word: flip ? card.b : card.a, decoy: flip ? card.a : card.b,
+      imps, order, starter: P.pick(order.filter(id => !imps.includes(id))),
+      phase: 'read', read: [], votes: {}, out: null, guess: '', guessed: false, winner: null, ends: 0
+    };
+    F.roundNo++;
+  }
+  function toTalk(F) {
+    F.R.phase = 'talk';
+    F.R.ends = F.set.timer ? Date.now() + F.set.timer * 1000 : 0;
+  }
+  function onlineFinish(F, winner) {
+    const R = F.R;
+    R.winner = winner;
+    R.phase = 'result';
+    F.players.forEach(p => {
+      const imp = R.imps.includes(p.id);
+      if (winner === 'crew' && !imp) F.scores[p.id] = (F.scores[p.id] || 0) + 1;
+      if (winner === 'impostor' && imp) F.scores[p.id] = (F.scores[p.id] || 0) + 2;
+    });
+  }
+  function tally(F) {
+    const R = F.R, count = {};
+    Object.keys(R.votes).forEach(k => { const t = R.votes[k]; count[t] = (count[t] || 0) + 1; });
+    const top = Math.max(0, ...Object.values(count));
+    const leaders = Object.keys(count).filter(id => count[id] === top);
+    R.out = leaders.length === 1 ? leaders[0] : 'tie';
+    if (R.out !== 'tie' && R.imps.includes(R.out)) {
+      if (F.set.mode === 'classic') R.phase = 'guess';
+      else onlineFinish(F, 'crew');
+    } else onlineFinish(F, 'impostor');
+  }
+  function secretInner(m, mode) {
+    if (!m) return '<span class="k">Dealing the words</span>';
+    if (m.imp) {
+      return `<span class="stamp">Impostor</span>
+        <p class="tip">You do not get the word. Listen to the clues and blend in.</p>
+        ${m.cat ? `<p class="cat">Category: <b>${esc(m.cat)}</b></p>` : ''}
+        ${m.many ? '<p class="tip">One other player is an impostor too.</p>' : ''}`;
+    }
+    return `<span class="k">Your secret word</span><span class="word">${esc(m.word)}</span><span class="cat">Category: ${esc(m.cat)}</span>
+      <p class="tip">${mode === 'classic' ? 'Give clues that prove you know it without giving it away.' : 'Someone has a different word. Give clues that are not too obvious.'}</p>`;
+  }
+  function onlineDossier(m, mode, hint) {
+    return `<div class="dossier" id="odossier" tabindex="0" role="button" aria-label="Press and hold to read your secret">
+      <div class="sheet">${secretInner(m, mode)}</div>
+      <div class="flap"><div class="flap-face"><span class="flap-stamp">Top secret</span><span class="flap-hint">${HAND}${hint}</span></div></div>
+    </div>`;
+  }
+  function onlineScores(F, me) {
+    const rows = F.players.map(p => [p, F.scores[p.id] || 0]).sort((a, b) => b[1] - a[1]);
+    if (!rows.some(r => r[1])) return '';
+    return `<div class="board"><span class="label-desk">Scores</span><ol class="scores">${rows.map(([p, n]) => `<li><span>${esc(p.name)}${p.id === me ? ' (you)' : ''}</span><b>${n}</b></li>`).join('')}</ol></div>`;
+  }
+  function onlineClock(c, v) {
+    const R = v.pub.R, L = v.local;
+    if (!c.isConnected) { clearInterval(L.clock); return; }
+    const left = R.ends - Date.now(), done = left <= 0;
+    c.textContent = done ? "Time's up" : fmt(left);
+    c.classList.toggle('done', done);
+    c.classList.toggle('low', !done && left <= 10000);
+    if (!done) L.running = R.n;
+    const sec = Math.ceil(left / 1000);
+    if (sec !== L.lastSec) { L.lastSec = sec; if (sec > 0 && sec <= 10) sfx.tick(); }
+    if (done && L.running === R.n && L.buzzed !== R.n) { L.buzzed = R.n; sfx.buzz(0.9); P.vibrate([220, 90, 220]); }
+  }
+  const ONLINE = {
+    game: 'impostor', title: 'Impostor', min: 3, max: 12, header,
+    ui: { main: 'btn btn-red btn-big', alt: 'btn btn-line', inAlt: 'btn btn-plain', panel: 'folder', eyebrow: 'eyes', big: 'who mid', lead: 'lead', label: 'label', textbtn: 'textbtn' },
+    options() {
+      const st = S.settings;
+      const opt = (val, title, text) => `<label class="opt"><input type="radio" name="o-mode" id="o-mode-${val}" value="${val}"${st.mode === val ? ' checked' : ''}><span class="opt-box"><b>${title}</b><small>${text}</small></span></label>`;
+      const seg = (name, key, opts) => `<div class="seg" role="radiogroup">${opts.map(([val, t]) => `<label><input type="radio" name="${name}" id="${name}-${val}" value="${val}"${Number(st[key]) === val ? ' checked' : ''}><span>${t}</span></label>`).join('')}</div>`;
+      return `<span class="label">Mode</span>
+        <div class="modes">${opt('classic', 'Classic', 'The impostor gets no word and has to bluff.')}${opt('undercover', 'Undercover', 'The impostor gets a similar word and does not know it.')}</div>
+        <div class="sec two"><div><span class="label">Impostors</span>${seg('o-imps', 'impostors', [[1, '1'], [2, '2']])}<p class="note">Two impostors needs 5 or more players.</p></div>
+        <div><span class="label">Talk timer</span>${seg('o-timer', 'timer', TIMERS)}</div></div>
+        ${st.mode === 'classic' ? `<div class="sec"><label class="check"><input type="checkbox" id="o-hint"${st.hint ? ' checked' : ''}><span>Tell the impostor the category</span></label></div>` : ''}`;
+    },
+    readOptions() {
+      const st = S.settings;
+      return { mode: st.mode, impostors: st.impostors, hint: st.hint, timer: st.timer, cats: st.cats.slice() };
+    },
+    start(players, o) {
+      const F = { players, set: o, scores: {}, roundNo: 0, lastImps: [], R: null };
+      onlineDeal(F);
+      return F;
+    },
+    view(F) {
+      const R = F.R;
+      const pub = {
+        players: F.players, scores: F.scores,
+        set: { mode: F.set.mode, timer: F.set.timer, many: R.imps.length > 1 },
+        R: { n: R.n, phase: R.phase, order: R.order, starter: R.starter, read: R.read, voted: Object.keys(R.votes), out: R.out, ends: R.ends, winner: R.winner, guessed: R.guessed }
+      };
+      if (R.phase === 'result') Object.assign(pub.R, { cat: R.cat, word: R.word, decoy: R.decoy, imps: R.imps, votes: R.votes, guess: R.guess });
+      return pub;
+    },
+    secrets(F) {
+      const R = F.R, out = {};
+      F.players.forEach(p => {
+        const imp = R.imps.includes(p.id);
+        const s = { n: R.n, vote: R.votes[p.id] || null };
+        if (imp && F.set.mode === 'classic') Object.assign(s, { imp: true, cat: F.set.hint ? R.cat : null, many: R.imps.length > 1 });
+        else Object.assign(s, { word: imp ? R.decoy : R.word, cat: R.cat });
+        out[p.id] = s;
+      });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      const R = F.R;
+      if (!F.players.some(p => p.id === from) || a.n !== R.n) return false;
+      const host = from === ctx.host;
+      switch (a.t) {
+        case 'read':
+          if (R.phase !== 'read' || R.read.includes(from)) return false;
+          R.read.push(from);
+          if (F.players.every(p => R.read.includes(p.id))) toTalk(F);
+          return true;
+        case 'talk':
+          if (!host || R.phase !== 'read') return false;
+          toTalk(F);
+          return true;
+        case 'votenow':
+          if (R.phase !== 'talk') return false;
+          R.phase = 'vote';
+          return true;
+        case 'vote':
+          if (R.phase !== 'vote' || a.id === from || !F.players.some(p => p.id === a.id)) return false;
+          R.votes[from] = a.id;
+          if (F.players.every(p => R.votes[p.id])) tally(F);
+          return true;
+        case 'count':
+          if (!host || R.phase !== 'vote' || !Object.keys(R.votes).length) return false;
+          tally(F);
+          return true;
+        case 'guess': {
+          const w = String(a.w == null ? '' : a.w).replace(/\s+/g, ' ').trim().slice(0, 40);
+          if (R.phase !== 'guess' || from !== R.out || !w) return false;
+          R.guess = w;
+          R.guessed = P.sameAnswer(w, R.word);
+          onlineFinish(F, R.guessed ? 'impostor' : 'crew');
+          return true;
+        }
+        case 'noguess':
+          if (!host || R.phase !== 'guess') return false;
+          onlineFinish(F, 'crew');
+          return true;
+        case 'next':
+          if (R.phase !== 'result') return false;
+          onlineDeal(F);
+          return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      gone.forEach(id => { delete F.scores[id]; });
+      if (F.players.length < 3) return 'open';
+      const R = F.R;
+      if (R.phase === 'result') return;
+      // An impostor walked out, so deal a fresh round.
+      if (gone.some(id => R.imps.includes(id))) { onlineDeal(F); return; }
+      R.order = R.order.filter(id => !gone.includes(id));
+      R.read = R.read.filter(id => !gone.includes(id));
+      Object.keys(R.votes).forEach(k => { if (gone.includes(k) || gone.includes(R.votes[k])) delete R.votes[k]; });
+      if (gone.includes(R.starter)) R.starter = R.order.find(id => !R.imps.includes(id));
+      if (R.phase === 'read' && F.players.every(p => R.read.includes(p.id))) toTalk(F);
+      if (R.phase === 'vote' && F.players.every(p => R.votes[p.id])) tally(F);
+    },
+    render(v) {
+      const F = v.pub, R = F.R, me = v.me, mode = F.set.mode;
+      const m = v.mine && v.mine.n === R.n ? v.mine : null;
+      const nm = id => { const p = F.players.find(x => x.id === id); return p ? p.name : 'Someone'; };
+      const names = ids => esc(P.listNames(ids.map(nm)));
+      const send = a => Online.sendAttr(Object.assign({ n: R.n }, a));
+      if (R.phase === 'read') {
+        const done = R.read.includes(me);
+        const waiting = F.players.filter(p => !R.read.includes(p.id)).map(p => p.id);
+        return `<section class="center">
+          <p class="eyes">Round ${F.roundNo || R.n}. For your eyes only</p>
+          ${onlineDossier(m, mode, 'Press and hold to read')}
+          ${done ? `<p class="lead">Waiting for ${names(waiting)} to read theirs.</p>`
+            : `<div class="actions center"><button class="btn btn-red btn-big" type="button" data-ui="read" id="oread"${v.local.peek === R.n && m ? '' : ' disabled'}>I've read it</button></div>
+               <p class="note-desk">Let go to close the folder. The button unlocks after you read it.</p>`}
+          ${v.host && waiting.length && waiting.length < F.players.length ? `<div class="actions center"><button class="btn btn-line" type="button" ${send({ t: 'talk' })}>Start without them</button></div>` : ''}
+        </section>`;
+      }
+      if (R.phase === 'talk') {
+        const at = R.order.indexOf(R.starter), seq = R.order.slice(at).concat(R.order.slice(0, at));
+        const who = mode === 'classic'
+          ? (F.set.many ? 'Two of you do not know the word.' : 'One of you does not know the word.')
+          : (F.set.many ? 'Two of you have a slightly different word, and they do not know it.' : 'One of you has a slightly different word, and does not know it.');
+        return `<section class="center">
+          <p class="eyes">Everyone has a word</p>
+          <h2 class="who mid">${R.starter === me ? 'You start' : esc(nm(R.starter)) + ' starts'}</h2>
+          <p class="lead">Then ${names(seq.slice(1))}. Each person says <b>one word</b> about the secret word. Go around twice, then vote.</p>
+          <p class="lead">${who}</p>
+          ${R.ends ? '<div class="clock" id="oclock" role="timer"></div>' : ''}
+          ${onlineDossier(m, mode, 'Hold to check your word')}
+          <div class="actions center"><button class="btn btn-red btn-big" type="button" ${send({ t: 'votenow' })}>Time to vote</button></div>
+        </section>`;
+      }
+      if (R.phase === 'vote') {
+        const mineVote = m && m.vote;
+        const waiting = F.players.filter(p => !R.voted.includes(p.id)).map(p => p.id);
+        return `<section class="center">
+          <p class="eyes">Vote</p>
+          <h2 class="who mid">Who is faking it?</h2>
+          <p class="lead">Tap the player you suspect. You can change your vote until everyone has voted.</p>
+          <div class="tags">${F.players.filter(p => p.id !== me).map((p, i) => `<button class="tag" type="button" ${send({ t: 'vote', id: p.id })} aria-pressed="${mineVote === p.id}" style="--r:${((i * 37) % 7) - 3}deg">${esc(p.name)}</button>`).join('')}</div>
+          <p class="note-desk">${waiting.length ? 'Still voting: ' + names(waiting) + '.' : 'Counting the votes.'}</p>
+          ${v.host && R.voted.length && waiting.length ? `<div class="actions center"><button class="btn btn-line" type="button" ${send({ t: 'count' })}>Count the votes now</button></div>` : ''}
+        </section>`;
+      }
+      if (R.phase === 'guess') {
+        if (R.out === me) {
+          return `<section class="center">
+            <p class="eyes">Caught</p>
+            <h2 class="who mid">They found you</h2>
+            <p class="lead">One last chance. Type the secret word. If you get it right, the impostors still win.</p>
+            ${m && m.cat ? `<p class="lead">Category: <b>${esc(m.cat)}</b></p>` : ''}
+            <div class="ol-field"><label for="oguess-${R.n}">The secret word</label><input id="oguess-${R.n}" data-keep data-enter="guess" type="text" maxlength="40" autocomplete="off" autocapitalize="off" enterkeyhint="done"></div>
+            <div class="actions center"><button class="btn btn-red btn-big" type="button" data-ui="guess"${v.pending ? ' disabled' : ''}>Make my guess</button></div>
+          </section>`;
+        }
+        return `<section class="center">
+          <p class="eyes">Caught</p>
+          <h2 class="who mid">${esc(nm(R.out))} is ${F.set.many ? 'an' : 'the'} impostor</h2>
+          <p class="lead">${esc(nm(R.out))} gets one guess at the secret word. If they get it right, the impostors still win.</p>
+          ${v.host ? `<div class="actions center"><button class="btn btn-line" type="button" ${send({ t: 'noguess' })}>Skip their guess</button></div>` : ''}
+        </section>`;
+      }
+      const crew = R.winner === 'crew', many = R.imps.length > 1;
+      let how;
+      if (R.out === 'tie') how = 'The vote was a tie, so nobody went out.';
+      else if (!R.imps.includes(R.out)) how = 'You voted out ' + nm(R.out) + ', who was not an impostor.';
+      else if (R.guess && R.guessed) how = nm(R.out) + ' was caught, but named the secret word.';
+      else if (R.guess) how = nm(R.out) + ' was caught and guessed ' + R.guess + '.';
+      else how = 'You caught ' + nm(R.out) + '.';
+      const pts = crew ? 'Everyone else gets 1 point.' : (many ? 'The impostors get 2 points each.' : 'The impostor gets 2 points.');
+      const count = {};
+      Object.keys(R.votes).forEach(k => { count[R.votes[k]] = (count[R.votes[k]] || 0) + 1; });
+      const tallyRows = Object.keys(count).sort((a, b) => count[b] - count[a]).map(id => `<li><span>${esc(nm(id))}</span><span>${P.plural(count[id], 'vote')}</span></li>`).join('');
+      return `<section class="center">
+        <div class="result">
+          <span class="stamp${crew ? ' calm' : ''}">${crew ? 'Crew wins' : (many ? 'Impostors win' : 'Impostor wins')}</span>
+          <dl class="facts">
+            <div><dt>Secret word</dt><dd>${esc(R.word)}</dd></div>
+            ${mode === 'undercover' ? `<div><dt>${many ? 'Their word' : 'Impostor word'}</dt><dd>${esc(R.decoy)}</dd></div>` : ''}
+            <div><dt>${many ? 'Impostors' : 'Impostor'}</dt><dd>${names(R.imps)}</dd></div>
+          </dl>
+          <p class="tip">${esc(how)} ${pts}</p>
+        </div>
+        ${tallyRows ? `<span class="label-desk">Votes</span><ul class="voted">${tallyRows}</ul>` : ''}
+        ${onlineScores(F, me)}
+        <div class="actions center"><button class="btn btn-red btn-big" type="button" ${send({ t: 'next' })}>Next round</button></div>
+      </section>`;
+    },
+    bind(v) {
+      const L = v.local, R = v.pub.R;
+      const d = document.getElementById('odossier');
+      if (d) {
+        holdOpen(d, () => {
+          if (L.peek === R.n) return;
+          L.peek = R.n;
+          const b = document.getElementById('oread');
+          if (b && v.mine && v.mine.n === R.n) b.disabled = false;
+        });
+      }
+      clearInterval(L.clock);
+      const c = document.getElementById('oclock');
+      if (c) { onlineClock(c, v); L.clock = setInterval(() => onlineClock(c, v), 250); }
+    },
+    click(name, el, v) {
+      const R = v.pub.R;
+      if (name === 'read') { el.disabled = true; v.send({ t: 'read', n: R.n }); paperSound(); }
+      if (name === 'guess') {
+        const f = document.getElementById('oguess-' + R.n);
+        const w = f ? f.value.replace(/\s+/g, ' ').trim() : '';
+        if (!w) { if (f) f.focus(); return; }
+        v.send({ t: 'guess', n: R.n, w });
+      }
+    },
+    fx(v, prev) {
+      const R = v.pub.R, B = prev && prev.pub.R;
+      if (!B) return;
+      if (R.n !== B.n) { paperSound(); return; }
+      if (R.phase === B.phase) return;
+      if (R.phase === 'talk') paperSound();
+      if (R.phase === 'vote' || R.phase === 'guess') stampSound();
+      if (R.phase === 'result') {
+        setTimeout(stampSound, 120);
+        const won = (R.winner === 'crew') !== R.imps.includes(v.me);
+        if (won) { sfx.win(); P.confetti({ colors: ['#e2382d', '#f1ebe0', '#d6b47c', '#ffffff'] }); }
+        else sfx.lose();
+      }
+    }
+  };
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'o-mode') { S.settings.mode = t.value; persist(); Online.redraw(); }
+    else if (t.name === 'o-imps') { S.settings.impostors = Number(t.value); persist(); }
+    else if (t.name === 'o-timer') { S.settings.timer = Number(t.value); persist(); }
+    else if (t.id === 'o-hint') { S.settings.hint = t.checked; persist(); }
+  });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>
