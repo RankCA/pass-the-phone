@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Two of a Kind | Pass the Phone</title>
+<meta name="description" content="Fill in the blank with one word. Match exactly one other player for 3 points. Match more and it is only worth 1.">
+<meta name="theme-color" content="#f7f7f2">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam:wght@700&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a classroom whiteboard. White board, marker blue and marker red, written-by-hand prompts. */
+:root{
+  color-scheme:light;
+  --bg:#f7f7f2;
+  --fg:#1e2a3a;
+  --muted:#4a5568;
+  --panel:#ffffff;
+  --line:rgba(30,42,58,.2);
+  --field:#ffffff;
+  --field-ink:#1e2a3a;
+  --accent:#1d4ed8;
+  --accent-ink:#ffffff;
+  --accent-shadow:#13318a;
+  --red:#c81e3a;
+  --focus:#1d4ed8;
+  --f-display:"Kalam","Comic Sans MS",cursive;
+  --f-body:"Plus Jakarta Sans",system-ui,-apple-system,sans-serif;
+}
+body{background:linear-gradient(rgba(30,42,58,.04) 1px,transparent 1px) 0 0/100% 28px,var(--bg)}
+.title{font-weight:700;color:var(--fg)}
+.title span{color:var(--red)}
+.big{font-weight:700}
+.btn,.label,.howto summary{font-family:var(--f-body);font-weight:800}
+.btn{font-size:19px}
+.btn-big{font-size:21px}
+.panel{box-shadow:0 1px 0 var(--line),0 14px 30px -22px rgba(30,42,58,.5)}
+.hero{display:block;width:min(64vw,250px);height:auto;margin-top:8px}
+.prompt{margin:10px auto 0;font-family:var(--f-display);font-weight:700;font-size:clamp(40px,12vw,72px);line-height:1.05;color:var(--fg);overflow-wrap:anywhere}
+.prompt .blank{display:inline-block;min-width:2.6em;border-bottom:6px solid var(--red);line-height:.9;color:var(--red)}
+.prompt.small{font-size:clamp(30px,9vw,46px)}
+.groups{display:grid;gap:10px;max-width:520px;margin:18px auto 0;text-align:left}
+.grp{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;padding:12px 14px;border:0;border-radius:16px;background:#fff;color:var(--fg);font:inherit;text-align:left;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
+.grp[aria-pressed="true"]{background:#e6edff;box-shadow:inset 0 0 0 3px var(--accent)}
+.grp.pair{box-shadow:inset 0 0 0 3px #15803d;background:#e8f7ee}
+.grp .n{display:grid;place-items:center;min-width:44px;height:44px;padding:0 8px;border-radius:12px;background:var(--fg);color:#fff;font-weight:800;font-size:20px}
+.grp b{display:block;font-family:var(--f-display);font-weight:700;font-size:26px;line-height:1.1;overflow-wrap:anywhere}
+.grp small{display:block;margin-top:2px;font-size:15px;color:var(--muted);overflow-wrap:anywhere}
+.grp .pts{font-weight:800;font-size:18px;white-space:nowrap}
+.board{list-style:none;margin:18px auto 0;padding:0;display:grid;gap:6px;max-width:440px;text-align:left}
+.board li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:#fff;font-weight:700;box-shadow:inset 0 0 0 1px var(--line)}
+.board li.top{box-shadow:inset 0 0 0 3px var(--accent)}
+.board li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.board li small{font-size:15px;font-weight:800;color:#15803d}
+.board li b{font-size:20px;font-variant-numeric:tabular-nums}
+.note{margin:12px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
+.field input{box-shadow:inset 0 0 0 2px var(--line);font-size:24px}
+.merge{position:sticky;bottom:12px;z-index:5}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script src="prompts.js?v=eef90b89"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.pairs';
+  const app = document.getElementById('app');
+  const deck = P.deck('pairs', window.PAIR_PROMPTS || ['___ cake']);
+  const promptHTML = (p, mine) => esc(p).replace('___', '<span class="blank">' + (mine ? esc(mine) : '&nbsp;') + '</span>');
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ goal: 20 }, saved.settings || {}),
+    screen: 'setup', players: [], scores: {}, p: '', answers: {}, at: 0, groups: [], sel: [], round: 0, gains: {}, winner: []
+  };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+
+  function newRound() {
+    S.round++;
+    S.p = deck.one([S.p]);
+    S.answers = {};
+    S.at = 0;
+    S.groups = [];
+    S.sel = [];
+    S.gains = {};
+    S.screen = 'prompt';
+    render();
+  }
+  function group() {
+    const gs = [];
+    S.players.forEach(n => {
+      const a = S.answers[n];
+      const g = gs.find(x => x.keys.some(k => P.sameAnswer(k, a)));
+      if (g) { g.names.push(n); g.keys.push(a); } else gs.push({ label: a, keys: [a], names: [n] });
+    });
+    S.groups = gs.sort((a, b) => b.names.length - a.names.length);
+    S.sel = [];
+  }
+  const worth = g => (g.names.length === 2 ? 3 : g.names.length > 2 ? 1 : 0);
+  function merge() {
+    if (S.sel.length < 2) return;
+    const picked = S.sel.map(i => S.groups[i]).sort((a, b) => b.names.length - a.names.length);
+    picked.slice(1).forEach(g => { picked[0].names.push(...g.names); picked[0].keys.push(...g.keys); });
+    S.groups = S.groups.filter(g => !picked.slice(1).includes(g)).sort((a, b) => b.names.length - a.names.length);
+    S.sel = [];
+    sfx.pop();
+    render();
+  }
+  function scoreRound() {
+    S.gains = {};
+    S.groups.forEach(g => g.names.forEach(n => { S.gains[n] = worth(g); }));
+    Object.entries(S.gains).forEach(([n, v]) => { S.scores[n] = (S.scores[n] || 0) + v; });
+    const best = Math.max(...S.players.map(n => S.scores[n] || 0));
+    if (best >= S.settings.goal) {
+      S.winner = S.players.filter(n => (S.scores[n] || 0) === best);
+      S.screen = 'final';
+      render();
+      sfx.win();
+      P.confetti({ colors: ['#1d4ed8', '#c81e3a', '#15803d', '#1e2a3a'] });
+      return;
+    }
+    S.screen = 'score';
+    render();
+    if (Object.values(S.gains).some(v => v === 3)) sfx.ding(); else sfx.pop();
+  }
+
+  function boardHTML() {
+    const rows = S.players.map(n => [n, S.scores[n] || 0]).sort((a, b) => b[1] - a[1]);
+    const top = rows[0] ? rows[0][1] : 0;
+    return '<ol class="board">' + rows.map(r => `<li class="${top > 0 && r[1] === top ? 'top' : ''}"><span>${esc(r[0])}</span>${S.screen === 'score' && S.gains[r[0]] ? `<small>+${S.gains[r[0]]}</small>` : ''}<b>${r[1]}</b></li>`).join('') + '</ol>';
+  }
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Two of a <span>Kind</span></h1>
+    <svg class="hero" viewBox="0 0 250 100" aria-hidden="true"><rect x="6" y="10" width="238" height="80" rx="10" fill="#fff" stroke="#1e2a3a" stroke-width="4"/><text x="56" y="66" font-family="Kalam, cursive" font-weight="700" font-size="40" fill="#1e2a3a">Ice</text><path d="M118 72h104" stroke="#c81e3a" stroke-width="6" stroke-linecap="round"/><text x="122" y="64" font-family="Kalam, cursive" font-weight="700" font-size="34" fill="#c81e3a">cream</text></svg>
+    <p class="tagline">Fill in the blank with one word. Match exactly one other player for 3 points. Match more and it is only worth 1.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Play to</span>${P.seg('goal', [[15, '15 points'], [20, '20 points'], [25, '25 points']], S.settings.goal)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Start writing</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Read the prompt out loud, like "Ice ___". Pass the phone and everyone fills the blank with one word in secret.</li>
+        <li>Match exactly one other player and you both score 3 points.</li>
+        <li>If three or more of you match, you each score 1. If nobody matches you, you score nothing.</li>
+        <li>The phone groups matching words. Tap two groups to merge them if they are really the same.</li>
+        <li>The first to the target wins.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPrompt() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Round ${S.round}</p>
+      <p class="prompt">${promptHTML(S.p)}</p>
+      <p class="lead">Read it out loud. Then pass the phone so everyone can fill the blank in secret.</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="begin">Start writing</button><button class="btn btn-alt" type="button" data-act="skip">Another prompt</button></div>
+      ${boardHTML()}
+    </section>`;
+  }
+  function viewPass() {
+    const n = S.players[S.at];
+    return P.header() + P.passScreen({ eyebrow: 'Answer ' + (S.at + 1) + ' of ' + S.players.length, name: n, lead: 'Only ' + esc(n) + ' looks.', act: 'me' });
+  }
+  function viewAnswer() {
+    const n = S.players[S.at];
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(n)}</p>
+      <p class="prompt small">${promptHTML(S.p)}</p>
+      <div class="field"><label for="ans">One word</label><input id="ans" type="text" maxlength="24" autocomplete="off" autocapitalize="off" enterkeyhint="done"></div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="lock" id="lockBtn" disabled>Lock it in</button></div>
+    </section>`;
+  }
+  function viewReady() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Everyone has written</p>
+      <h2 class="big">Show the words</h2>
+      <p class="lead">Put the phone where everyone can see it.</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="reveal">Reveal</button></div>
+    </section>`;
+  }
+  function viewReveal() {
+    return P.header() + `
+    <section class="center">
+      <p class="prompt small">${promptHTML(S.p)}</p>
+      <p class="note">Pairs score 3 each. Bigger groups score 1. Tap groups that mean the same word, then merge them.</p>
+      <div class="groups">${S.groups.map((g, i) => `<button type="button" class="grp${g.names.length === 2 ? ' pair' : ''}" data-act="pick" data-i="${i}" aria-pressed="${S.sel.includes(i)}"><span class="n">${g.names.length}</span><span><b>${esc(g.label)}</b><small>${esc(P.listNames(g.names))}</small></span><span class="pts">${worth(g) ? '+' + worth(g) + ' each' : 'No match'}</span></button>`).join('')}</div>
+      <div class="actions center merge">${S.sel.length >= 2 ? '<button class="btn btn-alt" type="button" data-act="merge">Merge these ' + S.sel.length + '</button>' : ''}<button class="btn btn-main btn-big" type="button" data-act="score">Score it</button></div>
+    </section>`;
+  }
+  function viewScore() {
+    const pairs = S.groups.filter(g => g.names.length === 2);
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Round ${S.round}</p>
+      <h2 class="big">${pairs.length ? P.plural(pairs.length, 'perfect pair') : 'No perfect pairs'}</h2>
+      <p class="lead">${pairs.length ? esc(pairs.map(g => P.listNames(g.names) + ' with ' + g.label).join('. ')) + '.' : 'Nobody matched exactly one other person this time.'}</p>
+      ${boardHTML()}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="next">Next prompt</button></div>
+    </section>`;
+  }
+  function viewFinal() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Game over</p>
+      <h2 class="big">${esc(P.listNames(S.winner))} ${S.winner.length > 1 ? 'win' : 'wins'}</h2>
+      ${boardHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, prompt: viewPrompt, pass: viewPass, answer: viewAnswer, ready: viewReady, reveal: viewReveal, score: viewScore, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 3, max: 12 });
+    if (S.screen === 'answer') { const f = document.getElementById('ans'); if (f) f.focus(); }
+    if (S.screen !== shown || S.screen === 'pass') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+  function lock() {
+    const f = document.getElementById('ans');
+    const v = f ? f.value.trim().split(/\s+/)[0].slice(0, 24) : '';
+    if (!v) return;
+    S.answers[S.players[S.at]] = v;
+    sfx.pop();
+    S.at++;
+    S.screen = S.at >= S.players.length ? 'ready' : 'pass';
+    render();
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': S.players = editor.get(); S.scores = {}; S.round = 0; sfx.unlock(); P.stayAwake(); newRound(); break;
+      case 'skip': S.round--; newRound(); break;
+      case 'begin': S.at = 0; S.screen = 'pass'; render(); break;
+      case 'me': S.screen = 'answer'; render(); break;
+      case 'lock': lock(); break;
+      case 'reveal': group(); S.screen = 'reveal'; sfx.whoosh(); render(); break;
+      case 'pick': { const i = Number(b.getAttribute('data-i')); const at = S.sel.indexOf(i); if (at >= 0) S.sel.splice(at, 1); else S.sel.push(i); render(); break; }
+      case 'merge': merge(); break;
+      case 'score': scoreRound(); break;
+      case 'next': newRound(); break;
+      case 'again': S.scores = {}; S.round = 0; newRound(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('input', e => { if (e.target.id === 'ans') { const btn = document.getElementById('lockBtn'); if (btn) btn.disabled = !e.target.value.trim(); } });
+  document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'ans') { e.preventDefault(); lock(); } });
+  document.addEventListener('change', e => { if (e.target.name === 'goal') { S.settings.goal = Number(e.target.value); persist(); } });
+
+  render();
+})();
+</script>
+</body>
+</html>

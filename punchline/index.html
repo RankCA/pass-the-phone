@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Punchline | Pass the Phone</title>
+<meta name="description" content="Everyone finishes a funny prompt in secret. The judge picks a favourite without knowing who wrote it. Then someone else judges.">
+<meta name="theme-color" content="#4e0c16">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&family=Pacifico&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a comedy club. Red curtain, one warm spotlight, answers on white cue cards. */
+:root{
+  color-scheme:dark;
+  --bg:#4e0c16;
+  --fg:#fff4e6;
+  --muted:#f0d6c2;
+  --panel:rgba(255,244,230,.08);
+  --line:rgba(255,244,230,.3);
+  --field:#fff4e6;
+  --field-ink:#2a0a0f;
+  --accent:#ffd54a;
+  --accent-ink:#2a0a0f;
+  --accent-shadow:#9b7c12;
+  --focus:#ffd54a;
+  --f-display:"Pacifico","Brush Script MT",cursive;
+  --f-body:"Lato",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(ellipse 60% 42% at 50% 0%,rgba(255,213,74,.16),transparent 70%),repeating-linear-gradient(90deg,rgba(0,0,0,.18) 0 18px,rgba(255,255,255,.02) 18px 40px),linear-gradient(180deg,#5c0f1a,#3b0810)}
+.title{font-size:clamp(48px,14vw,104px);line-height:1.2;color:var(--accent);text-shadow:0 4px 0 #2a0a0f}
+.big{font-family:var(--f-body);font-weight:900;font-size:clamp(32px,9vw,54px);line-height:1.05}
+.btn,.label,.howto summary{font-family:var(--f-body);font-weight:900}
+.btn{font-size:19px}
+.btn-big{font-size:21px}
+.hero{display:block;width:min(56vw,210px);height:auto;margin-top:4px}
+.prompt{max-width:440px;margin:14px auto 0;padding:18px;border-radius:18px;background:#fff4e6;color:#2a0a0f;font-weight:900;font-size:clamp(22px,6vw,30px);line-height:1.25;text-align:center;box-shadow:0 14px 28px -16px rgba(0,0,0,.7)}
+.prompt .blank{display:block;width:60%;height:6px;margin:12px auto 2px;border-radius:3px;background:#c4142f}
+.judge{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:6px 16px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:900;font-size:17px}
+.cards{display:grid;gap:10px;max-width:480px;margin:16px auto 0;text-align:left}
+.card{display:block;width:100%;padding:14px 16px;border:0;border-radius:16px;background:#fff4e6;color:#2a0a0f;font:700 20px/1.3 var(--f-body);text-align:left;cursor:pointer;overflow-wrap:anywhere;box-shadow:0 8px 18px -12px rgba(0,0,0,.6)}
+.card[aria-pressed="true"]{background:#ffe9a3;box-shadow:inset 0 0 0 4px #c4142f}
+.card:disabled{cursor:default}
+.card small{display:block;margin-top:6px;font-size:15px;font-weight:900;color:#7a1c2b}
+.card.won{background:#ffe9a3;box-shadow:inset 0 0 0 4px #c4142f}
+.board{list-style:none;margin:18px auto 0;padding:0;display:grid;gap:6px;max-width:440px;text-align:left}
+.board li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--panel);font-weight:700}
+.board li.top{box-shadow:inset 0 0 0 2px var(--accent)}
+.board li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.board li b{font-weight:900;font-size:22px}
+.field textarea{min-height:110px;font-size:20px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script src="prompts.js?v=48f37349"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.punch';
+  const app = document.getElementById('app');
+  const deck = P.deck('punch', window.PUNCH_PROMPTS || ['The worst thing to hear from your pilot']);
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ goal: 5 }, saved.settings || {}),
+    screen: 'setup', players: [], scores: {}, judgeAt: 0, p: '', answers: {}, writers: [], at: 0, cards: [], sel: -1, picked: -1, round: 0, winner: []
+  };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const judge = () => S.players[S.judgeAt % S.players.length];
+
+  function newRound() {
+    S.round++;
+    S.p = deck.one([S.p]);
+    S.answers = {};
+    const j = S.judgeAt % S.players.length;
+    S.writers = S.players.slice(j + 1).concat(S.players.slice(0, j));
+    S.at = 0;
+    S.cards = [];
+    S.sel = -1;
+    S.picked = -1;
+    S.screen = 'prompt';
+    render();
+  }
+  function promptHTML() { return `<div class="prompt">${esc(S.p)}<span class="blank" aria-hidden="true"></span></div>`; }
+  function boardHTML() {
+    const rows = S.players.map(n => [n, S.scores[n] || 0]).sort((a, b) => b[1] - a[1]);
+    const top = rows[0] ? rows[0][1] : 0;
+    return '<ol class="board">' + rows.map(r => `<li class="${top > 0 && r[1] === top ? 'top' : ''}"><span>${esc(r[0])}</span><b>${r[1]}</b></li>`).join('') + '</ol>';
+  }
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Punchline</h1>
+    <svg class="hero" viewBox="0 0 210 100" aria-hidden="true"><path d="M105 0 50 92h110z" fill="rgba(255,213,74,.25)"/><rect x="98" y="34" width="14" height="44" rx="7" fill="#2a0a0f" stroke="#ffd54a" stroke-width="3"/><circle cx="105" cy="28" r="14" fill="#ffd54a" stroke="#2a0a0f" stroke-width="4"/><path d="M80 96h50" stroke="#2a0a0f" stroke-width="6" stroke-linecap="round"/><path d="M105 78v18" stroke="#2a0a0f" stroke-width="5"/></svg>
+    <p class="tagline">Everyone finishes a funny prompt in secret. The judge picks a favourite without knowing who wrote it.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">First to</span>${P.seg('goal', [[3, '3 points'], [5, '5 points'], [7, '7 points']], S.settings.goal)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Open the show</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Each round, one player is the judge. They read the prompt out loud.</li>
+        <li>Pass the phone to everyone else. Each player writes an ending in secret.</li>
+        <li>The judge reads every answer out loud, without knowing who wrote what, and picks a favourite.</li>
+        <li>Whoever wrote it scores a point. Then the next player judges. First to the target wins.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPrompt() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Round ${S.round}</p>
+      <span class="judge">Judge: ${esc(judge())}</span>
+      ${promptHTML()}
+      <p class="lead">${esc(judge())}, read it out loud. Then pass the phone so everyone else can write an ending.</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="begin">Start writing</button><button class="btn btn-alt" type="button" data-act="skip">Another prompt</button></div>
+      ${boardHTML()}
+    </section>`;
+  }
+  function viewPass() {
+    const n = S.writers[S.at];
+    return P.header() + P.passScreen({ eyebrow: 'Answer ' + (S.at + 1) + ' of ' + S.writers.length, name: n, lead: 'Only ' + esc(n) + ' looks.', act: 'me' });
+  }
+  function viewWrite() {
+    const n = S.writers[S.at];
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(n)}</p>
+      ${promptHTML()}
+      <div class="field"><label for="ans">Your ending</label><textarea id="ans" maxlength="90" autocomplete="off" placeholder="Make the judge laugh"></textarea></div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="lock" id="lockBtn" disabled>Lock it in</button></div>
+    </section>`;
+  }
+  function viewJudgePass() {
+    return P.header() + P.passScreen({ eyebrow: 'All the answers are in', name: judge(), lead: esc(judge()) + ' reads them all out loud and picks a favourite.', act: 'judgeme' });
+  }
+  function viewJudge() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(judge())}, read them out loud</p>
+      ${promptHTML()}
+      <div class="cards">${S.cards.map((c, i) => `<button type="button" class="card" data-act="sel" data-i="${i}" aria-pressed="${S.sel === i}">${esc(c.text)}</button>`).join('')}</div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="pickone"${S.sel >= 0 ? '' : ' disabled'}>${S.sel >= 0 ? 'This one wins' : 'Tap your favourite'}</button></div>
+    </section>`;
+  }
+  function viewReveal() {
+    const w = S.cards[S.picked].by;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(judge())} picked</p>
+      <h2 class="big">${esc(w)} scores</h2>
+      ${promptHTML()}
+      <div class="cards">${S.cards.map((c, i) => `<div class="card${i === S.picked ? ' won' : ''}">${esc(c.text)}<small>${esc(c.by)}</small></div>`).join('')}</div>
+      ${boardHTML()}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="next">Next round</button></div>
+      <p class="hint">${esc(S.players[(S.judgeAt + 1) % S.players.length])} judges next.</p>
+    </section>`;
+  }
+  function viewFinal() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">That's the show</p>
+      <h2 class="big">${esc(P.listNames(S.winner))} ${S.winner.length > 1 ? 'win' : 'wins'}</h2>
+      ${boardHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, prompt: viewPrompt, pass: viewPass, write: viewWrite, judgepass: viewJudgePass, judge: viewJudge, reveal: viewReveal, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 3, max: 10 });
+    if (S.screen === 'write') { const f = document.getElementById('ans'); if (f) f.focus(); }
+    if (S.screen !== shown || S.screen === 'pass') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+  function lock() {
+    const f = document.getElementById('ans');
+    const v = f ? f.value.replace(/\s+/g, ' ').trim().slice(0, 90) : '';
+    if (!v) return;
+    S.answers[S.writers[S.at]] = v;
+    sfx.pop();
+    S.at++;
+    if (S.at >= S.writers.length) {
+      S.cards = P.shuffle(S.writers.map(n => ({ by: n, text: S.answers[n] })));
+      S.screen = 'judgepass';
+    } else S.screen = 'pass';
+    render();
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': S.players = editor.get(); S.scores = {}; S.round = 0; S.judgeAt = Math.floor(Math.random() * S.players.length); sfx.unlock(); P.stayAwake(); newRound(); break;
+      case 'skip': S.round--; newRound(); break;
+      case 'begin': S.at = 0; S.screen = 'pass'; render(); break;
+      case 'me': S.screen = 'write'; render(); break;
+      case 'lock': lock(); break;
+      case 'judgeme': S.screen = 'judge'; render(); break;
+      case 'sel': S.sel = Number(b.getAttribute('data-i')); sfx.tick(1300); render(); break;
+      case 'pickone': {
+        if (S.sel < 0) break;
+        S.picked = S.sel;
+        const w = S.cards[S.picked].by;
+        S.scores[w] = (S.scores[w] || 0) + 1;
+        if (S.scores[w] >= S.settings.goal) {
+          S.winner = [w];
+          S.screen = 'final';
+          render();
+          sfx.win();
+          P.confetti({ colors: ['#ffd54a', '#fff4e6', '#c4142f'] });
+          break;
+        }
+        S.screen = 'reveal';
+        render();
+        sfx.ding();
+        break;
+      }
+      case 'next': S.judgeAt++; newRound(); break;
+      case 'again': S.scores = {}; S.round = 0; S.judgeAt++; newRound(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('input', e => { if (e.target.id === 'ans') { const btn = document.getElementById('lockBtn'); if (btn) btn.disabled = !e.target.value.trim(); } });
+  document.addEventListener('change', e => { if (e.target.name === 'goal') { S.settings.goal = Number(e.target.value); persist(); } });
+
+  render();
+})();
+</script>
+</body>
+</html>

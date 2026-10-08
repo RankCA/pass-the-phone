@@ -16,6 +16,10 @@ Party games for one phone and a room full of people. Open the site on one phone,
 | Inside Job | 4 to 12 | Find the secret word with yes or no questions, then catch the player who knew it all along. |
 | Mole | 5 to 10 | A crew plans five jobs while hidden moles try to wreck them. Votes and sabotage happen in secret on the phone. |
 | Close Call | 3 to 8 | Everyone guesses a number in secret, then bets on whose guess is closest without going over. |
+| Two of a Kind | 3 to 12 | Fill in the blank with one word. Match exactly one other player for 3 points, or more players for 1. |
+| Quick Sketch | 4 or more | Teams take turns drawing the secret word on the phone while their team races the clock to guess it. |
+| Punchline | 3 to 10 | Everyone finishes a funny prompt in secret, and a rotating judge picks a favourite without knowing who wrote it. |
+| Snake Pit | 3 to 6 | Hide gems and a snake in a secret pile, then bid on how many gems you can dig up without finding a snake. |
 | Impostor | 3 to 12 | Everyone reads a secret word except the impostor. One-word clues, then a vote. |
 | Werewolf | 5 to 16 | The phone deals secret roles and reads the night out loud, so nobody has to sit out as narrator. |
 | Tune In | 2 to 12 | One player sees a hidden target on a dial and gives a clue. The rest turn the dial. |

@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quick Sketch | Pass the Phone</title>
+<meta name="description" content="Two teams take turns. One player draws the secret word on the phone while their team races the clock to guess it.">
+<meta name="theme-color" content="#e8dcc8">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Raleway:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a sketchbook. Kraft paper, a white page to draw on, a red team and a blue team. */
+:root{
+  color-scheme:light;
+  --bg:#e8dcc8;
+  --fg:#2b2118;
+  --muted:#54463a;
+  --panel:#fffaf0;
+  --line:rgba(43,33,24,.24);
+  --field:#ffffff;
+  --field-ink:#2b2118;
+  --accent:#2f7d4f;
+  --accent-ink:#ffffff;
+  --accent-shadow:#1c4c30;
+  --red:#c0392b;
+  --blue:#2457c5;
+  --focus:#2457c5;
+  --f-display:"Caveat Brush","Comic Sans MS",cursive;
+  --f-body:"Raleway",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(circle at 20% 10%,rgba(255,255,255,.35),transparent 40%),var(--bg)}
+.title{font-size:clamp(58px,16vw,120px);line-height:.95}
+.big{font-size:clamp(40px,11vw,68px)}
+.btn,.label,.howto summary{font-family:var(--f-body);font-weight:800}
+.btn{font-size:19px}
+.btn-big{font-size:21px}
+.panel{box-shadow:0 1px 0 var(--line),0 14px 28px -22px rgba(43,33,24,.6)}
+.hero{display:block;width:min(56vw,220px);height:auto;margin-top:4px}
+.teams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.team{min-width:0;padding:10px 12px;border-radius:14px;background:#fff;box-shadow:inset 0 0 0 3px var(--c)}
+.team h3{margin:0 0 4px;font-size:18px;font-weight:800;color:var(--fg)}
+.team ul{margin:0;padding-left:1.1em;font-size:16px}
+.score{display:flex;justify-content:center;gap:10px;margin-top:12px}
+.score span{padding:6px 14px;border-radius:999px;color:#fff;font-weight:800;font-size:17px}
+.word{display:inline-block;margin-top:10px;padding:6px 20px;border-radius:14px;background:#fff;font-family:var(--f-display);font-size:clamp(46px,13vw,80px);line-height:1.1;box-shadow:inset 0 0 0 3px var(--fg)}
+.drawhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+.drawhead .who{font-weight:800;font-size:17px;overflow-wrap:anywhere}
+.clock{min-width:3.2em;padding:4px 14px;border-radius:12px;background:#fff;font-family:var(--f-display);font-size:34px;line-height:1.1;text-align:center;font-variant-numeric:tabular-nums;box-shadow:inset 0 0 0 2px var(--line)}
+.clock.low{background:#fff;color:#b3261e;box-shadow:inset 0 0 0 3px #b3261e}
+.padbox{margin-top:10px;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 0 0 3px var(--fg)}
+#pad{display:block;width:100%;aspect-ratio:1;touch-action:none;cursor:crosshair;background:#fff}
+.tools{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:10px}
+.tool{min-width:52px;min-height:46px;padding:4px 12px;border:0;border-radius:12px;background:#fff;color:var(--fg);font:800 16px/1 var(--f-body);cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
+.tool[aria-pressed="true"]{background:var(--fg);color:#fff;box-shadow:none}
+.tool .dot{display:inline-block;border-radius:50%;background:currentColor;vertical-align:middle}
+.result{margin-top:12px;font-size:19px;font-weight:700}
+.final-art{display:block;width:min(70vw,260px);margin:14px auto 0;border-radius:14px;box-shadow:0 0 0 3px var(--fg)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script src="words.js?v=c411fe44"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.sketch';
+  const app = document.getElementById('app');
+  const deck = P.deck('sketch', window.SKETCH_WORDS || ['Snowman']);
+  const TEAMS = [{ name: 'Red', color: 'var(--red)' }, { name: 'Blue', color: 'var(--blue)' }];
+  const CW = 1000, CH = 1000;
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ goal: 5, secs: 60 }, saved.settings || {}),
+    screen: 'setup', players: [], mix: null, teams: [[], []], turn: 0, nextDrawer: [0, 0], word: '', clock: null, points: [0, 0], last: null, art: ''
+  };
+  let editor = null, shown = null, pad = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const drawer = () => S.teams[S.turn][S.nextDrawer[S.turn] % S.teams[S.turn].length];
+
+  function makeTeams(names, reshuffle) {
+    if (reshuffle || !S.mix || S.mix.length !== names.length) S.mix = P.shuffle(names.map((n, i) => i));
+    S.teams = P.splitTeams(names, S.mix);
+  }
+  function startTurn() {
+    S.word = deck.one([S.word]);
+    S.screen = 'pass';
+    render();
+  }
+  function endTurn(got) {
+    if (S.clock) S.clock.stop();
+    S.art = pad ? pad.cv.toDataURL('image/png') : '';
+    S.last = { team: S.turn, got, word: S.word, by: drawer() };
+    if (got) { S.points[S.turn]++; sfx.win(); } else { sfx.buzz(0.6); }
+    S.nextDrawer[S.turn]++;
+    S.screen = S.points[S.turn] >= S.settings.goal ? 'final' : 'result';
+    render();
+    if (S.screen === 'final') P.confetti({ colors: ['#c0392b', '#2457c5', '#2f7d4f', '#ffffff'] });
+  }
+
+  /* ---------- Drawing pad ---------- */
+  function mountPad() {
+    const cv = document.getElementById('pad');
+    if (!cv) return;
+    cv.width = CW;
+    cv.height = CH;
+    pad = { cv, ctx: cv.getContext('2d'), strokes: [], cur: null, size: 12, eraser: false };
+    redraw();
+    cv.addEventListener('pointerdown', down);
+    cv.addEventListener('pointermove', move);
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => cv.addEventListener(t, up));
+  }
+  const posOf = e => { const r = pad.cv.getBoundingClientRect(); return [(e.clientX - r.left) * CW / r.width, (e.clientY - r.top) * CH / r.height]; };
+  function dot(s, p) { const c = pad.ctx; c.fillStyle = s.c; c.beginPath(); c.arc(p[0], p[1], s.w / 2, 0, Math.PI * 2); c.fill(); }
+  function seg(s, i) {
+    const c = pad.ctx, pts = s.pts, p0 = pts[i - 2] || pts[i - 1], p1 = pts[i - 1], p2 = pts[i];
+    c.strokeStyle = s.c; c.lineWidth = s.w; c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath(); c.moveTo((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2); c.quadraticCurveTo(p1[0], p1[1], (p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2); c.stroke();
+  }
+  function tail(s) {
+    const pts = s.pts, n = pts.length;
+    if (n < 2) return;
+    const c = pad.ctx, a = pts[n - 2], b = pts[n - 1];
+    c.strokeStyle = s.c; c.lineWidth = s.w; c.lineCap = 'round';
+    c.beginPath(); c.moveTo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2); c.lineTo(b[0], b[1]); c.stroke();
+  }
+  function redraw() {
+    const c = pad.ctx;
+    c.fillStyle = '#ffffff';
+    c.fillRect(0, 0, CW, CH);
+    pad.strokes.forEach(s => { dot(s, s.pts[0]); for (let i = 1; i < s.pts.length; i++) seg(s, i); tail(s); });
+  }
+  function down(e) {
+    e.preventDefault();
+    try { pad.cv.setPointerCapture(e.pointerId); } catch (x) { /* older browsers */ }
+    const p = posOf(e);
+    pad.cur = { c: pad.eraser ? '#ffffff' : '#1d1a16', w: pad.eraser ? 46 : pad.size, pts: [p] };
+    pad.strokes.push(pad.cur);
+    dot(pad.cur, p);
+  }
+  function move(e) {
+    if (!pad.cur) return;
+    const list = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    (list.length ? list : [e]).forEach(ev => {
+      const p = posOf(ev), pts = pad.cur.pts, last = pts[pts.length - 1];
+      if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 1.5) return;
+      pts.push(p);
+      seg(pad.cur, pts.length - 1);
+    });
+  }
+  function up() { if (!pad || !pad.cur) return; tail(pad.cur); pad.cur = null; }
+  function setTool(t) {
+    if (!pad) return;
+    if (t === 'thin') { pad.size = 12; pad.eraser = false; }
+    if (t === 'thick') { pad.size = 30; pad.eraser = false; }
+    if (t === 'erase') pad.eraser = true;
+    document.querySelectorAll('[data-tool]').forEach(b => {
+      const k = b.getAttribute('data-tool');
+      b.setAttribute('aria-pressed', String(k === 'erase' ? pad.eraser : !pad.eraser && ((k === 'thin' && pad.size === 12) || (k === 'thick' && pad.size === 30))));
+    });
+  }
+
+  /* ---------- Views ---------- */
+  function teamsHTML() {
+    return '<div class="teams">' + [0, 1].map(t => `<div class="team" style="--c:${TEAMS[t].color}"><h3>${TEAMS[t].name} team</h3><ul>${S.teams[t].map(n => '<li>' + esc(n) + '</li>').join('')}</ul></div>`).join('') + '</div>';
+  }
+  function scoreHTML() {
+    return `<div class="score"><span style="background:var(--red)">Red ${S.points[0]}</span><span style="background:var(--blue)">Blue ${S.points[1]}</span></div>`;
+  }
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Quick Sketch</h1>
+    <svg class="hero" viewBox="0 0 220 100" aria-hidden="true"><rect x="8" y="8" width="150" height="86" rx="10" fill="#fff" stroke="#2b2118" stroke-width="4"/><path d="M30 70c14-30 30-34 42-16s26 10 34-14 22-18 30 6" fill="none" stroke="#2b2118" stroke-width="5" stroke-linecap="round"/><g transform="rotate(35 186 50)"><rect x="176" y="6" width="20" height="80" rx="4" fill="#f2c12e" stroke="#2b2118" stroke-width="4"/><path d="M176 86l10 16 10-16z" fill="#e8dcc8" stroke="#2b2118" stroke-width="4" stroke-linejoin="round"/></g></svg>
+    <p class="tagline">Two teams take turns. One player draws the secret word on the phone while their team races the clock to guess it.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Teams</span><div id="teams">${S.players.length >= 4 ? teamsHTML() : '<p class="hint">Add at least 4 players to make two teams.</p>'}</div><div class="actions"><button class="btn btn-alt" type="button" data-act="shuffle">Shuffle teams</button></div></div>
+      <div class="sec"><span class="label">Time to draw</span>${P.seg('secs', [[45, '45 sec'], [60, '60 sec'], [90, '90 sec']], S.settings.secs)}</div>
+      <div class="sec"><span class="label">First to</span>${P.seg('goal', [[5, '5'], [7, '7'], [10, '10']], S.settings.goal)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Sharpen the pencils</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Teams take turns. One player from the team secretly sees a word, then draws it on the phone.</li>
+        <li>Their team shouts out guesses. No letters, numbers or words in the drawing, and the drawer cannot talk.</li>
+        <li>If the team gets it before time runs out, tap Got it for a point. Then the other team has a go.</li>
+        <li>Everyone takes a turn to draw. First team to the target wins.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    return P.header() + `<section class="center">${scoreHTML()}</section>` + P.passScreen({ eyebrow: TEAMS[S.turn].name + ' team draws', name: drawer(), lead: 'Only ' + esc(drawer()) + ' looks at the next screen.', act: 'me' });
+  }
+  function viewWord() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(drawer())}, draw this</p>
+      <span class="word">${esc(S.word)}</span>
+      <p class="lead">When you tap start, the word hides and the clock begins. No letters, numbers or talking.</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="draw">Start drawing</button></div>
+    </section>`;
+  }
+  function viewDraw() {
+    return P.header() + `
+    <section>
+      <div class="drawhead"><span class="who">${esc(drawer())} is drawing for the ${TEAMS[S.turn].name} team</span><span class="clock" id="clock">${P.clock(S.settings.secs * 1000)}</span></div>
+      <div class="padbox"><canvas id="pad" aria-label="Drawing pad"></canvas></div>
+      <div class="tools">
+        <button class="tool" type="button" data-tool="thin" aria-pressed="true" aria-label="Thin pen"><span class="dot" style="width:8px;height:8px"></span> Thin</button>
+        <button class="tool" type="button" data-tool="thick" aria-pressed="false" aria-label="Thick pen"><span class="dot" style="width:16px;height:16px"></span> Thick</button>
+        <button class="tool" type="button" data-tool="erase" aria-pressed="false">Rubber</button>
+        <button class="tool" type="button" data-act="undo">Undo</button>
+        <button class="tool" type="button" data-act="clear">Clear</button>
+      </div>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="giveup">Give up</button><button class="btn btn-main btn-big" type="button" data-act="got">Got it</button></div>
+    </section>`;
+  }
+  function viewResult() {
+    const L = S.last;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${TEAMS[L.team].name} team</p>
+      <h2 class="big">${L.got ? 'Got it' : "Time's up"}</h2>
+      <p class="result">The word was ${esc(L.word)}.</p>
+      ${S.art ? `<img class="final-art" src="${S.art}" alt="${esc(L.by)}'s drawing of ${esc(L.word)}">` : ''}
+      ${scoreHTML()}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="next">${TEAMS[1 - L.team].name} team's turn</button></div>
+    </section>`;
+  }
+  function viewFinal() {
+    const w = S.last.team;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">The last word was ${esc(S.last.word)}</p>
+      <h2 class="big">${TEAMS[w].name} team wins</h2>
+      ${S.art ? `<img class="final-art" src="${S.art}" alt="The winning drawing of ${esc(S.last.word)}">` : ''}
+      ${scoreHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change teams</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, word: viewWord, draw: viewDraw, result: viewResult, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') {
+      editor = P.playerEditor(document.getElementById('players'), {
+        min: 4, max: 16,
+        onChange(names) { S.players = names; makeTeams(names, false); const box = document.getElementById('teams'); if (box) box.innerHTML = names.length >= 4 ? teamsHTML() : '<p class="hint">Add at least 4 players to make two teams.</p>'; }
+      });
+      if (!S.players.length) { S.players = editor.get(); makeTeams(S.players, false); const box = document.getElementById('teams'); if (box) box.innerHTML = teamsHTML(); }
+    }
+    if (S.screen === 'draw') mountPad(); else pad = null;
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const tool = e.target.closest('[data-tool]');
+    if (tool) { setTool(tool.getAttribute('data-tool')); sfx.tick(1200); return; }
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'shuffle': S.players = editor.get(); makeTeams(S.players, true); render(); sfx.whoosh(); break;
+      case 'start':
+        S.players = editor.get();
+        makeTeams(S.players, false);
+        S.points = [0, 0];
+        S.nextDrawer = [0, 0];
+        S.turn = Math.floor(Math.random() * 2);
+        sfx.unlock();
+        P.stayAwake();
+        startTurn();
+        break;
+      case 'me': S.screen = 'word'; render(); break;
+      case 'draw':
+        S.screen = 'draw';
+        render();
+        S.clock = P.countdown(S.settings.secs * 1000, {
+          tickLast: 5,
+          onTick(left) { const el = document.getElementById('clock'); if (el) { el.textContent = P.clock(left); el.classList.toggle('low', left <= 10000); } },
+          onEnd() { endTurn(false); }
+        });
+        S.clock.start();
+        sfx.beep(true);
+        break;
+      case 'undo': if (pad && pad.strokes.length) { pad.strokes.pop(); redraw(); } break;
+      case 'clear': if (pad) { pad.strokes = []; redraw(); } break;
+      case 'got': endTurn(true); break;
+      case 'giveup': endTurn(false); break;
+      case 'next': S.turn = 1 - S.turn; startTurn(); break;
+      case 'again': S.points = [0, 0]; S.turn = 1 - S.last.team; startTurn(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.name === 'secs' || e.target.name === 'goal') { S.settings[e.target.name] = Number(e.target.value); persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

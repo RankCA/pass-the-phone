@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Snake Pit | Pass the Phone</title>
+<meta name="description" content="Everyone hides gems and one snake in a secret pile. Bid on how many gems you can dig up without finding a snake. Win two digs to win.">
+<meta name="theme-color" content="#0e2b26">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@600;700&family=Metamorphous&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a jungle temple. Mossy stone, gold for gems, red for snakes. */
+:root{
+  color-scheme:dark;
+  --bg:#0e2b26;
+  --fg:#f1ead2;
+  --muted:#c9d3c2;
+  --panel:rgba(241,234,210,.08);
+  --line:rgba(241,234,210,.3);
+  --field:#f1ead2;
+  --field-ink:#0e2b26;
+  --accent:#e9b949;
+  --accent-ink:#1c1505;
+  --accent-shadow:#8a6812;
+  --gem:#3fd0a0;
+  --snake:#e5484d;
+  --focus:#e9b949;
+  --f-display:"Metamorphous","Georgia",serif;
+  --f-body:"Josefin Sans",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(ellipse 80% 40% at 50% 0%,rgba(233,185,73,.12),transparent 70%),linear-gradient(180deg,#123630,#0a1f1b)}
+.title{font-size:clamp(46px,13vw,96px);color:var(--accent);text-shadow:0 4px 0 #04100d}
+.big{font-size:clamp(30px,8vw,50px)}
+.btn,.label,.howto summary{font-family:var(--f-body);font-weight:700}
+.btn{font-size:20px}
+.btn-big{font-size:22px}
+.hero{display:block;width:min(62vw,240px);height:auto;margin-top:8px}
+.tile{display:inline-block;width:var(--t,40px);height:var(--t,40px);vertical-align:middle}
+.piles{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:8px;text-align:left}
+.pile{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 12px;border-radius:14px;background:var(--panel)}
+.pile.now{box-shadow:inset 0 0 0 3px var(--accent)}
+.pile.out .nm{color:var(--muted);text-decoration:line-through}
+.pile.pass .nm::after{content:" passed";font-weight:600;font-size:15px;color:var(--muted)}
+.pile .nm{flex:1;min-width:6em;font-weight:700;font-size:18px;overflow-wrap:anywhere}
+.pile .stack{display:flex;gap:3px}
+.pile .info{font-size:15px;color:var(--muted)}
+.pile .wins{display:flex;gap:4px}
+.pile .wins i{width:16px;height:16px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--accent)}
+.pile .wins i.on{background:var(--accent)}
+button.pile{width:100%;border:0;color:inherit;font:inherit;text-align:left;cursor:pointer}
+button.pile:disabled{cursor:default}
+.choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:420px;margin:18px auto 0}
+.choice button{display:grid;place-items:center;gap:6px;min-height:150px;padding:12px;border:0;border-radius:18px;background:var(--panel);color:var(--fg);font:700 20px/1.1 var(--f-body);cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
+.choice button:disabled{opacity:.5;cursor:default}
+.choice small{font-size:15px;color:var(--muted)}
+.hand{display:flex;justify-content:center;gap:8px;margin-top:10px}
+.bidbox{max-width:420px;margin:16px auto 0;padding:14px;border-radius:18px;background:var(--panel);text-align:center}
+.qty{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:8px}
+.qty button{width:52px;height:52px;border:0;border-radius:50%;background:transparent;color:var(--fg);box-shadow:inset 0 0 0 2px var(--line);font:700 28px/1 var(--f-body);cursor:pointer}
+.qty button:disabled{opacity:.55;cursor:default}
+.qty output{min-width:2em;font-family:var(--f-display);font-size:48px;line-height:1}
+.flips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:14px}
+.flips figure{margin:0;display:grid;justify-items:center;gap:2px;font-size:14px;color:var(--muted)}
+.result{margin-top:10px;font-size:19px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const app = document.getElementById('app');
+  const GEM = '<svg class="tile" viewBox="0 0 48 48" aria-hidden="true"><rect x="2" y="2" width="44" height="44" rx="10" fill="#183d36" stroke="#04100d" stroke-width="3"/><path d="M14 18 20 11h8l6 7-10 19z" fill="#3fd0a0" stroke="#04100d" stroke-width="2.5" stroke-linejoin="round"/><path d="M14 18h20M20 11l4 7 4-7M24 18v19" stroke="#04100d" stroke-width="2" fill="none"/></svg>';
+  const SNAKE = '<svg class="tile" viewBox="0 0 48 48" aria-hidden="true"><rect x="2" y="2" width="44" height="44" rx="10" fill="#3a1416" stroke="#04100d" stroke-width="3"/><path d="M12 34c0-6 8-6 12-6s10 0 10-6-6-6-10-6-8-1-8-5 4-4 8-4" fill="none" stroke="#e5484d" stroke-width="5" stroke-linecap="round"/><circle cx="31" cy="11" r="3.5" fill="#e5484d"/><circle cx="32" cy="10" r="1" fill="#04100d"/></svg>';
+  const BACK = '<svg class="tile" viewBox="0 0 48 48" aria-hidden="true"><rect x="2" y="2" width="44" height="44" rx="10" fill="#6b6a5c" stroke="#04100d" stroke-width="3"/><path d="M24 24m-3 0a3 3 0 1 0 6 0 7 7 0 1 0-14 0 11 11 0 1 0 22 0" fill="none" stroke="#3b3a31" stroke-width="2.5" stroke-linecap="round"/></svg>';
+  const tileHTML = (t, size) => (t === 'g' ? GEM : t === 's' ? SNAKE : BACK).replace('class="tile"', 'class="tile"' + (size ? ' style="--t:' + size + 'px"' : ''));
+
+  const S = { screen: 'setup', players: [], order: [], firstAt: 0, turn: 0, phase: 'first', bid: 0, bidder: -1, passed: [], q: 1, flips: [], ownDone: false, result: null, winner: -1 };
+  let editor = null, shown = null;
+
+  const alive = () => S.players.map((p, i) => i).filter(i => !S.players[i].out);
+  const nextAlive = i => { let n = i; do { n = (n + 1) % S.players.length; } while (S.players[n].out); return n; };
+  const handG = p => p.gems - p.pile.filter(t => t === 'g').length;
+  const handS = p => p.snakes - p.pile.filter(t => t === 's').length;
+  const hand = p => handG(p) + handS(p);
+  const piled = () => S.players.reduce((a, p) => a + (p.out ? 0 : p.pile.length), 0);
+  const me = () => S.players[S.turn];
+
+  /* ---------- Rounds ---------- */
+  function newRound(starter) {
+    S.players.forEach(p => { p.pile = []; });
+    S.order = [];
+    let k = starter;
+    do { S.order.push(k); k = nextAlive(k); } while (k !== starter);
+    S.firstAt = 0;
+    S.turn = starter;
+    S.phase = 'first';
+    S.bid = 0;
+    S.bidder = -1;
+    S.passed = [];
+    S.flips = [];
+    S.ownDone = false;
+    S.result = null;
+    S.screen = 'pass';
+    render();
+  }
+  function place(t) {
+    const p = S.phase === 'first' ? S.players[S.order[S.firstAt]] : me();
+    if ((t === 'g' && handG(p) < 1) || (t === 's' && handS(p) < 1)) return;
+    p.pile.push(t);
+    sfx.tone(260, { type: 'triangle', dur: 0.12, gain: 0.12 });
+    if (S.phase === 'first') {
+      S.firstAt++;
+      if (S.firstAt < S.order.length) { S.screen = 'pass'; render(); return; }
+      S.phase = 'turn';
+      S.turn = S.order[0];
+    } else S.turn = nextAlive(S.turn);
+    S.screen = 'table';
+    render();
+  }
+  function nextBidder() {
+    let n = S.turn;
+    do { n = nextAlive(n); } while (S.passed.includes(n) && n !== S.bidder);
+    return n;
+  }
+  function makeBid(q) {
+    const max = piled();
+    if (q <= S.bid || q > max) return;
+    S.bid = q;
+    S.bidder = S.turn;
+    S.phase = 'bid';
+    sfx.tick(800 + q * 60);
+    if (q >= max) return startDig();
+    S.turn = nextBidder();
+    if (S.turn === S.bidder) return startDig();
+    S.q = S.bid + 1;
+    S.screen = 'table';
+    render();
+  }
+  function passBid() {
+    S.passed.push(S.turn);
+    sfx.pop();
+    S.turn = nextBidder();
+    if (S.turn === S.bidder) return startDig();
+    S.q = S.bid + 1;
+    render();
+  }
+  function startDig() {
+    S.phase = 'dig';
+    S.turn = S.bidder;
+    S.flips = [];
+    S.screen = 'dig';
+    render();
+  }
+  function flipFrom(owner) {
+    const p = S.players[owner];
+    const already = S.flips.filter(f => f.owner === owner).length;
+    if (already >= p.pile.length) return;
+    const t = p.pile[p.pile.length - 1 - already];
+    S.flips.push({ owner, t });
+    if (t === 's') { sfx.buzz(0.7); P.vibrate([150, 60, 150]); return finishDig(false, owner); }
+    sfx.ding();
+    if (S.flips.length >= S.bid) return finishDig(true);
+    render();
+  }
+  function digOwn() {
+    const p = S.players[S.bidder];
+    for (let k = S.flips.filter(f => f.owner === S.bidder).length; k < p.pile.length; k++) {
+      const t = p.pile[p.pile.length - 1 - k];
+      S.flips.push({ owner: S.bidder, t });
+      if (t === 's') { sfx.buzz(0.7); return finishDig(false, S.bidder); }
+      if (S.flips.length >= S.bid) { sfx.ding(); return finishDig(true); }
+    }
+    S.ownDone = true;
+    sfx.ding();
+    render();
+  }
+  function finishDig(ok, snakeOwner) {
+    const c = S.players[S.bidder];
+    let next;
+    if (ok) {
+      c.wins++;
+      S.result = { ok: true };
+      if (c.wins >= 2) { S.winner = S.bidder; S.screen = 'final'; render(); sfx.win(); P.confetti({ colors: ['#e9b949', '#3fd0a0', '#f1ead2'] }); return; }
+      next = S.bidder;
+    } else {
+      const bag = Array(c.gems).fill('g').concat(Array(c.snakes).fill('s'));
+      const lost = P.pick(bag);
+      if (lost === 'g') c.gems--; else c.snakes--;
+      if (c.gems + c.snakes === 0) c.out = true;
+      S.result = { ok: false, owner: snakeOwner, out: c.out };
+      next = c.out ? (S.players[snakeOwner].out ? nextAlive(S.bidder) : snakeOwner) : S.bidder;
+      if (alive().length <= 1) { S.winner = alive()[0]; S.screen = 'final'; render(); sfx.win(); return; }
+    }
+    S.nextStarter = next;
+    S.screen = 'dig';
+    render();
+  }
+
+  /* ---------- Views ---------- */
+  function pilesHTML(clickable) {
+    return '<ol class="piles">' + S.players.map((p, i) => {
+      const flipped = S.flips.filter(f => f.owner === i);
+      const down = p.pile.length - flipped.length;
+      const stack = Array(Math.max(0, down)).fill(0).map(() => tileHTML('b', 30)).join('') + flipped.map(f => tileHTML(f.t, 30)).join('');
+      const can = clickable && !p.out && down > 0 && i !== S.bidder;
+      const inner = `<span class="nm">${esc(p.name)}</span><span class="stack" aria-label="${p.pile.length} in the pile">${stack}</span><span class="info">${p.out ? 'Out' : hand(p) + ' in hand'}</span><span class="wins" aria-label="${p.wins} of 2 digs won"><i class="${p.wins >= 1 ? 'on' : ''}"></i><i class="${p.wins >= 2 ? 'on' : ''}"></i></span>`;
+      const cls = 'pile' + (i === S.turn && S.screen === 'table' ? ' now' : '') + (p.out ? ' out' : '') + (S.phase === 'bid' && S.passed.includes(i) ? ' pass' : '');
+      return can ? `<li><button type="button" class="${cls}" data-act="flip" data-i="${i}">${inner}</button></li>` : `<li class="${cls}">${inner}</li>`;
+    }).join('') + '</ol>';
+  }
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Snake Pit</h1>
+    <svg class="hero" viewBox="0 0 240 90" aria-hidden="true"><g transform="translate(10 20)">${BACK.replace('class="tile"', 'width="56" height="56"')}</g><g transform="translate(74 10)">${GEM.replace('class="tile"', 'width="66" height="66"')}</g><g transform="translate(148 20)">${SNAKE.replace('class="tile"', 'width="56" height="56"')}</g></svg>
+    <p class="tagline">Everyone hides gems and one snake in a secret pile. Bid on how many gems you can dig up without finding a snake.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Enter the pit</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Everyone has 3 gems and 1 snake. To start each round, pass the phone round and everyone secretly puts one tile on their pile.</li>
+        <li>On your turn, add another tile to your pile in secret, or start the bidding by saying how many gems you can dig up.</li>
+        <li>Once bidding starts, each player raises or passes. When everyone else has passed, the top bidder digs.</li>
+        <li>You must dig your own pile first, then take top tiles from any other piles. Find a snake and you lose a random tile.</li>
+        <li>Dig up all the gems you bid and you win that dig. Win two digs, or be the last player with tiles, to win.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    const p = S.players[S.order[S.firstAt]];
+    return P.header() + P.passScreen({ eyebrow: 'Starting piles. ' + (S.firstAt + 1) + ' of ' + S.order.length, name: p.name, lead: 'Only ' + esc(p.name) + ' looks.', act: 'me' });
+  }
+  function viewChoose() {
+    const p = S.phase === 'first' ? S.players[S.order[S.firstAt]] : me();
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(p.name)}, choose in secret</p>
+      <h2 class="big">Add to your pile</h2>
+      <p class="lead">Your hand: ${P.plural(handG(p), 'gem')} and ${P.plural(handS(p), 'snake')}.</p>
+      <div class="hand">${Array(handG(p)).fill(0).map(() => tileHTML('g', 40)).join('')}${Array(handS(p)).fill(0).map(() => tileHTML('s', 40)).join('')}</div>
+      <div class="choice"><button type="button" data-act="place" data-t="g"${handG(p) ? '' : ' disabled'}>${tileHTML('g', 64)}Gem<small>${handG(p)} left</small></button><button type="button" data-act="place" data-t="s"${handS(p) ? '' : ' disabled'}>${tileHTML('s', 64)}Snake<small>${handS(p)} left</small></button></div>
+    </section>`;
+  }
+  function viewTable() {
+    const p = me(), max = piled();
+    let controls;
+    if (S.phase === 'turn') {
+      S.q = Math.max(1, Math.min(S.q, max));
+      controls = `<div class="bidbox"><span class="label">${esc(p.name)}'s turn</span>
+        <div class="actions center">${hand(p) ? '<button class="btn btn-alt btn-big" type="button" data-act="add">Add a tile</button>' : ''}</div>
+        <p class="hint">${hand(p) ? 'Or start the bidding:' : 'No tiles left in your hand, so you must bid:'}</p>
+        <div class="qty"><button type="button" data-act="q" data-d="-1"${S.q <= 1 ? ' disabled' : ''} aria-label="Lower">-</button><output>${S.q}</output><button type="button" data-act="q" data-d="1"${S.q >= max ? ' disabled' : ''} aria-label="Higher">+</button></div>
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="bid">Bid ${P.plural(S.q, 'gem')}</button></div></div>`;
+    } else {
+      S.q = Math.max(S.bid + 1, Math.min(S.q, max));
+      const canRaise = S.bid < max;
+      controls = `<div class="bidbox"><span class="label">${esc(S.players[S.bidder].name)} bid ${P.plural(S.bid, 'gem')}</span>
+        <p class="hint">${esc(p.name)}, raise it or pass.</p>
+        ${canRaise ? `<div class="qty"><button type="button" data-act="q" data-d="-1"${S.q <= S.bid + 1 ? ' disabled' : ''} aria-label="Lower">-</button><output>${S.q}</output><button type="button" data-act="q" data-d="1"${S.q >= max ? ' disabled' : ''} aria-label="Higher">+</button></div>` : ''}
+        <div class="actions center"><button class="btn btn-alt btn-big" type="button" data-act="pass">Pass</button>${canRaise ? `<button class="btn btn-main btn-big" type="button" data-act="bid">Bid ${S.q}</button>` : ''}</div></div>`;
+    }
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${P.plural(max, 'tile')} in the piles</p>
+      ${controls}
+      ${pilesHTML(false)}
+    </section>`;
+  }
+  function viewDig() {
+    const c = S.players[S.bidder];
+    const ownLeft = c.pile.length - S.flips.filter(f => f.owner === S.bidder).length;
+    const found = S.flips.filter(f => f.t === 'g').length;
+    let body;
+    if (S.result) {
+      const R = S.result;
+      body = R.ok
+        ? `<h2 class="big">${esc(c.name)} found ${P.plural(S.bid, 'gem')}</h2><p class="result">That is ${c.wins === 1 ? 'one dig won. One more wins the game.' : 'another dig won.'}</p>`
+        : `<h2 class="big">Snake!</h2><p class="result">${esc(c.name)} dug up ${R.owner === S.bidder ? 'their own snake' : esc(S.players[R.owner].name) + "'s snake"} and loses a tile at random${R.out ? ', which was their last one. They are out.' : '. Only they know which.'}</p>`;
+      body += `<div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="nextround">Next round</button></div>`;
+    } else if (ownLeft > 0) {
+      body = `<h2 class="big">${esc(c.name)} digs</h2><p class="lead">You bid ${P.plural(S.bid, 'gem')}. Your own pile comes first.</p><div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="own">Dig my own pile</button></div>`;
+    } else {
+      body = `<h2 class="big">${found} of ${S.bid} gems</h2><p class="lead">${esc(c.name)}, tap a player's pile to take their top tile.</p>`;
+    }
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">The dig</p>
+      ${S.flips.length ? `<div class="flips">${S.flips.map(f => `<figure>${tileHTML(f.t, 48)}<figcaption>${esc(S.players[f.owner].name)}</figcaption></figure>`).join('')}</div>` : ''}
+      ${body}
+      ${pilesHTML(!S.result && ownLeft === 0)}
+    </section>`;
+  }
+  function viewFinal() {
+    const w = S.players[S.winner];
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${w.wins >= 2 ? 'Two digs won' : 'Last one standing'}</p>
+      <h2 class="big">${esc(w.name)} wins</h2>
+      ${pilesHTML(false)}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change players</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, choose: viewChoose, table: viewTable, dig: viewDig, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 3, max: 6 });
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+  function begin(names) {
+    S.players = names.map(name => ({ name, gems: 3, snakes: 1, pile: [], wins: 0, out: false }));
+    S.winner = -1;
+    S.q = 1;
+    newRound(Math.floor(Math.random() * names.length));
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': sfx.unlock(); P.stayAwake(); begin(editor.get()); break;
+      case 'me': S.screen = 'choose'; render(); break;
+      case 'place': place(b.getAttribute('data-t')); break;
+      case 'add': S.screen = 'choose'; render(); break;
+      case 'q': S.q += Number(b.getAttribute('data-d')); render(); break;
+      case 'bid': makeBid(S.q); break;
+      case 'pass': passBid(); break;
+      case 'own': digOwn(); break;
+      case 'flip': flipFrom(Number(b.getAttribute('data-i'))); break;
+      case 'nextround': newRound(S.nextStarter); break;
+      case 'again': begin(S.players.map(p => p.name)); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
