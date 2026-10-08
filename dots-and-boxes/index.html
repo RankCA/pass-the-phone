@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dots and Boxes | Pass the Phone</title>
+<meta name="description" content="Take turns joining two dots. Close a box and it is yours, and you go again. Most boxes wins.">
+<meta name="theme-color" content="#fbfbf6">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Nunito:wght@600;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a maths exercise book. Graph paper, a ballpoint navy, one colour of pen per player. */
+:root{
+  color-scheme:light;
+  --bg:#fbfbf6;
+  --fg:#1f2b4d;
+  --muted:#4a5577;
+  --panel:#ffffff;
+  --line:rgba(31,43,77,.22);
+  --field:#ffffff;
+  --field-ink:#1f2b4d;
+  --accent:#1f2b4d;
+  --accent-ink:#ffffff;
+  --accent-shadow:#0d1428;
+  --focus:#d6283b;
+  --f-display:"Architects Daughter","Comic Sans MS",cursive;
+  --f-body:"Nunito",system-ui,-apple-system,sans-serif;
+}
+body{background:linear-gradient(rgba(70,120,200,.13) 1px,transparent 1px) 0 0/22px 22px,linear-gradient(90deg,rgba(70,120,200,.13) 1px,transparent 1px) 0 0/22px 22px,var(--bg)}
+.title{font-size:clamp(46px,13vw,96px);line-height:1}
+.big{font-size:clamp(32px,9vw,54px)}
+.btn,.label,.howto summary{font-family:var(--f-body);font-weight:800}
+.btn{font-size:19px}
+.btn-big{font-size:21px}
+.panel{box-shadow:0 1px 0 var(--line),0 14px 30px -22px rgba(31,43,77,.5)}
+.hero{display:block;width:min(50vw,190px);height:auto;margin-top:8px}
+.turn{margin:12px 0 0;text-align:center;font-weight:800;font-size:20px}
+.turn i{display:inline-block;width:16px;height:16px;margin-right:8px;border-radius:50%;background:var(--c);vertical-align:-2px}
+.grid{display:grid;width:min(100%,480px);margin:14px auto 0;padding:6px;border-radius:14px;background:#fff;box-shadow:0 0 0 2px var(--line)}
+.dot{width:12px;height:12px;place-self:center;border-radius:50%;background:var(--fg)}
+.edge{margin:0;padding:0;border:0;background:transparent;cursor:pointer;touch-action:manipulation;position:relative}
+.edge::after{content:"";position:absolute;border-radius:4px;background:rgba(31,43,77,.12)}
+.edge.h::after{left:2px;right:2px;top:calc(50% - 2px);height:4px}
+.edge.v::after{top:2px;bottom:2px;left:calc(50% - 2px);width:4px}
+.edge:hover::after,.edge:focus-visible::after{background:rgba(31,43,77,.35)}
+.edge.on{cursor:default}
+.edge.on::after{background:var(--c)}
+.edge.h.on::after{top:calc(50% - 3px);height:6px}
+.edge.v.on::after{left:calc(50% - 3px);width:6px}
+.edge.last::after{box-shadow:0 0 0 3px rgba(255,210,63,.8)}
+.box{display:grid;place-items:center;margin:2px;border-radius:6px;font-family:var(--f-display);font-size:clamp(16px,5vw,26px);color:#fff}
+.box.own{background:var(--c)}
+.score{list-style:none;margin:16px auto 0;padding:0;display:grid;gap:6px;max-width:420px;text-align:left}
+.score li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:#fff;font-weight:800;box-shadow:inset 0 0 0 1px var(--line)}
+.score li.now{box-shadow:inset 0 0 0 3px var(--c)}
+.score li i{width:16px;height:16px;border-radius:50%;background:var(--c)}
+.score li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.score li b{font-family:var(--f-display);font-size:22px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.dots';
+  const app = document.getElementById('app');
+  const COLORS = ['#d6283b', '#2457c5', '#18794a', '#b45309'];
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = { settings: Object.assign({ size: 4 }, saved.settings || {}), screen: 'setup', players: [], n: 4, h: [], v: [], box: [], turn: 0, last: null };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const initial = name => name.charAt(0).toUpperCase();
+  const count = k => S.box.flat().filter(o => o === k).length;
+
+  function newGame() {
+    const n = S.n = S.settings.size;
+    S.h = Array.from({ length: n + 1 }, () => Array(n).fill(-1));
+    S.v = Array.from({ length: n }, () => Array(n + 1).fill(-1));
+    S.box = Array.from({ length: n }, () => Array(n).fill(-1));
+    S.turn = 0;
+    S.last = null;
+    S.screen = 'play';
+    render();
+  }
+  const closed = (r, c) => S.h[r][c] >= 0 && S.h[r + 1][c] >= 0 && S.v[r][c] >= 0 && S.v[r][c + 1] >= 0;
+  function draw(kind, r, c) {
+    const arr = kind === 'h' ? S.h : S.v;
+    if (arr[r][c] >= 0) return;
+    arr[r][c] = S.turn;
+    S.last = kind + r + ',' + c;
+    const near = kind === 'h' ? [[r - 1, c], [r, c]] : [[r, c - 1], [r, c]];
+    let made = 0;
+    near.forEach(([br, bc]) => {
+      if (br < 0 || bc < 0 || br >= S.n || bc >= S.n) return;
+      if (S.box[br][bc] < 0 && closed(br, bc)) { S.box[br][bc] = S.turn; made++; }
+    });
+    if (made) { sfx.ding(); P.vibrate(20); } else { sfx.tick(1200); S.turn = (S.turn + 1) % S.players.length; }
+    if (S.box.flat().every(o => o >= 0)) { S.screen = 'final'; render(); sfx.win(); P.confetti({ colors: COLORS }); return; }
+    render();
+  }
+
+  function gridHTML(play) {
+    const n = S.n, cols = [];
+    for (let i = 0; i <= 2 * n; i++) cols.push(i % 2 === 0 ? '22px' : 'minmax(0,1fr)');
+    let h = `<div class="grid" style="grid-template-columns:${cols.join(' ')};grid-template-rows:${cols.map(x => x === '22px' ? '22px' : 'auto').join(' ')}">`;
+    for (let r = 0; r <= 2 * n; r++) {
+      for (let c = 0; c <= 2 * n; c++) {
+        if (r % 2 === 0 && c % 2 === 0) h += '<span class="dot"></span>';
+        else if (r % 2 === 0) {
+          const er = r / 2, ec = (c - 1) / 2, o = S.h[er][ec];
+          h += `<button type="button" class="edge h${o >= 0 ? ' on' : ''}${S.last === 'h' + er + ',' + ec ? ' last' : ''}" ${o >= 0 ? `style="--c:${COLORS[o]}" disabled` : (play ? '' : 'disabled')} data-act="edge" data-k="h" data-r="${er}" data-c="${ec}" aria-label="Line across, row ${er + 1}, gap ${ec + 1}${o >= 0 ? ', drawn' : ''}"></button>`;
+        } else if (c % 2 === 0) {
+          const er = (r - 1) / 2, ec = c / 2, o = S.v[er][ec];
+          h += `<button type="button" class="edge v${o >= 0 ? ' on' : ''}${S.last === 'v' + er + ',' + ec ? ' last' : ''}" ${o >= 0 ? `style="--c:${COLORS[o]}" disabled` : (play ? '' : 'disabled')} data-act="edge" data-k="v" data-r="${er}" data-c="${ec}" aria-label="Line down, row ${er + 1}, gap ${ec + 1}${o >= 0 ? ', drawn' : ''}"></button>`;
+        } else {
+          const o = S.box[(r - 1) / 2][(c - 1) / 2];
+          h += `<span class="box${o >= 0 ? ' own' : ''}" style="aspect-ratio:1;${o >= 0 ? '--c:' + COLORS[o] : ''}">${o >= 0 ? esc(initial(S.players[o])) : ''}</span>`;
+        }
+      }
+    }
+    return h + '</div>';
+  }
+  function scoreHTML() {
+    return '<ol class="score">' + S.players.map((p, k) => `<li class="${k === S.turn && S.screen === 'play' ? 'now' : ''}" style="--c:${COLORS[k]}"><i></i><span>${esc(p)}</span><b>${count(k)}</b></li>`).join('') + '</ol>';
+  }
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Dots and Boxes</h1>
+    <svg class="hero" viewBox="0 0 190 100" aria-hidden="true"><g fill="#1f2b4d">${[0, 1, 2, 3].map(c => [0, 1, 2].map(r => `<circle cx="${20 + c * 50}" cy="${12 + r * 38}" r="6"/>`).join('')).join('')}</g><path d="M20 12h50M20 12v38M70 12v38M20 50h50" stroke="#d6283b" stroke-width="6" stroke-linecap="round"/><rect x="27" y="19" width="36" height="24" rx="4" fill="#d6283b"/><path d="M120 50h50M120 50v38" stroke="#2457c5" stroke-width="6" stroke-linecap="round"/></svg>
+    <p class="tagline">Take turns joining two dots. Close a box and it is yours, and you go again. Most boxes wins.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Grid</span>${P.seg('size', [[3, '3 by 3'], [4, '4 by 4'], [5, '5 by 5'], [6, '6 by 6']], S.settings.size)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Start drawing</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Put the phone where everyone can reach it. On your turn, tap the gap between two dots to draw a line.</li>
+        <li>Draw the fourth side of a box and it becomes yours. Then you draw again.</li>
+        <li>Try not to draw the third side of a box, because the next player will take it.</li>
+        <li>When every box is taken, the player with the most boxes wins.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPlay() {
+    return P.header() + `
+    <section>
+      <p class="turn" style="--c:${COLORS[S.turn]}"><i></i>${esc(S.players[S.turn])}'s turn</p>
+      ${gridHTML(true)}
+      ${scoreHTML()}
+    </section>`;
+  }
+  function viewFinal() {
+    const best = Math.max(...S.players.map((p, k) => count(k)));
+    const won = S.players.filter((p, k) => count(k) === best);
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Every box is taken</p>
+      <h2 class="big">${won.length > 1 ? 'A draw between ' + esc(P.listNames(won)) : esc(won[0]) + ' wins'}</h2>
+      ${gridHTML(false)}
+      ${scoreHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, play: viewPlay, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 2, max: 4 });
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': S.players = editor.get(); sfx.unlock(); newGame(); break;
+      case 'edge': draw(b.getAttribute('data-k'), Number(b.getAttribute('data-r')), Number(b.getAttribute('data-c'))); break;
+      case 'again': S.players.push(S.players.shift()); newGame(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => { if (e.target.name === 'size') { S.settings.size = Number(e.target.value); persist(); } });
+
+  render();
+})();
+</script>
+</body>
+</html>

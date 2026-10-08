@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Four in a Row | Pass the Phone</title>
+<meta name="description" content="Two players take turns dropping discs into the grid. Line up four across, down or diagonally to win.">
+<meta name="theme-color" content="#1d1235">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800&family=Paytone+One&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a night-time arcade. A purple board, pink and teal discs that drop into place. */
+:root{
+  color-scheme:dark;
+  --bg:#1d1235;
+  --fg:#f6f1ff;
+  --muted:#cfc4ea;
+  --panel:rgba(246,241,255,.08);
+  --line:rgba(246,241,255,.3);
+  --field:#f6f1ff;
+  --field-ink:#1d1235;
+  --accent:#ff5d8f;
+  --accent-ink:#2a0716;
+  --accent-shadow:#a1244e;
+  --p0:#ff5d8f;
+  --p1:#25c2d3;
+  --focus:#ffd23f;
+  --f-display:"Paytone One","Arial Black",sans-serif;
+  --f-body:"Nunito",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(165,120,255,.18),transparent 70%),linear-gradient(180deg,#241645,#140c26)}
+.title{font-size:clamp(46px,13vw,96px);line-height:1}
+.big{font-size:clamp(32px,9vw,54px)}
+.btn,.label,.howto summary{font-family:var(--f-body);font-weight:800}
+.btn{font-size:19px}
+.btn-big{font-size:21px}
+.hero{display:block;width:min(52vw,200px);height:auto;margin-top:8px}
+.turn{display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0 0;font-weight:800;font-size:20px}
+.turn i,.score i{display:inline-block;width:22px;height:22px;border-radius:50%;background:var(--c);box-shadow:inset 0 -3px 0 rgba(0,0,0,.25)}
+.board{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;width:min(100%,480px);margin:14px auto 0;padding:8px;border-radius:18px;background:#4b2a99;box-shadow:inset 0 -6px 0 rgba(0,0,0,.25),0 18px 30px -18px rgba(0,0,0,.7)}
+.col{display:grid;grid-template-rows:repeat(6,1fr);gap:4px;margin:0;padding:3px;border:0;border-radius:12px;background:transparent;cursor:pointer;touch-action:manipulation}
+.col:hover,.col:focus-visible{background:rgba(255,255,255,.08)}
+.col:disabled{cursor:default;background:transparent}
+.hole{display:block;aspect-ratio:1;border-radius:50%;background:#1d1235;box-shadow:inset 0 3px 0 rgba(0,0,0,.35)}
+.hole.p0{background:var(--p0);box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
+.hole.p1{background:var(--p1);box-shadow:inset 0 -4px 0 rgba(0,0,0,.25)}
+.hole.win{box-shadow:0 0 0 4px #fff,inset 0 -4px 0 rgba(0,0,0,.25)}
+.hole.drop{animation:drop .35s cubic-bezier(.4,0,.6,1.4)}
+@keyframes drop{from{transform:translateY(-300%)}to{transform:none}}
+.score{display:flex;justify-content:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+.score span{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:var(--panel);font-weight:800;font-size:17px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const app = document.getElementById('app');
+  const COLS = 7, ROWS = 6;
+  const S = { screen: 'setup', players: [], grid: [], turn: 0, first: 0, wins: [0, 0], line: [], last: null, draw: false };
+  let editor = null, shown = null;
+
+  function newGame() {
+    S.grid = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
+    S.turn = S.first;
+    S.line = [];
+    S.last = null;
+    S.draw = false;
+    S.screen = 'play';
+    render();
+  }
+  function fourFrom(r, c) {
+    const k = S.grid[r][c];
+    for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+      const cells = [[r, c]];
+      for (const s of [1, -1]) {
+        let rr = r + dr * s, cc = c + dc * s;
+        while (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && S.grid[rr][cc] === k) { cells.push([rr, cc]); rr += dr * s; cc += dc * s; }
+      }
+      if (cells.length >= 4) return cells;
+    }
+    return null;
+  }
+  function drop(c) {
+    if (S.screen !== 'play') return;
+    let r = ROWS - 1;
+    while (r >= 0 && S.grid[r][c] >= 0) r--;
+    if (r < 0) return;
+    S.grid[r][c] = S.turn;
+    S.last = [r, c];
+    sfx.tone(300 + r * 40, { type: 'triangle', dur: 0.12, gain: 0.14 });
+    const line = fourFrom(r, c);
+    if (line) {
+      S.line = line;
+      S.wins[S.turn]++;
+      S.screen = 'final';
+      render();
+      sfx.win();
+      P.confetti({ colors: ['#ff5d8f', '#25c2d3', '#ffffff'] });
+      return;
+    }
+    if (S.grid.every(row => row.every(x => x >= 0))) { S.draw = true; S.screen = 'final'; render(); sfx.pop(); return; }
+    S.turn = 1 - S.turn;
+    render();
+  }
+
+  function boardHTML(play) {
+    let h = '<div class="board" role="grid" aria-label="Seven columns">';
+    for (let c = 0; c < COLS; c++) {
+      const full = S.grid[0][c] >= 0;
+      h += `<button type="button" class="col" data-act="drop" data-c="${c}"${play && !full ? '' : ' disabled'} aria-label="Column ${c + 1}${full ? ', full' : ''}">`;
+      for (let r = 0; r < ROWS; r++) {
+        const k = S.grid[r][c];
+        const win = S.line.some(([a, b]) => a === r && b === c);
+        const drop = S.last && S.last[0] === r && S.last[1] === c && S.screen === 'play';
+        h += `<span class="hole${k >= 0 ? ' p' + k : ''}${win ? ' win' : ''}${drop ? ' drop' : ''}"></span>`;
+      }
+      h += '</button>';
+    }
+    return h + '</div>';
+  }
+  function scoreHTML() {
+    return `<div class="score">${S.players.map((n, k) => `<span style="--c:var(--p${k})"><i></i>${esc(n)} ${S.wins[k]}</span>`).join('')}</div>`;
+  }
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Four in a Row</h1>
+    <svg class="hero" viewBox="0 0 200 110" aria-hidden="true"><rect x="6" y="6" width="188" height="98" rx="14" fill="#4b2a99"/>${[0, 1, 2, 3, 4].map(c => [0, 1, 2].map(r => `<circle cx="${30 + c * 35}" cy="${28 + r * 30}" r="12" fill="${(r === 2 && c < 4) ? '#ff5d8f' : (r === 1 && c === 1) || (r === 2 && c === 4) ? '#25c2d3' : '#1d1235'}"/>`).join('')).join('')}</svg>
+    <p class="tagline">Two players take turns dropping discs into the grid. Line up four across, down or diagonally to win.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Two players</span><div id="players"></div></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Drop the first disc</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Lay the phone flat between you. Take turns tapping a column to drop a disc to the lowest free space.</li>
+        <li>The first to get four of their discs in a line, across, down or diagonally, wins.</li>
+        <li>If the grid fills up with no line of four, it is a draw. The other player goes first next game.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPlay() {
+    return P.header() + `
+    <section>
+      <p class="turn" style="--c:var(--p${S.turn})"><i></i>${esc(S.players[S.turn])}'s turn</p>
+      ${boardHTML(true)}
+      ${scoreHTML()}
+    </section>`;
+  }
+  function viewFinal() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${S.draw ? 'The grid is full' : 'Four in a row'}</p>
+      <h2 class="big">${S.draw ? "It's a draw" : esc(S.players[S.turn]) + ' wins'}</h2>
+      ${boardHTML(false)}
+      ${scoreHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change players</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, play: viewPlay, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 2, max: 2 });
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': S.players = editor.get(); S.wins = [0, 0]; S.first = 0; sfx.unlock(); newGame(); break;
+      case 'drop': drop(Number(b.getAttribute('data-c'))); break;
+      case 'again': S.first = 1 - S.first; newGame(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (S.screen === 'play' && /^[1-7]$/.test(e.key)) drop(Number(e.key) - 1);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

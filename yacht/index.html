@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Yacht | Pass the Phone</title>
+<meta name="description" content="The classic dice game. Roll five dice up to three times, then fill one of twelve boxes. Highest total after twelve rounds wins.">
+<meta name="theme-color" content="#0c3156">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bree+Serif&family=Mukta:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a sailing club. Deep sea navy, white scorecard rows, signal-flag yellow. */
+:root{
+  color-scheme:dark;
+  --bg:#0c3156;
+  --fg:#f2f7fc;
+  --muted:#c3d4e6;
+  --panel:rgba(242,247,252,.08);
+  --line:rgba(242,247,252,.3);
+  --field:#f2f7fc;
+  --field-ink:#0c3156;
+  --accent:#ffcc33;
+  --accent-ink:#0c2440;
+  --accent-shadow:#9c7a10;
+  --focus:#ffcc33;
+  --f-display:"Bree Serif",Georgia,serif;
+  --f-body:"Mukta",system-ui,-apple-system,sans-serif;
+}
+body{background:repeating-linear-gradient(170deg,rgba(255,255,255,.035) 0 22px,transparent 22px 44px),linear-gradient(180deg,#0f3a66,#0a2643)}
+.title{font-size:clamp(60px,17vw,120px)}
+.big{font-size:clamp(34px,9vw,56px)}
+.btn,.label,.howto summary{font-family:var(--f-body);font-weight:800}
+.btn{font-size:20px}
+.btn-big{font-size:22px}
+.hero{display:block;width:min(62vw,240px);height:auto;margin-top:6px}
+.die{display:inline-grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);width:var(--s,clamp(46px,14vw,62px));aspect-ratio:1;padding:15%;border-radius:22%;background:#fff;box-shadow:inset 0 -4px 0 rgba(0,0,0,.14)}
+.die span{display:block;width:80%;aspect-ratio:1;place-self:center;border-radius:50%}
+.die span.on{background:#0c2440}
+.dice{display:flex;justify-content:center;gap:8px;margin-top:14px}
+.dbtn{padding:0;border:0;border-radius:16px;background:transparent;cursor:pointer;touch-action:manipulation;transition:transform .12s ease}
+.dbtn:disabled{cursor:default}
+.dbtn[aria-pressed="true"]{transform:translateY(8px)}
+.dbtn[aria-pressed="true"] .die{background:#ffe9a6;box-shadow:0 0 0 4px var(--accent)}
+.holdnote{margin:12px 0 0;font-size:16px;color:var(--muted)}
+.card{list-style:none;margin:16px auto 0;padding:0;display:grid;gap:6px;max-width:480px;text-align:left}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;padding:8px 12px;border:0;border-radius:12px;background:#f2f7fc;color:#0c2440;font:inherit;text-align:left}
+.row b{display:block;font-weight:800;font-size:18px}
+.row small{display:block;font-size:14px;color:#3d5573}
+.row .v{min-width:3.4em;padding:4px 10px;border-radius:10px;font-family:var(--f-display);font-size:22px;text-align:center}
+.row.done{background:rgba(242,247,252,.12);color:var(--fg)}
+.row.done small{color:var(--muted)}
+.row.done .v{background:transparent}
+button.row{cursor:pointer;box-shadow:inset 0 0 0 2px transparent}
+button.row .v{background:var(--accent);color:var(--accent-ink)}
+button.row.zero .v{background:#dbe5f0;color:#3d5573}
+button.row:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.totals{list-style:none;margin:16px auto 0;padding:0;display:grid;gap:6px;max-width:440px;text-align:left}
+.totals li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--panel);font-weight:700}
+.totals li.now{box-shadow:inset 0 0 0 2px var(--accent)}
+.totals li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.totals li b{font-family:var(--f-display);font-size:22px;font-weight:400}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script src="rules.js?v=0595d9b8"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc, Y = window.YACHT;
+  const app = document.getElementById('app');
+  const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+  const d6 = () => 1 + Math.floor(Math.random() * 6);
+  const dieHTML = (n, size) => '<span class="die" role="img" aria-label="' + n + '"' + (size ? ' style="--s:' + size + 'px"' : '') + '>' + Array.from({ length: 9 }, (_, k) => '<span' + (PIPS[n].includes(k) ? ' class="on"' : '') + '></span>').join('') + '</span>';
+
+  const S = { screen: 'setup', players: [], turn: 0, dice: [1, 2, 3, 4, 5], held: [false, false, false, false, false], rolls: 0, busy: false };
+  let editor = null, shown = null;
+  const me = () => S.players[S.turn];
+  const total = p => Object.values(p.card).reduce((a, b) => a + b, 0);
+  const filled = p => Object.keys(p.card).length;
+  const round = () => Math.min(12, filled(me()) + 1);
+
+  function startTurn() {
+    S.rolls = 0;
+    S.held = [false, false, false, false, false];
+    S.screen = 'play';
+    render();
+  }
+  function roll() {
+    if (S.busy || S.rolls >= 3) return;
+    S.busy = true;
+    S.rolls++;
+    let k = 0;
+    const id = setInterval(() => {
+      S.dice = S.dice.map((v, i) => (S.held[i] ? v : d6()));
+      const box = document.getElementById('dice');
+      if (box) box.innerHTML = diceHTML(true);
+      sfx.tick(600 + Math.random() * 700);
+      if (++k >= 7) { clearInterval(id); S.busy = false; P.vibrate(15); render(); }
+    }, 70);
+  }
+  function choose(id) {
+    if (S.rolls === 0 || me().card[id] != null) return;
+    const v = Y.score(id, S.dice);
+    me().card[id] = v;
+    if (id === 'yacht' && v === 50) { sfx.win(); P.confetti({ colors: ['#ffcc33', '#ffffff', '#3d8fd6'] }); } else if (v) sfx.ding(); else sfx.pop();
+    const next = (S.turn + 1) % S.players.length;
+    if (next === 0 && filled(S.players[S.players.length - 1]) >= 12) { S.screen = 'final'; render(); sfx.win(); return; }
+    S.turn = next;
+    startTurn();
+  }
+
+  function diceHTML(rolling) {
+    return S.dice.map((v, i) => `<button type="button" class="dbtn" data-act="hold" data-i="${i}" aria-pressed="${S.held[i]}"${S.rolls === 0 || S.rolls >= 3 || rolling ? ' disabled' : ''} aria-label="Die showing ${v}${S.held[i] ? ', held' : ''}">${dieHTML(v)}</button>`).join('');
+  }
+  function totalsHTML() {
+    return '<ol class="totals">' + S.players.map((p, i) => `<li class="${i === S.turn && S.screen === 'play' ? 'now' : ''}"><span>${esc(p.name)}</span><b>${total(p)}</b></li>`).join('') + '</ol>';
+  }
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Yacht</h1>
+    <svg class="hero" viewBox="0 0 240 100" aria-hidden="true"><path d="M20 76h200l-24 20H44z" fill="#ffcc33" stroke="#06182b" stroke-width="4" stroke-linejoin="round"/><path d="M118 8v66" stroke="#06182b" stroke-width="5"/><path d="M122 12c30 14 46 36 52 58h-52z" fill="#f2f7fc" stroke="#06182b" stroke-width="4" stroke-linejoin="round"/><path d="M114 22c-22 12-36 30-42 48h42z" fill="#f2f7fc" stroke="#06182b" stroke-width="4" stroke-linejoin="round"/></svg>
+    <p class="tagline">The classic dice game. Roll five dice up to three times, then fill one of twelve boxes. Highest total wins.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Set sail</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>On your turn, roll all five dice. Tap any dice you want to keep, then roll the rest. You get three rolls at most.</li>
+        <li>Then pick one empty box on your scorecard to score those dice. You must fill a box every turn, even if it scores 0.</li>
+        <li>Each box can only be used once. After twelve rounds every box is full, and the highest total wins.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPlay() {
+    const p = me();
+    const rows = Y.CATS.map(c => {
+      const done = p.card[c.id] != null;
+      if (done) return `<li><div class="row done"><span><b>${c.name}</b><small>${esc(c.hint)}</small></span><span class="v">${p.card[c.id]}</span></div></li>`;
+      if (!S.rolls) return `<li><div class="row"><span><b>${c.name}</b><small>${esc(c.hint)}</small></span><span class="v"></span></div></li>`;
+      const v = Y.score(c.id, S.dice);
+      return `<li><button type="button" class="row${v ? '' : ' zero'}" data-act="score" data-id="${c.id}" aria-label="Score ${v} in ${c.name}"><span><b>${c.name}</b><small>${esc(c.hint)}</small></span><span class="v">${v}</span></button></li>`;
+    }).join('');
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Round ${round()} of 12. ${esc(p.name)}'s turn</p>
+      <div class="dice" id="dice">${diceHTML(false)}</div>
+      <p class="holdnote">${S.rolls === 0 ? 'Roll to start your turn.' : S.rolls < 3 ? 'Tap dice to keep them, then roll the rest. Or pick a box below.' : 'No rolls left. Pick a box below.'}</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="roll"${S.rolls >= 3 ? ' disabled' : ''}>${S.rolls === 0 ? 'Roll' : S.rolls < 3 ? 'Roll again (' + (3 - S.rolls) + ' left)' : 'No rolls left'}</button></div>
+      <ol class="card" aria-label="${esc(p.name)}'s scorecard">${rows}</ol>
+      ${totalsHTML()}
+    </section>`;
+  }
+  function viewFinal() {
+    const rows = S.players.slice().sort((a, b) => total(b) - total(a));
+    const best = total(rows[0]), won = rows.filter(r => total(r) === best).map(r => r.name);
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Twelve rounds done</p>
+      <h2 class="big">${esc(P.listNames(won))} ${won.length > 1 ? 'win' : 'wins'}</h2>
+      <p class="lead">With ${best} points.</p>
+      ${totalsHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change players</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, play: viewPlay, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 1, max: 6 });
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+  function begin(names) {
+    S.players = names.map(name => ({ name, card: {} }));
+    S.turn = 0;
+    startTurn();
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': sfx.unlock(); P.stayAwake(); begin(editor.get()); break;
+      case 'roll': roll(); break;
+      case 'hold': { const i = Number(b.getAttribute('data-i')); S.held[i] = !S.held[i]; sfx.tick(S.held[i] ? 1500 : 900); render(); break; }
+      case 'score': choose(b.getAttribute('data-id')); break;
+      case 'again': begin(S.players.map(p => p.name)); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

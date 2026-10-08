@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mancala | Pass the Phone</title>
+<meta name="description" content="The ancient game of sowing seeds. Pick up a pit, sow round the board, and capture more seeds than your opponent.">
+<meta name="theme-color" content="#f3e3c3">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cabin:wght@500;700&family=Marcellus&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a carved wooden board on sand. Glass seeds in jewel colours. */
+:root{
+  color-scheme:light;
+  --bg:#f3e3c3;
+  --fg:#3b2412;
+  --muted:#5c4128;
+  --panel:#fbf2de;
+  --line:rgba(59,36,18,.24);
+  --field:#ffffff;
+  --field-ink:#3b2412;
+  --accent:#8a3b12;
+  --accent-ink:#ffffff;
+  --accent-shadow:#4e1f07;
+  --wood:#a0522d;
+  --pit:#6e3518;
+  --focus:#1d4ed8;
+  --f-display:"Marcellus",Georgia,serif;
+  --f-body:"Cabin",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(circle at 15% 10%,rgba(255,255,255,.5),transparent 40%),var(--bg)}
+.title{font-size:clamp(56px,16vw,112px)}
+.big{font-size:clamp(34px,9vw,56px)}
+.btn,.label,.howto summary{font-family:var(--f-body);font-weight:700}
+.btn{font-size:19px}
+.btn-big{font-size:21px}
+.panel{box-shadow:0 1px 0 var(--line),0 14px 30px -22px rgba(59,36,18,.5)}
+.hero{display:block;width:min(64vw,250px);height:auto;margin-top:8px}
+.who{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;font-weight:700;font-size:17px}
+.who span{padding:4px 12px;border-radius:999px;background:var(--panel);overflow-wrap:anywhere}
+.who span.now{background:var(--accent);color:#fff}
+.board{display:grid;grid-template-columns:minmax(0,.9fr) repeat(6,minmax(0,1fr)) minmax(0,.9fr);grid-template-rows:auto auto;gap:3px;width:min(100%,560px);margin:10px auto 0;padding:6px;border-radius:26px;background:linear-gradient(180deg,#b5653a,var(--wood));box-shadow:inset 0 -6px 0 rgba(0,0,0,.18),0 16px 28px -18px rgba(59,36,18,.8)}
+.store{grid-row:1/3;display:grid;place-items:center;align-content:center;gap:4px;min-height:96px;border-radius:999px;background:var(--pit);color:#fff2dd;box-shadow:inset 0 4px 8px rgba(0,0,0,.45)}
+.store b{font-family:var(--f-display);font-size:clamp(22px,6vw,32px)}
+.store small{max-width:100%;padding:0 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:700}
+.pit{position:relative;display:grid;place-items:center;width:100%;aspect-ratio:1;min-width:0;margin:0;padding:0;border:0;border-radius:50%;background:var(--pit);color:#fff2dd;cursor:pointer;box-shadow:inset 0 4px 8px rgba(0,0,0,.45);touch-action:manipulation}
+.pit:disabled{cursor:default}
+.pit.mine:not(:disabled){box-shadow:inset 0 4px 8px rgba(0,0,0,.45),0 0 0 3px #ffd56b}
+.pit.last{box-shadow:inset 0 4px 8px rgba(0,0,0,.45),0 0 0 3px #fff}
+.pit b{position:relative;z-index:1;font-family:var(--f-display);font-size:clamp(16px,4.6vw,24px);text-shadow:0 1px 2px rgba(0,0,0,.7)}
+.beads{position:absolute;inset:16%;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:1px;opacity:.85}
+.beads i{width:7px;height:7px;border-radius:50%}
+.msg{margin:12px auto 0;min-height:1.4em;text-align:center;font-weight:700;font-size:18px}
+.score{display:flex;justify-content:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+.score span{padding:6px 14px;border-radius:999px;background:var(--panel);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.mancala';
+  const app = document.getElementById('app');
+  const BEADS = ['#60a5fa', '#f87171', '#fbbf24', '#34d399', '#c084fc', '#f472b6'];
+  // Pits 0-5 belong to the bottom player and 6 is their store.
+  // Pits 7-12 belong to the top player and 13 is their store. Sowing runs 0, 1, 2 ... 13.
+  const saved = P.store.get(KEY, {}) || {};
+  const S = { settings: Object.assign({ seeds: 4 }, saved.settings || {}), screen: 'setup', players: [], pits: [], turn: 0, first: 0, busy: false, last: -1, msg: '', wins: [0, 0] };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const store = k => (k === 0 ? 6 : 13);
+  const mine = (k, i) => (k === 0 ? i >= 0 && i <= 5 : i >= 7 && i <= 12);
+  const sideEmpty = k => (k === 0 ? [0, 1, 2, 3, 4, 5] : [7, 8, 9, 10, 11, 12]).every(i => S.pits[i] === 0);
+
+  function newGame() {
+    S.pits = Array(14).fill(S.settings.seeds);
+    S.pits[6] = 0;
+    S.pits[13] = 0;
+    S.turn = S.first;
+    S.last = -1;
+    S.msg = '';
+    S.screen = 'play';
+    render();
+  }
+  function sow(i) {
+    if (S.busy || !mine(S.turn, i) || !S.pits[i]) return;
+    S.busy = true;
+    let seeds = S.pits[i];
+    S.pits[i] = 0;
+    let at = i;
+    const k = S.turn, skip = store(1 - k);
+    const step = () => {
+      at = (at + 1) % 14;
+      if (at === skip) at = (at + 1) % 14;
+      S.pits[at]++;
+      seeds--;
+      S.last = at;
+      sfx.tick(900 + at * 40);
+      render();
+      if (seeds > 0) { setTimeout(step, 170); return; }
+      setTimeout(() => finish(at, k), 200);
+    };
+    S.msg = '';
+    render();
+    setTimeout(step, 120);
+  }
+  function finish(at, k) {
+    let again = false;
+    if (at === store(k)) { again = true; S.msg = S.players[k] + ' landed in their store and goes again.'; sfx.ding(); }
+    else if (mine(k, at) && S.pits[at] === 1 && S.pits[12 - at] > 0) {
+      const got = S.pits[12 - at] + 1;
+      S.pits[store(k)] += got;
+      S.pits[at] = 0;
+      S.pits[12 - at] = 0;
+      S.msg = S.players[k] + ' captured ' + P.plural(got, 'seed') + '.';
+      sfx.win();
+    }
+    if (sideEmpty(0) || sideEmpty(1)) {
+      [0, 1, 2, 3, 4, 5].forEach(i => { S.pits[6] += S.pits[i]; S.pits[i] = 0; });
+      [7, 8, 9, 10, 11, 12].forEach(i => { S.pits[13] += S.pits[i]; S.pits[i] = 0; });
+      S.busy = false;
+      const a = S.pits[6], b = S.pits[13];
+      if (a !== b) S.wins[a > b ? 0 : 1]++;
+      S.screen = 'final';
+      render();
+      sfx.win();
+      if (a !== b) P.confetti({ colors: BEADS });
+      return;
+    }
+    if (!again) S.turn = 1 - k;
+    S.busy = false;
+    render();
+  }
+
+  function pitHTML(i, play) {
+    const n = S.pits[i];
+    const own = mine(S.turn, i) && S.screen === 'play';
+    const beads = Array.from({ length: Math.min(n, 12) }, (_, b) => `<i style="background:${BEADS[(i + b) % BEADS.length]}"></i>`).join('');
+    return `<button type="button" class="pit${own ? ' mine' : ''}${S.last === i ? ' last' : ''}" data-act="sow" data-i="${i}"${play && own && n && !S.busy ? '' : ' disabled'} aria-label="${(i < 7 ? S.players[0] : S.players[1])}'s pit with ${P.plural(n, 'seed')}"><span class="beads" aria-hidden="true">${beads}</span><b>${n}</b></button>`;
+  }
+  function boardHTML(play) {
+    const top = [12, 11, 10, 9, 8, 7].map((i, c) => `<div style="grid-row:1;grid-column:${c + 2}">${pitHTML(i, play)}</div>`).join('');
+    const bottom = [0, 1, 2, 3, 4, 5].map((i, c) => `<div style="grid-row:2;grid-column:${c + 2}">${pitHTML(i, play)}</div>`).join('');
+    return `<div class="board">
+      <div class="store" style="grid-column:1" role="img" aria-label="${esc(S.players[1])}'s store with ${P.plural(S.pits[13], 'seed')}"><small>${esc(S.players[1])}</small><b>${S.pits[13]}</b></div>
+      ${top}${bottom}
+      <div class="store" style="grid-column:8" role="img" aria-label="${esc(S.players[0])}'s store with ${P.plural(S.pits[6], 'seed')}"><small>${esc(S.players[0])}</small><b>${S.pits[6]}</b></div>
+    </div>`;
+  }
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Mancala</h1>
+    <svg class="hero" viewBox="0 0 250 90" aria-hidden="true"><rect x="4" y="6" width="242" height="78" rx="38" fill="#a0522d"/><rect x="12" y="14" width="30" height="62" rx="15" fill="#6e3518"/><rect x="208" y="14" width="30" height="62" rx="15" fill="#6e3518"/>${[0, 1, 2, 3, 4].map(c => [0, 1].map(r => `<circle cx="${68 + c * 30}" cy="${30 + r * 30}" r="11" fill="#6e3518"/>`).join('')).join('')}<circle cx="64" cy="28" r="3.5" fill="#60a5fa"/><circle cx="72" cy="32" r="3.5" fill="#f87171"/><circle cx="98" cy="58" r="3.5" fill="#fbbf24"/><circle cx="224" cy="44" r="4" fill="#34d399"/></svg>
+    <p class="tagline">The ancient game of sowing seeds. Pick up a pit, sow round the board, and capture more seeds than your opponent.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Two players</span><div id="players"></div><p class="hint">The first player sits at the bottom of the board, the second at the top.</p></div>
+      <div class="sec"><span class="label">Seeds in each pit</span>${P.seg('seeds', [[3, '3'], [4, '4'], [5, '5'], [6, '6']], S.settings.seeds)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Sow the seeds</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Your six pits are the row nearest you, and your store is the big pit on your right.</li>
+        <li>On your turn, tap one of your pits. Its seeds are sown one at a time into the next pits going round the board, including your store but not your opponent's.</li>
+        <li>If your last seed lands in your store, you go again.</li>
+        <li>If your last seed lands in an empty pit on your side, you capture it and every seed in the pit opposite.</li>
+        <li>When one side runs out of seeds, each player adds the seeds left on their side to their store. Most seeds wins.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPlay() {
+    return P.header() + `
+    <section>
+      <div class="who"><span class="${S.turn === 1 ? 'now' : ''}">Top: ${esc(S.players[1])}</span><span class="${S.turn === 0 ? 'now' : ''}">Bottom: ${esc(S.players[0])}</span></div>
+      ${boardHTML(true)}
+      <p class="msg" aria-live="polite">${S.busy ? 'Sowing...' : esc(S.msg || S.players[S.turn] + ', tap one of your pits.')}</p>
+      <div class="score"><span>${esc(S.players[0])} ${S.wins[0]} wins</span><span>${esc(S.players[1])} ${S.wins[1]} wins</span></div>
+    </section>`;
+  }
+  function viewFinal() {
+    const a = S.pits[6], b = S.pits[13];
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">One side ran out of seeds</p>
+      <h2 class="big">${a === b ? "It's a draw" : esc(S.players[a > b ? 0 : 1]) + ' wins'}</h2>
+      <p class="lead">${esc(S.players[0])} ${a}, ${esc(S.players[1])} ${b}.</p>
+      ${boardHTML(false)}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, play: viewPlay, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 2, max: 2 });
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': S.players = editor.get(); S.wins = [0, 0]; S.first = 0; sfx.unlock(); newGame(); break;
+      case 'sow': sow(Number(b.getAttribute('data-i'))); break;
+      case 'again': S.first = 1 - S.first; newGame(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => { if (e.target.name === 'seeds') { S.settings.seeds = Number(e.target.value); persist(); } });
+
+  render();
+})();
+</script>
+</body>
+</html>

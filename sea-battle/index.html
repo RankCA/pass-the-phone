@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sea Battle | Pass the Phone</title>
+<meta name="description" content="Two players hide a fleet on a grid, then take turns firing at each other's. Sink every ship to win. The phone keeps each fleet secret.">
+<meta name="theme-color" content="#06261c">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Saira:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a radar screen. Deep green glass, glowing grid lines, red for hits and white for misses. */
+:root{
+  color-scheme:dark;
+  --bg:#06261c;
+  --fg:#e6fff4;
+  --muted:#a9dcc6;
+  --panel:rgba(230,255,244,.07);
+  --line:rgba(169,220,198,.35);
+  --field:#e6fff4;
+  --field-ink:#06261c;
+  --accent:#5cf2b0;
+  --accent-ink:#04180f;
+  --accent-shadow:#1f8a5f;
+  --hit:#ff5a5f;
+  --focus:#ffd23f;
+  --f-display:"Orbitron","Arial Black",sans-serif;
+  --f-body:"Saira",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(circle at 50% 20%,rgba(92,242,176,.12),transparent 55%),linear-gradient(180deg,#073326,#041a13)}
+.title{font-weight:900;font-size:clamp(40px,11.5vw,88px);letter-spacing:.02em}
+.big{font-weight:900;font-size:clamp(26px,7vw,44px);letter-spacing:.01em}
+.btn,.label,.howto summary{font-family:var(--f-body);font-weight:800}
+.btn{font-size:19px}
+.btn-big{font-size:21px}
+.hero{display:block;width:min(46vw,180px);height:auto;margin-top:8px}
+.grid{display:grid;grid-template-columns:20px repeat(10,minmax(0,1fr));gap:2px;width:min(100%,460px);margin:12px auto 0}
+.grid .l{display:grid;place-items:center;font-weight:800;font-size:13px;color:var(--muted)}
+.cell{position:relative;display:grid;place-items:center;aspect-ratio:1;margin:0;padding:0;border:0;border-radius:3px;background:#0b3a2b;box-shadow:inset 0 0 0 1px rgba(92,242,176,.18);cursor:pointer;touch-action:manipulation}
+.cell:disabled{cursor:default}
+.cell.ship{background:#3aa57a}
+.cell.sunk{background:#7a2226}
+.cell.sel{box-shadow:inset 0 0 0 3px #ffd23f}
+.cell .hit,.cell .miss{display:block;border-radius:50%}
+.cell .hit{width:62%;height:62%;background:var(--hit);box-shadow:0 0 6px rgba(255,90,95,.8)}
+.cell .miss{width:30%;height:30%;background:#e6fff4}
+.mini{width:min(56vw,220px);grid-template-columns:repeat(10,minmax(0,1fr));gap:1px}
+.mini .cell{border-radius:2px;cursor:default}
+.split{display:grid;gap:10px;justify-items:center;margin-top:8px}
+.split small{font-weight:800;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.result{margin:10px auto 0;max-width:24em;font-family:var(--f-display);font-weight:900;font-size:clamp(22px,6vw,32px);letter-spacing:.02em}
+.result.hit{color:var(--hit)}
+.fleet{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:10px}
+.fleet span{padding:3px 10px;border-radius:999px;background:var(--panel);font-weight:700;font-size:15px}
+.fleet span.down{color:var(--muted);text-decoration:line-through}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const app = document.getElementById('app');
+  const N = 10, LET = 'ABCDEFGHIJ';
+  const FLEET = [['Carrier', 5], ['Battleship', 4], ['Cruiser', 3], ['Submarine', 3], ['Destroyer', 2]];
+  const key = (r, c) => r + ',' + c;
+  const code = (r, c) => LET[c] + (r + 1);
+
+  const S = { screen: 'setup', players: [], fleets: [[], []], shots: [{}, {}], turn: 0, placing: 0, sel: null, last: null, winner: -1 };
+  let editor = null, shown = null;
+  const foe = k => 1 - k;
+
+  function randomFleet() {
+    for (let tries = 0; tries < 500; tries++) {
+      const taken = new Set(), ships = [];
+      let ok = true;
+      for (const [name, size] of FLEET) {
+        let placed = false;
+        for (let t = 0; t < 200 && !placed; t++) {
+          const across = Math.random() < 0.5;
+          const r = Math.floor(Math.random() * (across ? N : N - size + 1));
+          const c = Math.floor(Math.random() * (across ? N - size + 1 : N));
+          const cells = Array.from({ length: size }, (_, i) => (across ? [r, c + i] : [r + i, c]));
+          if (cells.some(([a, b]) => taken.has(key(a, b)))) continue;
+          cells.forEach(([a, b]) => taken.add(key(a, b)));
+          ships.push({ name, size, cells });
+          placed = true;
+        }
+        if (!placed) { ok = false; break; }
+      }
+      if (ok) return ships;
+    }
+    return [];
+  }
+  const shipAt = (k, r, c) => S.fleets[k].find(s => s.cells.some(([a, b]) => a === r && b === c));
+  const isSunk = (k, ship) => ship.cells.every(([a, b]) => S.shots[foe(k)][key(a, b)]);
+  const allSunk = k => S.fleets[k].every(s => isSunk(k, s));
+
+  function fire() {
+    if (!S.sel) return;
+    const [r, c] = S.sel, me = S.turn, them = foe(me);
+    if (S.shots[me][key(r, c)]) return;
+    const ship = shipAt(them, r, c);
+    S.shots[me][key(r, c)] = ship ? 'hit' : 'miss';
+    S.sel = null;
+    if (ship) {
+      const sunk = isSunk(them, ship);
+      S.last = { hit: true, sunk: sunk ? ship.name : '', at: code(r, c) };
+      if (sunk) sfx.boom(); else sfx.buzz(0.4);
+      P.vibrate(sunk ? [120, 60, 200] : 60);
+      if (allSunk(them)) { S.winner = me; S.screen = 'final'; render(); sfx.win(); P.confetti({ colors: ['#5cf2b0', '#ff5a5f', '#e6fff4'] }); return; }
+    } else {
+      S.last = { hit: false, at: code(r, c) };
+      sfx.noise({ filter: 'lowpass', freq: 600, to: 150, dur: 0.5, gain: 0.25 });
+    }
+    S.screen = 'fired';
+    render();
+  }
+
+  /* ---------- Drawing ---------- */
+  function boardHTML(o) {
+    // o: { owner: whose ships, viewer: whose shots to show on it, showShips, pick }
+    let h = '<div class="grid' + (o.mini ? ' mini' : '') + '">';
+    if (!o.mini) h += '<span></span>' + [...LET].map(l => '<span class="l">' + l + '</span>').join('');
+    for (let r = 0; r < N; r++) {
+      if (!o.mini) h += '<span class="l">' + (r + 1) + '</span>';
+      for (let c = 0; c < N; c++) {
+        const shot = o.shotsBy != null ? S.shots[o.shotsBy][key(r, c)] : null;
+        const ship = shipAt(o.owner, r, c);
+        const sunk = ship && shot && isSunk(o.owner, ship);
+        let cls = '';
+        if (ship && (o.showShips || sunk)) cls = sunk ? ' sunk' : ' ship';
+        if (S.sel && S.sel[0] === r && S.sel[1] === c && o.pick) cls += ' sel';
+        const mark = shot === 'hit' ? '<span class="hit"></span>' : shot === 'miss' ? '<span class="miss"></span>' : '';
+        const label = code(r, c) + (shot ? ', ' + shot : '') + (ship && o.showShips ? ', ship' : '');
+        if (o.pick) h += `<button type="button" class="cell${cls}" data-act="cell" data-r="${r}" data-c="${c}"${shot ? ' disabled' : ''} aria-label="${label}">${mark}</button>`;
+        else h += `<span class="cell${cls}" ${o.mini ? 'aria-hidden="true"' : 'role="img" aria-label="' + label + '"'}>${mark}</span>`;
+      }
+    }
+    return h + '</div>';
+  }
+  function fleetHTML(k) {
+    return '<div class="fleet">' + S.fleets[k].map(s => `<span class="${isSunk(k, s) ? 'down' : ''}">${s.name} ${s.size}</span>`).join('') + '</div>';
+  }
+
+  /* ---------- Views ---------- */
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Sea Battle</h1>
+    <svg class="hero" viewBox="0 0 180 120" aria-hidden="true"><circle cx="90" cy="60" r="54" fill="none" stroke="#5cf2b0" stroke-width="3"/><circle cx="90" cy="60" r="34" fill="none" stroke="#5cf2b0" stroke-width="2" opacity=".6"/><path d="M90 6v108M36 60h108" stroke="#5cf2b0" stroke-width="2" opacity=".5"/><path d="M90 60 132 26" stroke="#5cf2b0" stroke-width="4"/><circle cx="118" cy="44" r="6" fill="#ff5a5f"/><circle cx="62" cy="78" r="4" fill="#e6fff4"/></svg>
+    <p class="tagline">Two players hide a fleet on a grid, then take turns firing at each other's. The phone keeps each fleet secret.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Two players</span><div id="players"></div></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Man the ships</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Each player secretly places their fleet: a carrier of 5, a battleship of 4, a cruiser and a submarine of 3, and a destroyer of 2. Shuffle until you like the layout.</li>
+        <li>Take turns. Pick a square on the enemy grid and fire. A red dot is a hit, a white dot is a miss.</li>
+        <li>When every square of a ship has been hit, it sinks. Sink the whole enemy fleet to win.</li>
+        <li>After each shot, pass the phone so the other player can take theirs.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPlacePass() {
+    const n = S.players[S.placing];
+    return P.header() + P.passScreen({ eyebrow: 'Hide your fleet', name: n, lead: 'Only ' + esc(n) + ' looks.', act: 'placeme' });
+  }
+  function viewPlace() {
+    const k = S.placing;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(S.players[k])}'s fleet</p>
+      <h2 class="big">Place your ships</h2>
+      ${boardHTML({ owner: k, showShips: true })}
+      ${fleetHTML(k)}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="shuffle">Shuffle ships</button><button class="btn btn-main btn-big" type="button" data-act="ready">Ready</button></div>
+    </section>`;
+  }
+  function viewTurnPass() {
+    const n = S.players[S.turn];
+    return P.header() + P.passScreen({ eyebrow: 'Your turn to fire', name: n, lead: 'Only ' + esc(n) + ' looks.', act: 'turnme' });
+  }
+  function viewAim() {
+    const me = S.turn, them = foe(me);
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(S.players[me])} is firing</p>
+      <h2 class="big">${esc(S.players[them])}'s waters</h2>
+      ${boardHTML({ owner: them, shotsBy: me, pick: true })}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="fire"${S.sel ? '' : ' disabled'}>${S.sel ? 'Fire at ' + code(S.sel[0], S.sel[1]) : 'Pick a square'}</button></div>
+      ${fleetHTML(them)}
+      <div class="split"><small>Your fleet</small>${boardHTML({ owner: me, shotsBy: them, showShips: true, mini: true })}</div>
+    </section>`;
+  }
+  function viewFired() {
+    const L = S.last, me = S.turn, them = foe(me);
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(S.players[me])} fired at ${L.at}</p>
+      <p class="result${L.hit ? ' hit' : ''}">${L.sunk ? 'Hit. You sank their ' + L.sunk + '!' : L.hit ? 'Hit!' : 'Miss.'}</p>
+      ${boardHTML({ owner: them, shotsBy: me })}
+      ${fleetHTML(them)}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="handover">Pass to ${esc(S.players[them])}</button></div>
+    </section>`;
+  }
+  function viewFinal() {
+    const w = S.winner;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">The whole fleet is sunk</p>
+      <h2 class="big">${esc(S.players[w])} wins</h2>
+      <div class="split"><small>${esc(S.players[foe(w)])}'s fleet</small>${boardHTML({ owner: foe(w), shotsBy: w, showShips: true })}</div>
+      <div class="split"><small>${esc(S.players[w])}'s fleet</small>${boardHTML({ owner: w, shotsBy: foe(w), showShips: true })}</div>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change players</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, placepass: viewPlacePass, place: viewPlace, turnpass: viewTurnPass, aim: viewAim, fired: viewFired, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 2, max: 2 });
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+  function begin(names) {
+    S.players = names;
+    S.fleets = [randomFleet(), randomFleet()];
+    S.shots = [{}, {}];
+    S.placing = 0;
+    S.turn = Math.floor(Math.random() * 2);
+    S.sel = null;
+    S.winner = -1;
+    S.screen = 'placepass';
+    render();
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': sfx.unlock(); P.stayAwake(); begin(editor.get()); break;
+      case 'placeme': S.screen = 'place'; render(); break;
+      case 'shuffle': S.fleets[S.placing] = randomFleet(); sfx.whoosh(); render(); break;
+      case 'ready':
+        if (S.placing === 0) { S.placing = 1; S.screen = 'placepass'; } else S.screen = 'turnpass';
+        render();
+        break;
+      case 'turnme': S.sel = null; S.screen = 'aim'; render(); break;
+      case 'cell': S.sel = [Number(b.getAttribute('data-r')), Number(b.getAttribute('data-c'))]; sfx.tick(1400); render(); break;
+      case 'fire': fire(); break;
+      case 'handover': S.turn = foe(S.turn); S.screen = 'turnpass'; render(); break;
+      case 'again': begin(S.players); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
