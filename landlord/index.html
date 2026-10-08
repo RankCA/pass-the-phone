@@ -1,0 +1,1024 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Landlord | Pass the Phone</title>
+<meta name="description" content="Roll the dice, buy streets, build houses and collect rent until everyone else goes bust. The phone is the board, the bank and the dice.">
+<meta name="theme-color" content="#14384f">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Ultra&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: an estate agent's board game. A navy table, a cream board, and a mint middle where the dice land. */
+:root{
+  color-scheme:dark;
+  --bg:#123247;
+  --fg:#f5f1e6;
+  --muted:#c6d3dc;
+  --panel:rgba(255,255,255,.07);
+  --line:rgba(245,241,230,.3);
+  --field:#fbf6e9;
+  --field-ink:#1d1b16;
+  --accent:#f6c344;
+  --accent-ink:#1d1b16;
+  --accent-shadow:#9c7414;
+  --paper:#fbf6e9;
+  --ink:#1d1b16;
+  --felt:#dcebd9;
+  --focus:#f6c344;
+  --max:620px;
+  --f-display:"Ultra",Rockwell,Georgia,serif;
+  --f-body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+body{background:radial-gradient(ellipse 90% 50% at 50% 0%,rgba(255,255,255,.05),transparent 70%),linear-gradient(180deg,#14384f,#0c2333);background-attachment:fixed}
+.title{font-size:clamp(40px,12.5vw,96px);color:var(--accent);text-shadow:0 4px 0 #0a1c28}
+.hero-art{display:block;width:min(70vw,260px);height:auto;margin-top:12px}
+.btn{font-family:var(--f-body);font-weight:800}
+.label,.howto summary{font-family:var(--f-body);font-weight:800}
+.big{font-size:clamp(32px,8vw,56px)}
+.note{margin:12px auto 0;max-width:32em;text-align:center;font-size:16px;color:var(--muted)}
+.resume p{margin:0 0 4px}
+
+/* Board */
+.board{display:grid;grid-template-columns:1.6fr repeat(9,1fr) 1.6fr;grid-template-rows:1.6fr repeat(9,1fr) 1.6fr;gap:2px;width:100%;max-width:560px;aspect-ratio:1;margin:14px auto 0;padding:3px;border-radius:14px;background:#0a1c28;box-shadow:0 20px 40px -24px rgba(0,0,0,.8)}
+.sq{position:relative;min-width:0;min-height:0;margin:0;padding:0;border:0;border-radius:3px;background:var(--paper);color:#123247;cursor:pointer;overflow:hidden;font:inherit;touch-action:manipulation}
+.sq.corner{border-radius:7px}
+.sq.mort{background:repeating-linear-gradient(135deg,#ddd5c2 0 4px,var(--paper) 4px 8px)}
+.sq.land{box-shadow:inset 0 0 0 3px var(--accent)}
+.band{position:absolute;display:flex;align-items:center;justify-content:center;gap:1px;background:var(--g)}
+.s-b .band{left:0;right:0;top:0;height:28%}
+.s-t .band{left:0;right:0;bottom:0;height:28%}
+.s-l .band{top:0;bottom:0;right:0;width:28%;flex-direction:column}
+.s-r .band{top:0;bottom:0;left:0;width:28%;flex-direction:column}
+.band i{display:block;width:5px;height:5px;background:#1f9d55;box-shadow:0 0 0 1px #0b3d22}
+.band i.hotel{width:10px;height:6px;background:#c62828;box-shadow:0 0 0 1px #5a0f0f}
+.s-l .band i.hotel,.s-r .band i.hotel{width:6px;height:10px}
+.ico{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.ico svg{width:60%;height:60%;max-width:24px;max-height:24px}
+.corner .ico svg{max-width:32px;max-height:32px}
+.ico .q{font-family:var(--f-display);font-weight:400;font-size:clamp(14px,4vw,20px);line-height:1}
+.ico .q.dip{color:#9a4a00}
+.own{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--o);box-shadow:0 0 0 1.5px var(--paper),0 0 0 2.5px rgba(0,0,0,.4)}
+.s-b .own{bottom:3px;left:calc(50% - 4.5px)}
+.s-t .own{top:3px;left:calc(50% - 4.5px)}
+.s-l .own{left:3px;top:calc(50% - 4.5px)}
+.s-r .own{right:3px;top:calc(50% - 4.5px)}
+.toks{position:absolute;inset:12% 4%;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:1px;pointer-events:none}
+.tok{display:inline-block;flex:none;width:11px;height:11px;border-radius:50%;background:var(--c);box-shadow:0 0 0 1.5px #fff,0 1px 3px rgba(0,0,0,.5)}
+.toks.many .tok{width:8px;height:8px}
+.tok.me{width:13px;height:13px;animation:bob .7s ease-in-out infinite alternate}
+.toks.many .tok.me{width:10px;height:10px}
+@keyframes bob{to{transform:translateY(-2px)}}
+.mid{grid-row:2/11;grid-column:2/11;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-width:0;min-height:0;padding:8px;border-radius:8px;background:var(--felt);color:var(--ink);text-align:center;overflow:hidden}
+.mid .logo{font-family:var(--f-display);font-size:clamp(18px,5vw,28px);line-height:1;color:#123247}
+.who-now{display:flex;align-items:center;justify-content:center;gap:8px;max-width:100%;font-weight:800;font-size:17px;overflow-wrap:anywhere}
+.who-now .tok{width:16px;height:16px}
+.dice{display:flex;gap:10px}
+.die{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);width:clamp(40px,12vw,58px);aspect-ratio:1;padding:15%;border-radius:22%;background:#fff;box-shadow:inset 0 -3px 0 rgba(0,0,0,.14),0 2px 6px rgba(0,0,0,.28)}
+.die span{display:block;width:80%;aspect-ratio:1;place-self:center;border-radius:50%}
+.die span.on{background:var(--ink)}
+.msg{display:-webkit-box;margin:0;max-width:24em;font-weight:700;font-size:15px;line-height:1.3;color:#24362f;text-wrap:balance;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.pot{margin:0;font-weight:800;font-size:14px;color:#24362f}
+@media (max-width:380px){.mid .logo{display:none}.mid{gap:6px}.msg{font-size:14px;-webkit-line-clamp:3}}
+
+/* Under the board */
+.acts{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:16px}
+.sub{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:14px}
+.chip-btn{min-height:44px;padding:6px 18px;border:0;border-radius:999px;background:var(--panel);color:var(--fg);box-shadow:inset 0 0 0 2px var(--line);font:800 16px/1 var(--f-body);cursor:pointer}
+.chip-btn:disabled{opacity:.55;cursor:default}
+.cardx{max-width:440px;margin:16px auto 0;padding:16px 18px;border-radius:16px;background:var(--paper);color:var(--ink);text-align:center;box-shadow:0 10px 24px -12px rgba(0,0,0,.6)}
+.cardx small{display:block;font-weight:800;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#8a3f00}
+.cardx.post small{color:#1d4f91}
+.cardx p{margin:6px 0 0;font-size:19px;font-weight:700;line-height:1.35}
+.owe{margin:16px auto 0;max-width:30em;text-align:center;font-size:17px}
+.plist{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:8px}
+.plist li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:10px 14px;border-radius:14px;background:var(--panel)}
+.plist li.now{box-shadow:inset 0 0 0 2px var(--accent)}
+.plist li.out .nm{color:var(--muted);text-decoration:line-through}
+.plist .nm{flex:1;min-width:6em;font-weight:800;overflow-wrap:anywhere}
+.plist .cash{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums}
+.plist .small{font-size:15px;color:var(--muted)}
+.tag{padding:2px 9px;border-radius:999px;background:rgba(255,255,255,.14);font-weight:800;font-size:13px}
+.log{margin-top:20px}
+.log summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-weight:800;font-size:18px}
+.log ol{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:15px;color:var(--muted)}
+.log li:first-child{color:var(--fg)}
+
+/* Deeds, streets, trades and auctions */
+.deed{max-width:380px;margin:20px auto 0;border-radius:16px;overflow:hidden;background:var(--paper);color:var(--ink);text-align:left;box-shadow:0 14px 30px -16px rgba(0,0,0,.7)}
+.deed-head{padding:14px 18px 16px;background:var(--g,#e6dfcc);color:var(--gi,#1d1b16);text-align:center}
+.deed-head small{display:block;font-weight:800;font-size:13px;letter-spacing:.14em;text-transform:uppercase}
+.deed-head b{display:block;margin-top:4px;font-family:var(--f-display);font-weight:400;font-size:24px;line-height:1.15;overflow-wrap:anywhere}
+.deed-body{padding:12px 18px 18px}
+.deed-body p{margin:8px 0 0;font-size:16px}
+.rents{width:100%;border-collapse:collapse;font-size:16px}
+.rents td{padding:6px 4px;border-bottom:1px solid rgba(29,27,22,.12)}
+.rents td:last-child{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+.rents tr.now td{background:#fde9ad}
+.who-owns{font-weight:800}
+.mgr{display:grid;gap:10px;margin-top:18px;text-align:left}
+.mrow{display:grid;grid-template-columns:12px minmax(0,1fr);border-radius:14px;overflow:hidden;background:var(--paper);color:var(--ink)}
+.mrow > i{background:var(--g)}
+.mrow .in{padding:10px 12px}
+.mrow b{display:block;font-size:17px;overflow-wrap:anywhere}
+.mrow small{display:block;margin-top:2px;font-size:15px;color:#4a463d}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.mini{min-height:42px;padding:4px 12px;border:0;border-radius:10px;background:#123247;color:#f5f1e6;font:800 15px/1.1 var(--f-body);cursor:pointer;touch-action:manipulation}
+.mini.alt{background:transparent;color:inherit;box-shadow:inset 0 0 0 2px currentColor}
+.mini:disabled{opacity:.5;cursor:default}
+.tside{margin-top:18px;padding:14px;border-radius:16px;background:var(--panel);text-align:left}
+.tside h3{margin:0 0 10px;font-weight:800;font-size:19px}
+.tlist{display:flex;flex-wrap:wrap;gap:8px}
+.tchip{display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 12px 6px 6px;border:0;border-radius:12px;background:var(--paper);color:var(--ink);font:800 15px/1.2 var(--f-body);text-align:left;cursor:pointer;box-shadow:inset 0 0 0 2px transparent}
+.tchip i{width:10px;align-self:stretch;border-radius:5px;background:var(--g)}
+.tchip[aria-pressed="true"]{background:#fde9ad;box-shadow:inset 0 0 0 3px #9c7414}
+.stepper{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.stepper span{font-weight:800}
+.stepper output{min-width:5.5em;text-align:center;font-weight:800;font-size:20px;font-variant-numeric:tabular-nums}
+.empty{margin:0;color:var(--muted)}
+.auc{list-style:none;margin:18px 0 0;padding:0;display:grid;gap:8px;text-align:left}
+.auc li{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 12px;border-radius:14px;background:var(--panel)}
+.auc li.lead{box-shadow:inset 0 0 0 2px var(--accent)}
+.auc .nm{flex:1;min-width:6em;font-weight:800;overflow-wrap:anywhere}
+.auc .cash{font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.auc .btns{margin:0;width:100%}
+.worth{list-style:none;margin:18px auto 0;padding:0;display:grid;gap:6px;max-width:440px;text-align:left}
+.worth li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:10px 14px;border-radius:12px;background:var(--panel);font-weight:800}
+.worth li.top{box-shadow:inset 0 0 0 3px var(--accent)}
+.worth li span{min-width:0;overflow-wrap:anywhere}
+.worth li b{font-variant-numeric:tabular-nums}
+.confirm{max-width:440px;margin:16px auto 0;padding:16px;border-radius:16px;background:var(--panel);text-align:center}
+.confirm p{margin:0}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script src="board.js?v=7596c8b5"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const B = window.LANDLORD, SQ = B.squares, GR = B.groups;
+  const KEY = 'ptp.landlord';
+  const app = document.getElementById('app');
+  const COLORS = ['#e63946', '#2563eb', '#16a34a', '#f59e0b', '#9333ea', '#0e7490'];
+  const STATIONS = [5, 15, 25, 35], UTILS = [12, 28], JAIL = 10, FINE = 50, SALARY = 200;
+  const GROUP = {};
+  SQ.forEach((s, i) => { if (s.g) (GROUP[s.g] = GROUP[s.g] || []).push(i); });
+  const money = n => '£' + Math.round(n).toLocaleString('en-GB');
+  const buyable = i => SQ[i].t === 'street' || SQ[i].t === 'station' || SQ[i].t === 'utility';
+  const d6 = () => 1 + Math.floor(Math.random() * 6);
+
+  const saved = P.store.get(KEY, {}) || {};
+  const settings = Object.assign({ cash: 1500, auction: 'yes', pot: 'no' }, saved.settings || {});
+  let G = saved.game && saved.game.v === 1 && Array.isArray(saved.game.players) ? saved.game : null;
+  if (G && G.phase === 'moving') G.phase = 'done';
+  const U = { view: 'setup', deed: 0, back: 'board', trade: null, confirm: '', busy: false };
+  let editor = null, shown = null;
+
+  function save() { P.store.set(KEY, { settings, game: G }); }
+  const cur = () => G.players[G.turn];
+  const alive = () => G.players.map((x, i) => i).filter(i => !G.players[i].out);
+  const fineTo = () => (G.settings.pot === 'yes' ? -2 : -1);
+  function say(t) { G.msg = t; G.log.unshift(t); if (G.log.length > 60) G.log.length = 60; }
+
+  /* ---------- Rules ---------- */
+  const ownsAll = (p, g) => GROUP[g].every(i => G.own[i] === p);
+  const housesIn = g => GROUP[g].map(i => G.houses[i]);
+  const mortValue = i => SQ[i].price / 2;
+  const payOffCost = i => Math.round(mortValue(i) * 1.1);
+  const houseCost = i => GR[SQ[i].g].house;
+  function rent(i, roll, card) {
+    const s = SQ[i], o = G.own[i];
+    if (o < 0 || G.mort[i]) return 0;
+    if (s.t === 'street') {
+      const h = G.houses[i];
+      if (h) return s.rent[h];
+      return ownsAll(o, s.g) ? s.rent[0] * 2 : s.rent[0];
+    }
+    if (s.t === 'station') {
+      const n = STATIONS.filter(k => G.own[k] === o).length;
+      return [25, 50, 100, 200][n - 1] * (card ? 2 : 1);
+    }
+    if (s.t === 'utility') return roll * (card || UTILS.every(k => G.own[k] === o) ? 10 : 4);
+    return 0;
+  }
+  function worth(p) {
+    let w = G.players[p].cash;
+    SQ.forEach((s, i) => {
+      if (G.own[i] !== p) return;
+      w += G.mort[i] ? s.price / 2 : s.price;
+      if (s.t === 'street') w += G.houses[i] * houseCost(i);
+    });
+    return w;
+  }
+  const canManage = () => !U.busy && ['roll', 'done', 'debt', 'buy'].includes(G.phase);
+  function canBuild(i) {
+    const s = SQ[i], p = G.turn;
+    if (G.phase === 'debt' || s.t !== 'street' || G.own[i] !== p || !ownsAll(p, s.g)) return false;
+    if (GROUP[s.g].some(k => G.mort[k])) return false;
+    return G.houses[i] < 5 && G.houses[i] <= Math.min(...housesIn(s.g)) && cur().cash >= houseCost(i);
+  }
+  const canSell = i => SQ[i].t === 'street' && G.own[i] === G.turn && G.houses[i] > 0 && G.houses[i] >= Math.max(...housesIn(SQ[i].g));
+  const canMortgage = i => G.own[i] === G.turn && !G.mort[i] && (SQ[i].t !== 'street' || housesIn(SQ[i].g).every(h => !h));
+  const canPayOff = i => G.phase !== 'debt' && G.own[i] === G.turn && G.mort[i] && cur().cash >= payOffCost(i);
+  const tradable = p => SQ.map((s, i) => i).filter(i => G.own[i] === p && (SQ[i].t !== 'street' || housesIn(SQ[i].g).every(h => !h)));
+
+  /* ---------- Money ---------- */
+  // to: a player, -1 the bank, -2 the Day Off pot, -3 every other player (per each)
+  function give(from, to, amount, per) {
+    if (from >= 0) G.players[from].cash -= amount;
+    if (to >= 0) G.players[to].cash += amount;
+    else if (to === -2) G.pot += amount;
+    else if (to === -3) alive().forEach(k => { if (k !== from) G.players[k].cash += per; });
+  }
+  function pay(amount, to, after, per) {
+    if (amount <= 0) return cont(after);
+    if (cur().cash >= amount) { give(G.turn, to, amount, per); return cont(after); }
+    G.debt = { amount, to, after, per: per || 0 };
+    G.phase = 'debt';
+    U.busy = false;
+    say(cur().name + ' owes ' + money(amount) + (to >= 0 ? ' to ' + G.players[to].name : '') + ' but only has ' + money(cur().cash) + '.');
+    sfx.buzz(0.5);
+    save(); render();
+  }
+  function cont(after) {
+    if (after === 'jailmove') return step(1, G.dice[0] + G.dice[1], () => land({}));
+    done();
+  }
+  function settle() {
+    const d = G.debt;
+    if (G.phase !== 'debt' || !d || cur().cash < d.amount) return;
+    give(G.turn, d.to, d.amount, d.per);
+    say(cur().name + ' paid ' + money(d.amount) + '.');
+    G.debt = null;
+    sfx.pop();
+    cont(d.after);
+  }
+  function done() {
+    G.phase = 'done';
+    U.busy = false;
+    if (cur().jail) G.again = false;
+    save(); render();
+  }
+
+  /* ---------- Moving ---------- */
+  function step(dir, n, after) {
+    const p = cur();
+    U.busy = true;
+    G.phase = 'moving';
+    render();
+    let left = n;
+    const tick = () => {
+      p.pos = (p.pos + dir + 40) % 40;
+      if (dir > 0 && p.pos === 0) { p.cash += SALARY; say(p.name + ' passed Start and collected ' + money(SALARY) + '.'); sfx.ding(); }
+      else sfx.tick(dir > 0 ? 1300 : 900);
+      render();
+      if (--left > 0) setTimeout(tick, 130);
+      else setTimeout(() => { U.busy = false; after(); }, 180);
+    };
+    setTimeout(tick, 130);
+  }
+  function moveTo(target, after) {
+    const n = (target - cur().pos + 40) % 40;
+    if (!n) return after();
+    step(1, n, after);
+  }
+  function land(o) {
+    const p = cur(), i = p.pos, s = SQ[i];
+    if (buyable(i)) {
+      const owner = G.own[i];
+      if (owner < 0) {
+        G.phase = 'buy';
+        say(p.name + ' landed on ' + s.name + '. It is for sale at ' + money(s.price) + '.');
+        save(); render();
+        return;
+      }
+      if (owner === G.turn) { say(p.name + ' landed on ' + s.name + ', which they own.'); return done(); }
+      if (G.mort[i]) { say(p.name + ' landed on ' + s.name + '. It is mortgaged, so there is no rent.'); return done(); }
+      let roll = G.dice[0] + G.dice[1], rolled = '';
+      if (s.t === 'utility' && o.card) {
+        G.dice = [d6(), d6()];
+        roll = G.dice[0] + G.dice[1];
+        rolled = ' rolled ' + roll + ' and';
+      }
+      const due = rent(i, roll, o.card);
+      say(p.name + rolled + ' owes ' + G.players[owner].name + ' ' + money(due) + ' rent for ' + s.name + '.');
+      sfx.tone(330, { type: 'triangle', dur: 0.25, gain: 0.12 });
+      return pay(due, owner, 'done');
+    }
+    if (s.t === 'tax') {
+      say(p.name + ' landed on ' + s.name + ' and pays ' + money(s.amount) + '.');
+      return pay(s.amount, fineTo(), 'done');
+    }
+    if (s.t === 'dip' || s.t === 'post') return draw(s.t);
+    if (s.t === 'gotojail') return toJail(p.name + ' landed on Go to jail.');
+    if (s.t === 'dayoff') {
+      if (G.pot > 0) {
+        const pot = G.pot;
+        p.cash += pot;
+        G.pot = 0;
+        say(p.name + ' took a day off and collected the pot of ' + money(pot) + '.');
+        sfx.win();
+      } else say(p.name + ' is taking a day off.');
+      return done();
+    }
+    say(i === JAIL ? p.name + ' is just visiting the jail.' : p.name + ' landed on Start.');
+    done();
+  }
+  function toJail(text) {
+    const p = cur();
+    p.pos = JAIL;
+    p.jail = 1;
+    G.again = false;
+    G.dbl = 0;
+    say(text);
+    sfx.buzz(0.6);
+    P.vibrate([120, 60, 120]);
+    done();
+  }
+
+  /* ---------- Dice ---------- */
+  const FACES = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+  const dieHTML = n => '<span class="die" role="img" aria-label="' + n + '">' + Array.from({ length: 9 }, (_, k) => '<span' + (FACES[n].includes(k) ? ' class="on"' : '') + '></span>').join('') + '</span>';
+  function shake(after) {
+    let n = 0;
+    const id = setInterval(() => {
+      const el = document.getElementById('dice');
+      if (el) el.innerHTML = dieHTML(d6()) + dieHTML(d6());
+      sfx.tick(700 + Math.random() * 500);
+      if (++n >= 8) { clearInterval(id); after(); }
+    }, 70);
+  }
+  function roll() {
+    if (U.busy || !(G.phase === 'roll' || (G.phase === 'done' && G.again && !cur().jail))) return;
+    const p = cur();
+    U.busy = true;
+    G.phase = 'moving';
+    render();
+    P.vibrate(25);
+    shake(() => {
+      const a = d6(), b = d6(), total = a + b, dbl = a === b;
+      G.dice = [a, b];
+      if (p.jail) {
+        G.again = false;
+        if (dbl) {
+          p.jail = 0;
+          say(p.name + ' rolled a double and walked out of jail.');
+          return step(1, total, () => land({}));
+        }
+        p.jail++;
+        if (p.jail > 3) {
+          p.jail = 0;
+          say(p.name + ' missed a third time, so pays ' + money(FINE) + ' and moves ' + total + '.');
+          return pay(FINE, fineTo(), 'jailmove');
+        }
+        say(p.name + ' rolled ' + total + '. No double, so they stay in jail.');
+        return done();
+      }
+      if (dbl) {
+        G.dbl++;
+        if (G.dbl >= 3) return toJail(p.name + ' rolled three doubles in a row and went to jail.');
+        G.again = true;
+      } else G.again = false;
+      say(p.name + ' rolled ' + total + (dbl ? '. A double, so they roll again after this.' : '.'));
+      step(1, total, () => land({}));
+    });
+  }
+  function payOut() {
+    const p = cur();
+    if (G.phase !== 'roll' || !p.jail || p.cash < FINE || U.busy) return;
+    give(G.turn, fineTo(), FINE);
+    p.jail = 0;
+    say(p.name + ' paid ' + money(FINE) + ' to leave jail. Now roll.');
+    sfx.pop(); save(); render();
+  }
+  function useFree() {
+    const p = cur();
+    if (G.phase !== 'roll' || !p.jail || !p.free.length || U.busy) return;
+    const kind = p.free.shift();
+    G.decks[kind].push(B[kind].findIndex(c => c.a === 'free'));
+    p.jail = 0;
+    say(p.name + ' used a get out of jail free card. Now roll.');
+    sfx.pop(); save(); render();
+  }
+  function nextPlayer() {
+    G.dbl = 0;
+    G.again = false;
+    let n = G.turn;
+    do { n = (n + 1) % G.players.length; } while (G.players[n].out);
+    G.turn = n;
+    G.phase = 'roll';
+    say(cur().name + "'s turn." + (cur().jail ? ' They are in jail.' : ''));
+    sfx.pop();
+    save(); render();
+  }
+
+  /* ---------- Buying and auctions ---------- */
+  function buy() {
+    const p = cur(), i = p.pos, s = SQ[i];
+    if (G.phase !== 'buy' || p.cash < s.price) return;
+    p.cash -= s.price;
+    G.own[i] = G.turn;
+    say(p.name + ' bought ' + s.name + ' for ' + money(s.price) + '.');
+    sfx.pop();
+    P.vibrate(20);
+    done();
+  }
+  function passOn() {
+    if (G.phase !== 'buy') return;
+    const i = cur().pos;
+    if (G.settings.auction === 'yes') {
+      G.auction = { sq: i, bid: 0, lead: -1, out: [] };
+      G.phase = 'auction';
+      say(SQ[i].name + ' goes up for auction.');
+      U.view = 'auction';
+      save(); render();
+      return;
+    }
+    say(cur().name + ' left ' + SQ[i].name + ' with the bank.');
+    done();
+  }
+  const bidders = () => alive().filter(k => !G.auction.out.includes(k));
+  function raise(k, inc) {
+    const a = G.auction;
+    if (!a || a.out.includes(k) || G.players[k].cash < a.bid + inc) return;
+    a.bid += inc;
+    a.lead = k;
+    sfx.tick(1500);
+    save(); render();
+  }
+  function fold(k) {
+    const a = G.auction;
+    if (!a || a.out.includes(k) || k === a.lead) return;
+    a.out.push(k);
+    const left = bidders();
+    if (!left.length || (left.length === 1 && left[0] === a.lead)) return closeAuction();
+    save(); render();
+  }
+  function closeAuction() {
+    const a = G.auction;
+    if (!a) return;
+    if (a.lead >= 0) {
+      G.players[a.lead].cash -= a.bid;
+      G.own[a.sq] = a.lead;
+      say(G.players[a.lead].name + ' won ' + SQ[a.sq].name + ' at auction for ' + money(a.bid) + '.');
+      sfx.win();
+    } else say('Nobody bid, so ' + SQ[a.sq].name + ' stays with the bank.');
+    G.auction = null;
+    U.view = 'board';
+    done();
+  }
+
+  /* ---------- Cards ---------- */
+  function draw(kind) {
+    const deck = G.decks[kind];
+    const idx = deck.shift();
+    if (B[kind][idx].a !== 'free') deck.push(idx);
+    G.card = { kind, idx };
+    G.phase = 'card';
+    say(cur().name + ' picked up a ' + (kind === 'dip' ? 'Lucky Dip' : 'Post') + ' card.');
+    sfx.whoosh();
+    save(); render();
+  }
+  function applyCard() {
+    if (G.phase !== 'card' || !G.card || U.busy) return;
+    const p = cur(), kind = G.card.kind, c = B[kind][G.card.idx];
+    G.card = null;
+    if (c.a === 'money') {
+      if (c.amount > 0) { p.cash += c.amount; say(p.name + ' collected ' + money(c.amount) + '.'); sfx.ding(); return done(); }
+      say(p.name + ' pays ' + money(-c.amount) + '.');
+      return pay(-c.amount, fineTo(), 'done');
+    }
+    if (c.a === 'each') {
+      const others = alive().filter(k => k !== G.turn);
+      if (c.amount > 0) {
+        let got = 0;
+        others.forEach(k => { const take = Math.min(G.players[k].cash, c.amount); G.players[k].cash -= take; got += take; });
+        p.cash += got;
+        say(p.name + ' collected ' + money(got) + ' from the other players.');
+        sfx.ding();
+        return done();
+      }
+      say(p.name + ' pays ' + money(-c.amount) + ' to each player.');
+      return pay(-c.amount * others.length, -3, 'done', -c.amount);
+    }
+    if (c.a === 'move') return moveTo(c.to, () => land({}));
+    if (c.a === 'back') return step(-1, c.n, () => land({}));
+    if (c.a === 'nearest') {
+      const list = c.kind === 'station' ? STATIONS : UTILS;
+      const next = list.find(k => k > p.pos);
+      return moveTo(next === undefined ? list[0] : next, () => land({ card: true }));
+    }
+    if (c.a === 'jail') return toJail(p.name + ' went straight to jail.');
+    if (c.a === 'free') { p.free.push(kind); say(p.name + ' kept the get out of jail free card.'); sfx.pop(); return done(); }
+    if (c.a === 'repairs') {
+      let h = 0, hotels = 0;
+      SQ.forEach((s, i) => { if (G.own[i] === G.turn && G.houses[i]) { if (G.houses[i] === 5) hotels++; else h += G.houses[i]; } });
+      const total = h * c.house + hotels * c.hotel;
+      if (!total) { say(p.name + ' has no houses, so there is nothing to pay.'); return done(); }
+      say(p.name + ' pays ' + money(total) + ' for repairs.');
+      return pay(total, fineTo(), 'done');
+    }
+    done();
+  }
+
+  /* ---------- Houses and mortgages ---------- */
+  function build(i) {
+    if (!canManage() || !canBuild(i)) return;
+    cur().cash -= houseCost(i);
+    G.houses[i]++;
+    say(cur().name + ' built ' + (G.houses[i] === 5 ? 'a hotel' : 'a house') + ' on ' + SQ[i].name + '.');
+    sfx.pop();
+    save(); render();
+  }
+  function sell(i) {
+    if (!canManage() || !canSell(i)) return;
+    const hotel = G.houses[i] === 5, back = houseCost(i) / 2;
+    G.houses[i]--;
+    cur().cash += back;
+    say(cur().name + ' sold ' + (hotel ? 'a hotel' : 'a house') + ' on ' + SQ[i].name + ' for ' + money(back) + '.');
+    sfx.tick();
+    save(); render();
+  }
+  function mortgage(i) {
+    if (!canManage() || !canMortgage(i)) return;
+    G.mort[i] = true;
+    cur().cash += mortValue(i);
+    say(cur().name + ' mortgaged ' + SQ[i].name + ' for ' + money(mortValue(i)) + '.');
+    sfx.tick();
+    save(); render();
+  }
+  function payOff(i) {
+    if (!canManage() || !canPayOff(i)) return;
+    cur().cash -= payOffCost(i);
+    G.mort[i] = false;
+    say(cur().name + ' paid off the mortgage on ' + SQ[i].name + '.');
+    sfx.pop();
+    save(); render();
+  }
+
+  /* ---------- Trades ---------- */
+  function offerText(k, list, cash, free) {
+    const bits = list.map(i => SQ[i].name);
+    if (cash) bits.push(money(cash));
+    if (free) bits.push(free === 1 ? 'a get out of jail free card' : free + ' get out of jail free cards');
+    return bits.length ? P.listNames(bits) : 'nothing';
+  }
+  function tradeEmpty(t) { return !t.give.length && !t.get.length && !t.giveCash && !t.getCash && !t.giveFree && !t.getFree; }
+  function doTrade() {
+    const t = U.trade, me = G.turn, them = t.other, A = G.players[me], Bp = G.players[them];
+    const okNow = t.give.every(i => G.own[i] === me) && t.get.every(i => G.own[i] === them) &&
+      A.cash >= t.giveCash && Bp.cash >= t.getCash && A.free.length >= t.giveFree && Bp.free.length >= t.getFree;
+    if (!okNow) { U.trade = null; U.view = 'board'; render(); return; }
+    t.give.forEach(i => { G.own[i] = them; });
+    t.get.forEach(i => { G.own[i] = me; });
+    A.cash += t.getCash - t.giveCash;
+    Bp.cash += t.giveCash - t.getCash;
+    for (let n = 0; n < t.giveFree; n++) Bp.free.push(A.free.shift());
+    for (let n = 0; n < t.getFree; n++) A.free.push(Bp.free.shift());
+    say(A.name + ' and ' + Bp.name + ' made a deal.');
+    U.trade = null;
+    U.view = 'board';
+    sfx.win();
+    save(); render();
+  }
+
+  /* ---------- Bust and the end ---------- */
+  function bust() {
+    if (G.phase !== 'debt') return;
+    const d = G.debt, p = G.turn, me = cur();
+    SQ.forEach((s, i) => { if (G.own[i] === p && G.houses[i]) { me.cash += G.houses[i] * houseCost(i) / 2; G.houses[i] = 0; } });
+    if (d.to >= 0) {
+      const to = G.players[d.to];
+      to.cash += me.cash;
+      SQ.forEach((s, i) => { if (G.own[i] === p) G.own[i] = d.to; });
+      to.free.push(...me.free);
+      say(me.name + ' went bust. ' + to.name + ' takes everything they had.');
+    } else {
+      SQ.forEach((s, i) => { if (G.own[i] === p) { G.own[i] = -1; G.mort[i] = false; } });
+      me.free.forEach(kind => G.decks[kind].push(B[kind].findIndex(c => c.a === 'free')));
+      say(me.name + ' went bust. Their streets go back to the bank.');
+    }
+    me.cash = 0;
+    me.free = [];
+    me.jail = 0;
+    me.out = true;
+    G.debt = null;
+    U.confirm = '';
+    sfx.lose();
+    if (alive().length <= 1) return finish('bust');
+    U.view = 'board';
+    nextPlayer();
+  }
+  function finish(how) {
+    G.over = true;
+    G.phase = 'over';
+    G.end = how;
+    G.ranks = G.players.map((x, i) => ({ i, w: x.out ? -1 : worth(i) })).sort((a, b) => b.w - a.w).map(r => r.i);
+    say(G.players[G.ranks[0]].name + ' wins.');
+    U.view = 'over';
+    U.confirm = '';
+    sfx.win();
+    P.confetti({ colors: ['#f6c344', '#e63946', '#2563eb', '#16a34a', '#fbf6e9'] });
+    save(); render();
+  }
+  function newGame(names) {
+    const deck = kind => P.shuffle(B[kind].map((c, i) => i));
+    G = {
+      v: 1,
+      players: names.map((name, i) => ({ name, color: COLORS[i], cash: settings.cash, pos: 0, jail: 0, free: [], out: false })),
+      own: SQ.map(() => -1), houses: SQ.map(() => 0), mort: SQ.map(() => false),
+      turn: 0, phase: 'roll', dice: [5, 2], dbl: 0, again: false, msg: '', log: [],
+      decks: { dip: deck('dip'), post: deck('post') }, pot: 0, debt: null, card: null, auction: null,
+      over: false, settings: Object.assign({}, settings)
+    };
+    say(names[0] + ' goes first. Tap Roll.');
+    save();
+  }
+
+  /* ---------- Board drawing ---------- */
+  const sv = d => '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
+  const ICON = {
+    start: sv('<path d="M20 12H5M11 6l-6 6 6 6"/>'),
+    jail: sv('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9.3 4v16M14.7 4v16"/>'),
+    dayoff: sv('<path d="M4 10h12v3a6 6 0 0 1-6 6 6 6 0 0 1-6-6z"/><path d="M16 11h1.5a2.5 2.5 0 0 1 0 5H15M8 3.5v3M12 3.5v3"/>'),
+    gotojail: sv('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>'),
+    dip: '<b class="q dip">?</b>',
+    post: sv('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3.5 7l8.5 6 8.5-6"/>'),
+    station: sv('<rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 10.5h14M8.5 21l2-4M15.5 21l-2-4"/><path d="M8.5 13.8h.01M15.5 13.8h.01" stroke-width="3"/>'),
+    wifi: sv('<path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M9 16a4.5 4.5 0 0 1 6 0"/><path d="M12 19.6h.01" stroke-width="3"/>'),
+    drop: sv('<path d="M12 3s6.5 7 6.5 11a6.5 6.5 0 0 1-13 0C5.5 10 12 3 12 3z"/>'),
+    tax: '<b class="q">£</b>'
+  };
+  function spot(i) {
+    if (i === 0) return [11, 11, 'corner s-b'];
+    if (i < 10) return [11, 11 - i, 's-b'];
+    if (i === 10) return [11, 1, 'corner s-b'];
+    if (i < 20) return [21 - i, 1, 's-l'];
+    if (i === 20) return [1, 1, 'corner s-t'];
+    if (i < 30) return [1, i - 19, 's-t'];
+    if (i === 30) return [1, 11, 'corner s-t'];
+    return [i - 29, 11, 's-r'];
+  }
+  function houseWord(h) { return h === 5 ? 'a hotel' : P.plural(h, 'house'); }
+  function sqLabel(i, here) {
+    const s = SQ[i], o = G.own[i];
+    let t = s.name;
+    if (o >= 0) t += ', owned by ' + G.players[o].name + (G.mort[i] ? ', mortgaged' : '') + (G.houses[i] ? ', ' + houseWord(G.houses[i]) : '');
+    else if (buyable(i)) t += ', for sale at ' + money(s.price);
+    if (here.length) t += '. Here: ' + P.listNames(here.map(k => G.players[k].name));
+    return t;
+  }
+  function sqHTML(i) {
+    const s = SQ[i], [r, c, side] = spot(i), o = G.own[i];
+    let inner = '';
+    if (s.t === 'street') {
+      const h = G.houses[i];
+      inner += '<span class="band" style="--g:' + GR[s.g].color + '">' + (h === 5 ? '<i class="hotel"></i>' : '<i></i>'.repeat(h)) + '</span>';
+    } else inner += '<span class="ico">' + ICON[s.t === 'utility' ? (i === 12 ? 'wifi' : 'drop') : s.t] + '</span>';
+    if (o >= 0) inner += '<span class="own" style="--o:' + G.players[o].color + '"></span>';
+    const here = alive().filter(k => G.players[k].pos === i);
+    if (here.length) inner += '<span class="toks' + (here.length > 3 ? ' many' : '') + '">' + here.map(k => '<span class="tok' + (k === G.turn ? ' me' : '') + '" style="--c:' + G.players[k].color + '"></span>').join('') + '</span>';
+    return '<button type="button" class="sq ' + side + (G.mort[i] ? ' mort' : '') + (here.includes(G.turn) ? ' land' : '') + '" style="grid-row:' + r + ';grid-column:' + c + '" data-sq="' + i + '" aria-label="' + esc(sqLabel(i, here)) + '">' + inner + '</button>';
+  }
+  function boardHTML() {
+    const p = cur();
+    return '<div class="board">' + SQ.map((s, i) => sqHTML(i)).join('') +
+      '<div class="mid"><div class="logo" aria-hidden="true">Landlord</div>' +
+      '<div class="who-now"><span class="tok" style="--c:' + p.color + '"></span><span>' + esc(p.name) + '</span></div>' +
+      '<div class="dice" id="dice">' + dieHTML(G.dice[0]) + dieHTML(G.dice[1]) + '</div>' +
+      '<p class="msg" aria-live="polite">' + esc(G.msg) + '</p>' +
+      (G.settings.pot === 'yes' ? '<p class="pot">Day Off pot ' + money(G.pot) + '</p>' : '') + '</div></div>';
+  }
+  function inkOn(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const L = [n >> 16, (n >> 8) & 255, n & 255].map(v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    const lum = 0.2126 * L[0] + 0.7152 * L[1] + 0.0722 * L[2];
+    return 1.05 / (lum + 0.05) >= (lum + 0.05) / 0.061 ? '#ffffff' : '#1d1b16';
+  }
+
+  /* ---------- Views ---------- */
+  const ART = '<svg class="hero-art" viewBox="0 0 260 130" aria-hidden="true"><rect x="8" y="8" width="244" height="114" rx="14" fill="#fbf6e9" stroke="#0a1c28" stroke-width="5"/><g stroke="#0a1c28" stroke-width="4"><path d="M8 40h244" fill="none"/><rect x="8" y="8" width="44" height="32" fill="#d63a33"/><rect x="52" y="8" width="44" height="32" fill="#f2c12e"/><rect x="96" y="8" width="44" height="32" fill="#2e9e5b"/><rect x="140" y="8" width="44" height="32" fill="#2b4fa3"/><rect x="184" y="8" width="68" height="32" fill="#de4f9a"/></g><path d="M40 112V80l26-22 26 22v32z" fill="#2e9e5b" stroke="#0a1c28" stroke-width="5" stroke-linejoin="round"/><rect x="58" y="90" width="16" height="22" fill="#fbf6e9" stroke="#0a1c28" stroke-width="4"/><g transform="rotate(-10 150 86)"><rect x="128" y="64" width="44" height="44" rx="9" fill="#fff" stroke="#0a1c28" stroke-width="4"/><circle cx="140" cy="76" r="4" fill="#0a1c28"/><circle cx="160" cy="96" r="4" fill="#0a1c28"/><circle cx="150" cy="86" r="4" fill="#0a1c28"/></g><g transform="rotate(14 210 88)"><rect x="188" y="66" width="44" height="44" rx="9" fill="#fff" stroke="#0a1c28" stroke-width="4"/><circle cx="200" cy="78" r="4" fill="#0a1c28"/><circle cx="220" cy="78" r="4" fill="#0a1c28"/><circle cx="200" cy="98" r="4" fill="#0a1c28"/><circle cx="220" cy="98" r="4" fill="#0a1c28"/></g></svg>';
+  const RULES = `<details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Put the phone where everyone can see it. Take turns to roll the dice and move round the board.</li>
+        <li>Land on a street, station or utility nobody owns and you can buy it. If you say no, it goes to auction.</li>
+        <li>Land on someone else's and you pay them rent. Rent doubles when they own the whole colour set.</li>
+        <li>Own a whole colour set to build houses, then a hotel. Build evenly across the set. Tap My streets to build.</li>
+        <li>Short of money? Sell houses back for half what they cost, or mortgage what you own.</li>
+        <li>Pass Start to collect ${money(SALARY)}. Roll a double to go again, but a third double in a row sends you to jail.</li>
+        <li>To leave jail, roll a double, pay ${money(FINE)} or use a free card. After three missed tries you pay and move.</li>
+        <li>Run out of money and you are bust. The last player left wins. In a hurry? Count up from the menu and the richest player wins.</li>
+      </ol>
+    </details>`;
+
+  function viewSetup() {
+    const going = G && !G.over;
+    return P.header() + `
+    <h1 class="title">Landlord</h1>
+    ${ART}
+    <p class="tagline">Roll the dice, buy streets, build houses and collect rent until everyone else goes bust. The phone is the board, the bank and the dice.</p>
+    ${going ? `<div class="panel resume"><p><b>A game is still going.</b></p><p class="hint">${esc(cur().name)} is up next, with ${P.plural(alive().length, 'player')} still in.</p><div class="actions"><button class="btn btn-main btn-big" type="button" data-act="resume">Carry on</button></div></div>` : ''}
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Starting money</span>${P.seg('cash', [[1000, money(1000)], [1500, money(1500)], [2000, money(2000)]], settings.cash)}</div>
+      <div class="sec"><span class="label">Streets nobody buys</span>${P.seg('auction', [['yes', 'Go to auction'], ['no', 'Stay with the bank']], settings.auction)}</div>
+      <div class="sec"><span class="label">Day Off pot</span>${P.seg('pot', [['no', 'No pot'], ['yes', 'Fines go in a pot']], settings.pot)}<p class="hint">With a pot, taxes and fines pile up and whoever lands on Day Off takes it all.</p></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">${going ? 'Start a new game' : 'Start the game'}</button></div>
+      ${going ? '<p class="hint">A new game replaces the saved one.</p>' : ''}
+    </div>
+    ${RULES}`;
+  }
+  function actionsHTML() {
+    const p = cur(), ph = G.phase;
+    if (U.confirm === 'bust') {
+      const d = G.debt;
+      return `<div class="confirm"><p>Give up? ${d && d.to >= 0 ? esc(G.players[d.to].name) + ' takes everything you have' : 'Your streets go back to the bank'} and you are out of the game.</p>
+        <div class="actions center"><button class="btn btn-alt" type="button" data-act="unconfirm">Keep trying</button><button class="btn btn-main" type="button" data-act="bust-yes">Yes, I am out</button></div></div>`;
+    }
+    if (ph === 'moving') return '<div class="acts"><button class="btn btn-main btn-big" type="button" disabled>Moving</button></div>';
+    if (ph === 'roll') {
+      if (p.jail) {
+        return `<p class="note">${esc(p.name)} is in jail. Roll a double to get out, or pay ${money(FINE)} first.</p>
+          <div class="acts"><button class="btn btn-main btn-big" type="button" data-act="roll">Roll for a double</button>
+          <button class="btn btn-alt" type="button" data-act="fine"${p.cash < FINE ? ' disabled' : ''}>Pay ${money(FINE)}</button>
+          ${p.free.length ? '<button class="btn btn-alt" type="button" data-act="free">Use free card</button>' : ''}</div>`;
+      }
+      return '<div class="acts"><button class="btn btn-main btn-big" type="button" data-act="roll">Roll</button></div>';
+    }
+    if (ph === 'buy') {
+      const s = SQ[p.pos], short = p.cash < s.price;
+      return `<div class="acts"><button class="btn btn-main btn-big" type="button" data-act="buy"${short ? ' disabled' : ''}>Buy for ${money(s.price)}</button>
+        <button class="btn btn-alt" type="button" data-act="pass">${G.settings.auction === 'yes' ? 'Auction it' : 'Leave it'}</button></div>
+        ${short ? `<p class="note">You have ${money(p.cash)}. Mortgage something in My streets to raise the money, or let it go.</p>` : ''}
+        <div class="acts"><button class="textbtn" type="button" data-act="deed" data-sq="${p.pos}">See the card for ${esc(s.name)}</button></div>`;
+    }
+    if (ph === 'card') {
+      const c = B[G.card.kind][G.card.idx];
+      return `<div class="cardx ${G.card.kind}"><small>${G.card.kind === 'dip' ? 'Lucky Dip' : 'Post'}</small><p>${esc(c.text)}</p></div>
+        <div class="acts"><button class="btn btn-main btn-big" type="button" data-act="card">OK</button></div>`;
+    }
+    if (ph === 'debt') {
+      const d = G.debt, enough = p.cash >= d.amount;
+      return `<p class="owe">${esc(p.name)} owes <b>${money(d.amount)}</b>${d.to >= 0 ? ' to ' + esc(G.players[d.to].name) : ''} and has <b>${money(p.cash)}</b>. ${enough ? 'Pay it to carry on.' : 'Sell houses or mortgage streets in My streets to raise the money.'}</p>
+        <div class="acts"><button class="btn btn-main btn-big" type="button" data-act="settle"${enough ? '' : ' disabled'}>Pay ${money(d.amount)}</button>
+        <button class="btn btn-alt" type="button" data-act="bust">Give up</button></div>`;
+    }
+    if (ph === 'done') {
+      if (G.again && !p.jail) return '<div class="acts"><button class="btn btn-main btn-big" type="button" data-act="roll">Roll again</button></div>';
+      return '<div class="acts"><button class="btn btn-main btn-big" type="button" data-act="end">End turn</button></div>';
+    }
+    return '';
+  }
+  function viewBoard() {
+    const ok = canManage();
+    return P.header() + boardHTML() + actionsHTML() +
+      `<div class="sub"><button class="chip-btn" type="button" data-act="manage"${ok ? '' : ' disabled'}>My streets</button>
+      <button class="chip-btn" type="button" data-act="trade"${ok && alive().length > 1 ? '' : ' disabled'}>Trade</button>
+      <button class="chip-btn" type="button" data-act="menu">Menu</button></div>
+      <ol class="plist">${G.players.map((x, k) => {
+        const n = G.own.filter(o => o === k).length;
+        return `<li class="${k === G.turn ? 'now' : ''}${x.out ? ' out' : ''}"><span class="tok" style="--c:${x.color}"></span><span class="nm">${esc(x.name)}</span>` +
+          (x.out ? '<span class="tag">Bust</span>' : (x.jail ? '<span class="tag">In jail</span>' : '') + (x.free.length ? '<span class="tag">Free card</span>' : '') +
+          `<span class="small">${P.plural(n, 'deed')}</span><span class="cash">${money(x.cash)}</span>`) + '</li>';
+      }).join('')}</ol>
+      <details class="log" open><summary>What happened</summary><ol>${G.log.slice(0, 8).map(t => '<li>' + esc(t) + '</li>').join('')}</ol></details>`;
+  }
+  function manageButtons(i) {
+    if (G.own[i] !== G.turn || !canManage()) return '';
+    const b = [];
+    if (canBuild(i)) b.push(`<button class="mini" type="button" data-act="build" data-sq="${i}">${G.houses[i] === 4 ? 'Build a hotel' : 'Build a house'} ${money(houseCost(i))}</button>`);
+    if (canSell(i)) b.push(`<button class="mini alt" type="button" data-act="sell" data-sq="${i}">Sell ${G.houses[i] === 5 ? 'the hotel' : 'a house'} +${money(houseCost(i) / 2)}</button>`);
+    if (canMortgage(i)) b.push(`<button class="mini alt" type="button" data-act="mortgage" data-sq="${i}">Mortgage +${money(mortValue(i))}</button>`);
+    if (canPayOff(i)) b.push(`<button class="mini" type="button" data-act="payoff" data-sq="${i}">Pay off ${money(payOffCost(i))}</button>`);
+    return b.length ? '<div class="btns">' + b.join('') + '</div>' : '';
+  }
+  function viewDeed() {
+    const i = U.deed, s = SQ[i], o = G.own[i], g = s.g ? GR[s.g] : null;
+    let kind = 'Square', table = '', foot = '';
+    if (s.t === 'street') {
+      kind = g.name + ' street';
+      const h = G.houses[i], full = o >= 0 && ownsAll(o, s.g);
+      const lines = [['Rent', s.rent[0]], ['With the whole set', s.rent[0] * 2], ['With 1 house', s.rent[1]], ['With 2 houses', s.rent[2]], ['With 3 houses', s.rent[3]], ['With 4 houses', s.rent[4]], ['With a hotel', s.rent[5]]];
+      const now = o < 0 || G.mort[i] ? -1 : h ? h + 1 : full ? 1 : 0;
+      table = '<table class="rents">' + lines.map((l, k) => `<tr${k === now ? ' class="now"' : ''}><td>${l[0]}</td><td>${money(l[1])}</td></tr>`).join('') + '</table>';
+      foot = `<p>Houses cost ${money(g.house)} each. A hotel takes the place of 4 houses.</p><p>Mortgage value ${money(mortValue(i))}.</p>`;
+    } else if (s.t === 'station') {
+      kind = 'Station';
+      const n = o >= 0 ? STATIONS.filter(k => G.own[k] === o).length : 0;
+      table = '<table class="rents">' + [25, 50, 100, 200].map((r, k) => `<tr${k + 1 === n && !G.mort[i] ? ' class="now"' : ''}><td>Owner has ${k + 1} station${k ? 's' : ''}</td><td>${money(r)}</td></tr>`).join('') + '</table>';
+      foot = `<p>Mortgage value ${money(mortValue(i))}.</p>`;
+    } else if (s.t === 'utility') {
+      kind = 'Utility';
+      const both = o >= 0 && UTILS.every(k => G.own[k] === o);
+      table = `<table class="rents"><tr${o >= 0 && !both && !G.mort[i] ? ' class="now"' : ''}><td>Owner has 1 utility</td><td>4 times the dice</td></tr><tr${both && !G.mort[i] ? ' class="now"' : ''}><td>Owner has both</td><td>10 times the dice</td></tr></table>`;
+      foot = `<p>Mortgage value ${money(mortValue(i))}.</p>`;
+    } else {
+      const text = {
+        start: `Collect ${money(SALARY)} every time you pass or land here.`,
+        dip: 'Take a Lucky Dip card and do what it says.',
+        post: 'Take a Post card and do what it says.',
+        tax: `Pay ${money(s.amount || 0)}${G.settings.pot === 'yes' ? ' into the Day Off pot.' : ' to the bank.'}`,
+        jail: `Just visiting, unless you were sent here. To get out, roll a double, pay ${money(FINE)} or use a free card.`,
+        dayoff: G.settings.pot === 'yes' ? `Land here to take the pot. It holds ${money(G.pot)} right now.` : 'Nothing happens here. Have a rest.',
+        gotojail: `Go straight to jail. You do not pass Start or collect ${money(SALARY)}.`
+      }[s.t];
+      foot = '<p>' + esc(text) + '</p>';
+    }
+    const owner = buyable(i) ? (o >= 0 ? `<p class="who-owns">Owned by ${esc(G.players[o].name)}${G.mort[i] ? '. Mortgaged.' : '.'}${G.houses[i] ? ' It has ' + houseWord(G.houses[i]) + '.' : ''}</p>` : `<p class="who-owns">For sale at ${money(s.price)}.</p>`) : '';
+    const head = g ? ` style="--g:${g.color};--gi:${inkOn(g.color)}"` : '';
+    return P.header() + `<section class="center">
+      <div class="deed"><div class="deed-head"${head}><small>${esc(kind)}</small><b>${esc(s.name)}</b></div>
+      <div class="deed-body">${table}${foot}${owner}${manageButtons(i)}</div></div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="back">Back</button></div></section>`;
+  }
+  function viewManage() {
+    const me = cur();
+    const mine = SQ.map((s, i) => i).filter(i => G.own[i] === G.turn);
+    const rows = mine.map(i => {
+      const s = SQ[i], color = s.g ? GR[s.g].color : '#8796a1';
+      let status;
+      if (G.mort[i]) status = 'Mortgaged. Pay ' + money(payOffCost(i)) + ' to clear it.';
+      else if (s.t === 'street') status = (G.houses[i] ? houseWord(G.houses[i]).replace(/^./, m => m.toUpperCase()) + '. ' : '') + 'Rent ' + money(rent(i, 7)) + '.' + (ownsAll(G.turn, s.g) ? '' : ' Own every ' + GR[s.g].name.toLowerCase() + ' street to build.');
+      else if (s.t === 'station') status = 'Rent ' + money(rent(i)) + '.';
+      else status = 'Rent is ' + (UTILS.every(k => G.own[k] === G.turn) ? '10' : '4') + ' times the dice.';
+      return `<div class="mrow" style="--g:${color}"><i></i><div class="in"><b>${esc(s.name)}</b><small>${esc(status)}</small>${manageButtons(i)}</div></div>`;
+    }).join('');
+    return P.header() + `<section>
+      <p class="eyebrow">${esc(me.name)} has ${money(me.cash)}</p>
+      <h2 class="big">My streets</h2>
+      ${G.phase === 'debt' ? `<p class="lead">You owe ${money(G.debt.amount)}. Sell houses or mortgage what you own to raise it.</p>` : ''}
+      ${mine.length ? `<div class="mgr">${rows}</div>` : '<p class="lead">You do not own anything yet. Buy a street when you land on one.</p>'}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="board">Back to the board</button></div></section>`;
+  }
+  function viewTradePick() {
+    const others = alive().filter(k => k !== G.turn);
+    return P.header() + `<section class="center"><p class="eyebrow">Trade</p><h2 class="big">Trade with who?</h2>
+      <div class="pick">${others.map(k => `<button type="button" data-act="trade-with" data-p="${k}">${esc(G.players[k].name)}</button>`).join('')}</div>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="board">Back to the board</button></div></section>`;
+  }
+  function tradeSide(side, k) {
+    const t = U.trade, x = G.players[k], list = tradable(k), sel = t[side];
+    const cash = side === 'give' ? t.giveCash : t.getCash, free = side === 'give' ? t.giveFree : t.getFree;
+    return `<div class="tside"><h3>${esc(x.name)} gives</h3>
+      ${list.length ? `<div class="tlist">${list.map(i => `<button type="button" class="tchip" data-act="tsel" data-side="${side}" data-sq="${i}" aria-pressed="${sel.includes(i)}" style="--g:${SQ[i].g ? GR[SQ[i].g].color : '#8796a1'}"><i></i>${esc(SQ[i].name)}${G.mort[i] ? ' (mortgaged)' : ''}</button>`).join('')}</div>` : '<p class="empty">Nothing that can be traded. Streets with houses have to be cleared first.</p>'}
+      <div class="stepper"><span>Cash</span><button class="mini alt" type="button" data-act="tcash" data-side="${side}" data-d="-50" aria-label="50 less">-50</button><button class="mini alt" type="button" data-act="tcash" data-side="${side}" data-d="-10" aria-label="10 less">-10</button><output>${money(cash)}</output><button class="mini alt" type="button" data-act="tcash" data-side="${side}" data-d="10" aria-label="10 more">+10</button><button class="mini alt" type="button" data-act="tcash" data-side="${side}" data-d="50" aria-label="50 more">+50</button></div>
+      ${x.free.length ? `<div class="stepper"><span>Free cards</span><button class="mini alt" type="button" data-act="tfree" data-side="${side}" data-d="-1">-1</button><output>${free}</output><button class="mini alt" type="button" data-act="tfree" data-side="${side}" data-d="1">+1</button></div>` : ''}
+    </div>`;
+  }
+  function viewTrade() {
+    const t = U.trade, them = G.players[t.other];
+    return P.header() + `<section><p class="eyebrow">Trade</p><h2 class="big">${esc(cur().name)} and ${esc(them.name)}</h2>
+      <p class="lead">Pick what changes hands, then pass the phone so ${esc(them.name)} can say yes or no.</p>
+      ${tradeSide('give', G.turn)}${tradeSide('get', t.other)}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="board">Cancel</button><button class="btn btn-main btn-big" type="button" data-act="offer"${tradeEmpty(t) ? ' disabled' : ''}>Offer to ${esc(them.name)}</button></div></section>`;
+  }
+  function viewTradeAsk() {
+    const t = U.trade, me = cur(), them = G.players[t.other];
+    return P.header() + `<section class="center pass"><p class="eyebrow">Trade offer</p><h2 class="big">Pass to ${esc(them.name)}</h2>
+      <p class="lead">${esc(me.name)} gives ${esc(offerText(G.turn, t.give, t.giveCash, t.giveFree))}.</p>
+      <p class="lead">${esc(them.name)} gives ${esc(offerText(t.other, t.get, t.getCash, t.getFree))}.</p>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="trade-no">No thanks</button><button class="btn btn-main btn-big" type="button" data-act="trade-yes">Deal</button></div></section>`;
+  }
+  function viewAuction() {
+    const a = G.auction, s = SQ[a.sq];
+    const rows = alive().map(k => {
+      const x = G.players[k], out = a.out.includes(k), lead = a.lead === k;
+      const bids = out ? '<span class="tag">Out</span>' : '<div class="btns">' + [10, 50, 100].map(inc => `<button class="mini" type="button" data-act="bid" data-p="${k}" data-inc="${inc}"${x.cash < a.bid + inc ? ' disabled' : ''}>Bid ${money(a.bid + inc)}</button>`).join('') + (lead ? '' : `<button class="mini alt" type="button" data-act="fold" data-p="${k}">Out</button>`) + '</div>';
+      return `<li class="${lead ? 'lead' : ''}"><span class="tok" style="--c:${x.color}"></span><span class="nm">${esc(x.name)}</span><span class="cash">${money(x.cash)}</span>${bids}</li>`;
+    }).join('');
+    return P.header() + `<section class="center"><p class="eyebrow">Auction</p><h2 class="big">${esc(s.name)}</h2>
+      <p class="lead">${a.lead >= 0 ? `Top bid ${money(a.bid)} from ${esc(G.players[a.lead].name)}.` : 'No bids yet. Anyone can bid, starting at ' + money(10) + '.'} The bank price is ${money(s.price)}.</p>
+      <ul class="auc">${rows}</ul>
+      <div class="actions center">${a.lead >= 0 ? `<button class="btn btn-main btn-big" type="button" data-act="sold">Sold to ${esc(G.players[a.lead].name)}</button>` : '<button class="btn btn-alt" type="button" data-act="sold">Nobody wants it</button>'}</div>
+      <div class="actions center"><button class="textbtn" type="button" data-act="deed" data-sq="${a.sq}">See the card for ${esc(s.name)}</button></div></section>`;
+  }
+  function viewMenu() {
+    return P.header() + `<section class="center"><p class="eyebrow">Menu</p><h2 class="big">Game menu</h2>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="board">Back to the board</button></div>
+      ${U.confirm === 'count' ? `<div class="confirm"><p>Finish now? Money, streets and houses all count, and the richest player wins.</p><div class="actions center"><button class="btn btn-alt" type="button" data-act="unconfirm">Keep playing</button><button class="btn btn-main" type="button" data-act="count-yes">Count up</button></div></div>`
+        : `<div class="confirm"><p>Short on time? Count up now and the richest player wins.</p><div class="actions center"><button class="btn btn-alt" type="button" data-act="count">Count up and finish</button></div></div>`}
+      ${RULES}
+      <div class="actions center"><button class="textbtn" type="button" data-act="quit">Back to setup. The game stays saved.</button></div></section>`;
+  }
+  function viewOver() {
+    const first = G.players[G.ranks[0]];
+    return P.header() + `<section class="center"><p class="eyebrow">${G.end === 'count' ? 'Counted up' : 'Game over'}</p><h2 class="big">${esc(first.name)} wins</h2>
+      <ol class="worth">${G.ranks.map((k, n) => { const x = G.players[k]; return `<li class="${n === 0 ? 'top' : ''}"><span>${esc(x.name)}</span><b>${x.out ? 'Bust' : money(worth(k))}</b></li>`; }).join('')}</ol>
+      <p class="note">Worth counts money, the price of every street and station, and what the houses cost.</p>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div></section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, board: viewBoard, deed: viewDeed, manage: viewManage, tradepick: viewTradePick, trade: viewTrade, tradeask: viewTradeAsk, auction: viewAuction, menu: viewMenu, over: viewOver };
+  function render() {
+    if (U.view !== 'setup' && !G) U.view = 'setup';
+    if (G && U.view !== 'setup') {
+      if (G.over) U.view = 'over';
+      else if (G.phase === 'auction' && U.view !== 'deed') U.view = 'auction';
+    }
+    app.innerHTML = (VIEWS[U.view] || viewSetup)();
+    if (U.view === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 2, max: 6 });
+    if (U.view !== shown) window.scrollTo(0, 0);
+    shown = U.view;
+  }
+
+  document.addEventListener('click', e => {
+    const tile = e.target.closest('.sq[data-sq]');
+    if (tile && G) { U.deed = Number(tile.getAttribute('data-sq')); U.back = U.view; U.view = 'deed'; render(); return; }
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    const sq = Number(b.getAttribute('data-sq')), k = Number(b.getAttribute('data-p'));
+    switch (b.getAttribute('data-act')) {
+      case 'start': {
+        const names = editor.get();
+        if (names.length < 2) return;
+        sfx.unlock();
+        P.stayAwake();
+        newGame(names);
+        U.view = 'board';
+        render();
+        break;
+      }
+      case 'resume': sfx.unlock(); P.stayAwake(); U.view = 'board'; render(); break;
+      case 'roll': roll(); break;
+      case 'fine': payOut(); break;
+      case 'free': useFree(); break;
+      case 'buy': buy(); break;
+      case 'pass': passOn(); break;
+      case 'card': applyCard(); break;
+      case 'settle': settle(); break;
+      case 'bust': U.confirm = 'bust'; render(); break;
+      case 'bust-yes': bust(); break;
+      case 'unconfirm': U.confirm = ''; render(); break;
+      case 'end': if (G.phase === 'done' && !U.busy) nextPlayer(); break;
+      case 'deed': U.deed = sq; U.back = U.view; U.view = 'deed'; render(); break;
+      case 'back': U.view = U.back || 'board'; render(); break;
+      case 'board': U.view = 'board'; U.trade = null; U.confirm = ''; render(); break;
+      case 'manage': if (canManage()) { U.view = 'manage'; render(); } break;
+      case 'build': build(sq); break;
+      case 'sell': sell(sq); break;
+      case 'mortgage': mortgage(sq); break;
+      case 'payoff': payOff(sq); break;
+      case 'trade': if (canManage()) { U.view = 'tradepick'; render(); } break;
+      case 'trade-with': U.trade = { other: k, give: [], get: [], giveCash: 0, getCash: 0, giveFree: 0, getFree: 0 }; U.view = 'trade'; render(); break;
+      case 'tsel': {
+        const list = U.trade[b.getAttribute('data-side')];
+        const at = list.indexOf(sq);
+        if (at >= 0) list.splice(at, 1); else list.push(sq);
+        render();
+        break;
+      }
+      case 'tcash': {
+        const side = b.getAttribute('data-side'), keyName = side === 'give' ? 'giveCash' : 'getCash';
+        const max = G.players[side === 'give' ? G.turn : U.trade.other].cash;
+        U.trade[keyName] = Math.max(0, Math.min(max, U.trade[keyName] + Number(b.getAttribute('data-d'))));
+        render();
+        break;
+      }
+      case 'tfree': {
+        const side = b.getAttribute('data-side'), keyName = side === 'give' ? 'giveFree' : 'getFree';
+        const max = G.players[side === 'give' ? G.turn : U.trade.other].free.length;
+        U.trade[keyName] = Math.max(0, Math.min(max, U.trade[keyName] + Number(b.getAttribute('data-d'))));
+        render();
+        break;
+      }
+      case 'offer': if (!tradeEmpty(U.trade)) { U.view = 'tradeask'; render(); } break;
+      case 'trade-yes': doTrade(); break;
+      case 'trade-no': say(G.players[U.trade.other].name + ' said no to the deal.'); U.trade = null; U.view = 'board'; save(); render(); break;
+      case 'bid': raise(k, Number(b.getAttribute('data-inc'))); break;
+      case 'fold': fold(k); break;
+      case 'sold': closeAuction(); break;
+      case 'menu': U.view = 'menu'; U.confirm = ''; render(); break;
+      case 'count': U.confirm = 'count'; render(); break;
+      case 'count-yes': finish('count'); break;
+      case 'quit': U.view = 'setup'; U.confirm = ''; render(); break;
+      case 'setup': G = null; save(); U.view = 'setup'; render(); break;
+      case 'again': {
+        const names = G.players.map(x => x.name);
+        newGame(names);
+        U.view = 'board';
+        render();
+        break;
+      }
+    }
+  });
+  document.addEventListener('change', e => {
+    const n = e.target.name;
+    if (n === 'cash') settings.cash = Number(e.target.value);
+    else if (n === 'auction' || n === 'pot') settings[n] = e.target.value;
+    else return;
+    save();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
