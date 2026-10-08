@@ -8,6 +8,10 @@ Party games for one phone and a room full of people. Open the site on one phone,
 | --- | --- | --- |
 | Fast Money | 2 to 8 | A host reads survey questions while everyone else wears headphones, then reveals the board. |
 | Landlord | 2 to 6 | Buy streets, build houses and collect rent. The phone is the board, the bank and the dice, and the game saves as you go. |
+| Flock | 3 to 16 | Everyone answers the same question in secret. The most popular answer scores, and a lone answer earns the black sheep. |
+| Shade Hunt | 3 to 10 | One player sees a secret colour and gives a one-word clue. Everyone hunts for it on a grid of 240 shades. |
+| Liar's Dice | 2 to 6 | Peek at your own dice, then bid on what is under every cup. Raise the bid or call liar. |
+| Farkle | 1 to 10 | Roll six dice, keep what scores and push your luck. Scoring rules live in `farkle/scoring.js`. |
 | Impostor | 3 to 12 | Everyone reads a secret word except the impostor. One-word clues, then a vote. |
 | Werewolf | 5 to 16 | The phone deals secret roles and reads the night out loud, so nobody has to sit out as narrator. |
 | Tune In | 2 to 12 | One player sees a hidden target on a dial and gives a clue. The rest turn the dial. |

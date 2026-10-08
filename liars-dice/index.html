@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Liar's Dice | Pass the Phone</title>
+<meta name="description" content="Everyone peeks at their own dice, then bids on what is under all the cups. Raise the bid or call liar. Lose a challenge and you lose a die.">
+<meta name="theme-color" content="#2e1b10">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@500;700;800&family=Pirata+One&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a pirate tavern table. Dark wood, parchment cards, gold for the bid. */
+:root{
+  color-scheme:dark;
+  --bg:#2a180e;
+  --fg:#f3e6c8;
+  --muted:#d6c39d;
+  --panel:rgba(243,230,200,.08);
+  --line:rgba(243,230,200,.3);
+  --field:#f3e6c8;
+  --field-ink:#2a1708;
+  --accent:#e8b64c;
+  --accent-ink:#2a1708;
+  --accent-shadow:#8a6214;
+  --focus:#e8b64c;
+  --f-display:"Pirata One","Georgia",serif;
+  --f-body:"Alegreya Sans",system-ui,-apple-system,sans-serif;
+}
+body{background:repeating-linear-gradient(90deg,rgba(0,0,0,.08) 0 3px,transparent 3px 46px),linear-gradient(180deg,#331e12,#1d110a)}
+.title{font-size:clamp(56px,15vw,112px);color:var(--accent);text-shadow:0 4px 0 #120a05}
+.big{font-size:clamp(40px,10vw,68px)}
+.btn,.label,.howto summary{font-family:var(--f-body);font-weight:800}
+.btn{font-size:21px}
+.label{font-size:19px}
+.hero{display:block;width:min(64vw,250px);height:auto;margin-top:8px}
+.die{display:inline-grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);width:var(--s,48px);aspect-ratio:1;padding:15%;border-radius:22%;background:#f7f1e3;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18),0 2px 5px rgba(0,0,0,.4);vertical-align:middle}
+.die span{display:block;width:80%;aspect-ratio:1;place-self:center;border-radius:50%}
+.die span.on{background:#2a1708}
+.die.hit{background:#ffd76a;box-shadow:0 0 0 3px #e8b64c,0 2px 5px rgba(0,0,0,.4)}
+.die.wild{background:#ffe9a8}
+.dice{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.cupcard .reveal-front{background:radial-gradient(circle at 50% 30%,#6b3d22,#3d2213 70%);box-shadow:inset 0 0 0 3px var(--accent);color:var(--fg)}
+.cupcard .reveal-front b{font-family:var(--f-display);font-weight:400;font-size:clamp(30px,8vw,40px)}
+.cupcard .reveal-front small{font-size:17px;color:var(--muted)}
+.cupcard .reveal-back{background:#f3e6c8;color:#2a1708}
+.cupcard .reveal-back small{font-weight:800;font-size:16px}
+.cup{width:76px;height:auto}
+.bidcard{max-width:420px;margin:18px auto 0;padding:16px 18px;border-radius:18px;background:#f3e6c8;color:#2a1708;text-align:center;box-shadow:0 12px 26px -14px rgba(0,0,0,.7)}
+.bidcard small{display:block;font-weight:800;font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:#6b4423}
+.bidcard b{display:block;margin-top:2px;font-family:var(--f-body);font-weight:800;font-size:clamp(36px,10vw,54px);line-height:1.05}
+.bidcard p{margin:6px 0 0;font-size:17px}
+.table{list-style:none;margin:16px auto 0;padding:0;display:grid;gap:6px;max-width:440px;text-align:left}
+.table li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--panel);font-weight:700}
+.table li.now{box-shadow:inset 0 0 0 2px var(--accent)}
+.table li.out span:first-child{color:var(--muted);text-decoration:line-through}
+.table li span:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
+.table li small{font-size:16px;color:var(--muted)}
+.maker{max-width:440px;margin:16px auto 0;padding:14px;border-radius:18px;background:var(--panel);text-align:center}
+.faces{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:10px}
+.face{display:grid;place-items:center;padding:4px;border:0;border-radius:14px;background:transparent;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
+.face[aria-pressed="true"]{background:rgba(232,182,76,.25);box-shadow:inset 0 0 0 3px var(--accent)}
+.face:disabled{opacity:.4;cursor:default}
+.qty{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:12px}
+.qty button{width:52px;height:52px;border:0;border-radius:50%;background:transparent;color:var(--fg);box-shadow:inset 0 0 0 2px var(--line);font:800 28px/1 var(--f-body);cursor:pointer}
+.qty button:disabled{opacity:.4;cursor:default}
+.qty output{min-width:2em;font-family:var(--f-body);font-weight:800;font-size:44px;line-height:1}
+.hands{display:grid;gap:10px;max-width:480px;margin:16px auto 0;text-align:left}
+.hand{padding:10px 12px;border-radius:14px;background:var(--panel)}
+.hand b{display:block;margin-bottom:6px;font-size:17px}
+.hand .dice{justify-content:flex-start;gap:6px}
+.count{font-family:var(--f-body);font-weight:800}
+.verdict{margin:8px auto 0;max-width:24em;font-size:20px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.liars';
+  const app = document.getElementById('app');
+  const FACES = ['', 'ones', 'twos', 'threes', 'fours', 'fives', 'sixes'];
+  const WORDS = 'no one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty'.split(' ');
+  const word = n => WORDS[n] || String(n);
+  const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+  const d6 = () => 1 + Math.floor(Math.random() * 6);
+  const dieHTML = (n, cls, size) => '<span class="die' + (cls ? ' ' + cls : '') + '" role="img" aria-label="' + n + '"' + (size ? ' style="--s:' + size + 'px"' : '') + '>' + Array.from({ length: 9 }, (_, k) => '<span' + (PIPS[n].includes(k) ? ' class="on"' : '') + '></span>').join('') + '</span>';
+  const bidText = b => word(b.q) + ' ' + b.f + (b.q === 1 ? '' : 's');
+  const CUP = '<svg class="cup" viewBox="0 0 80 80" aria-hidden="true"><path d="M14 66 22 14h36l8 52z" fill="#8a4b25" stroke="#120a05" stroke-width="5" stroke-linejoin="round"/><path d="M19 30h42M17 48h46" stroke="#120a05" stroke-width="4"/><rect x="8" y="64" width="64" height="10" rx="4" fill="#6b3a1c" stroke="#120a05" stroke-width="5"/></svg>';
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ dice: 5, wild: 'yes' }, saved.settings || {}),
+    screen: 'setup', players: [], turn: 0, bid: null, q: 1, f: 2, order: [], at: 0, peeker: null, peeked: false, result: null, round: 0, starter: 0
+  };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+
+  const wild = () => S.settings.wild === 'yes';
+  const alive = () => S.players.map((p, i) => i).filter(i => S.players[i].n > 0);
+  const totalDice = () => S.players.reduce((a, p) => a + p.n, 0);
+  const nextAlive = i => { let n = i; do { n = (n + 1) % S.players.length; } while (S.players[n].n <= 0); return n; };
+  const valid = (q, f) => q >= 1 && q <= totalDice() && (!wild() || f !== 1) && (!S.bid || q > S.bid.q || (q === S.bid.q && f > S.bid.f));
+  function minQty(f) { if (!S.bid) return 1; return f > S.bid.f ? S.bid.q : S.bid.q + 1; }
+
+  /* ---------- Rounds ---------- */
+  function newRound(starter) {
+    S.round++;
+    S.players.forEach(p => { p.dice = Array.from({ length: p.n }, d6).sort((a, b) => a - b); });
+    S.bid = null;
+    S.turn = starter;
+    S.starter = starter;
+    S.order = [];
+    let k = starter;
+    do { S.order.push(k); k = nextAlive(k); } while (k !== starter);
+    S.at = 0;
+    S.peeker = null;
+    S.f = wild() ? 2 : 1;
+    S.q = 1;
+    S.screen = 'pass';
+    sfx.noise({ filter: 'bandpass', freq: 900, dur: 0.5, gain: 0.25, q: 0.7 });
+    render();
+  }
+  function placeBid() {
+    if (!valid(S.q, S.f)) return;
+    S.bid = { q: S.q, f: S.f, by: S.turn };
+    sfx.tick(900 + S.q * 40);
+    S.turn = nextAlive(S.turn);
+    S.q = Math.min(totalDice(), minQty(S.f));
+    render();
+  }
+  function challenge() {
+    if (!S.bid) return;
+    const b = S.bid, caller = S.turn;
+    let count = 0;
+    S.players.forEach(p => p.dice.forEach(v => { if (v === b.f || (wild() && v === 1 && b.f !== 1)) count++; }));
+    const stands = count >= b.q;
+    const loser = stands ? caller : b.by;
+    S.players[loser].n--;
+    S.result = { bid: b, caller, count, stands, loser, out: S.players[loser].n === 0 };
+    S.screen = 'reveal';
+    render();
+    sfx.whoosh();
+    setTimeout(() => (stands ? sfx.buzz(0.5) : sfx.ding()), 300);
+    P.vibrate([60, 40, 60]);
+  }
+  function afterReveal() {
+    const left = alive();
+    if (left.length <= 1) {
+      S.screen = 'final';
+      render();
+      sfx.win();
+      P.confetti({ colors: ['#e8b64c', '#f3e6c8', '#8a4b25', '#ffffff'] });
+      return;
+    }
+    const L = S.result.loser;
+    newRound(S.players[L].n > 0 ? L : nextAlive(L));
+  }
+
+  /* ---------- Views ---------- */
+  function tableHTML() {
+    return '<ol class="table">' + S.players.map((p, i) => '<li class="' + (i === S.turn && S.screen === 'table' ? 'now' : '') + (p.n ? '' : ' out') + '"><span>' + esc(p.name) + '</span><small>' + (p.n ? P.plural(p.n, 'die', 'dice') : 'Out') + '</small></li>').join('') + '</ol>';
+  }
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Liar's Dice</h1>
+    <svg class="hero" viewBox="0 0 250 110" aria-hidden="true"><path d="M26 92 36 22h48l10 70z" fill="#8a4b25" stroke="#120a05" stroke-width="5" stroke-linejoin="round"/><path d="M32 44h56M29 68h62" stroke="#120a05" stroke-width="4"/><rect x="18" y="90" width="84" height="12" rx="5" fill="#6b3a1c" stroke="#120a05" stroke-width="5"/><g transform="rotate(-12 150 70)"><rect x="124" y="46" width="48" height="48" rx="10" fill="#f7f1e3" stroke="#120a05" stroke-width="4"/><circle cx="136" cy="58" r="4.5" fill="#2a1708"/><circle cx="160" cy="82" r="4.5" fill="#2a1708"/><circle cx="148" cy="70" r="4.5" fill="#2a1708"/></g><g transform="rotate(10 210 74)"><rect x="186" y="50" width="48" height="48" rx="10" fill="#f7f1e3" stroke="#120a05" stroke-width="4"/><circle cx="198" cy="62" r="4.5" fill="#2a1708"/><circle cx="222" cy="62" r="4.5" fill="#2a1708"/><circle cx="198" cy="86" r="4.5" fill="#2a1708"/><circle cx="222" cy="86" r="4.5" fill="#2a1708"/><circle cx="210" cy="74" r="4.5" fill="#2a1708"/></g></svg>
+    <p class="tagline">Everyone peeks at their own dice, then bids on what is under all the cups. Raise the bid or call liar.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Dice each</span>${P.seg('dice', [[3, '3'], [4, '4'], [5, '5']], S.settings.dice)}</div>
+      <div class="sec"><span class="label">Ones are wild</span>${P.seg('wild', [['yes', 'Yes'], ['no', 'No']], S.settings.wild)}<p class="hint">Wild ones count as any number, so nobody bids on ones.</p></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Shake the cups</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>The phone rolls everyone's dice. Pass it round so each player can peek at their own.</li>
+        <li>On your turn, bid how many dice of one number you think are on the whole table, like "four fives". Your own dice count too.</li>
+        <li>The next player must raise: more dice, or the same amount of a higher number. Or they call liar.</li>
+        <li>When someone calls liar, every cup is lifted. If there are at least as many as the bid said, the caller loses a die. If not, the bidder does.</li>
+        <li>Lose all your dice and you are out. The last pirate with dice wins.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    const p = S.players[S.order[S.at]];
+    return P.header() + P.passScreen({ eyebrow: 'Round ' + S.round + '. Peek ' + (S.at + 1) + ' of ' + S.order.length, name: p.name, lead: 'Only ' + esc(p.name) + ' looks under the cup.', act: 'me' });
+  }
+  function cupHTML(p, done) {
+    return `
+    <section class="center">
+      <p class="eyebrow">${esc(p.name)}, these are your dice</p>
+      <div class="reveal cupcard" id="cup" tabindex="0" role="button" aria-label="Press and hold to lift your cup">
+        <div class="reveal-in">
+          <div class="reveal-face reveal-front">${CUP}<b>Hold to lift your cup</b><small>Let go to hide them again.</small></div>
+          <div class="reveal-face reveal-back"><div class="dice">${p.dice.map(v => dieHTML(v, wild() && v === 1 ? 'wild' : '', 56)).join('')}</div>${wild() ? '<small>Ones are wild</small>' : ''}</div>
+        </div>
+      </div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="${done}" id="doneBtn"${S.peeked ? '' : ' disabled'}>${done === 'seen' && S.at < S.order.length - 1 ? 'Done. Pass it on' : 'Done'}</button></div>
+    </section>`;
+  }
+  function viewPeek() { return P.header() + cupHTML(S.players[S.order[S.at]], 'seen'); }
+  function viewTable() {
+    const me = S.players[S.turn], faces = wild() ? [2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6];
+    const ok = valid(S.q, S.f);
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Round ${S.round}. ${totalDice()} dice on the table</p>
+      <div class="bidcard">${S.bid ? `<small>${esc(S.players[S.bid.by].name)} bid</small><b>${bidText(S.bid)}</b><p>${esc(me.name)}, raise it or call liar.</p>` : `<small>No bid yet</small><b>${esc(me.name)}</b><p>Open the bidding.</p>`}</div>
+      <div class="maker">
+        <span class="label">${esc(me.name)}'s bid</span>
+        <div class="faces" role="radiogroup" aria-label="Number on the dice">${faces.map(f => `<button type="button" class="face" data-act="face" data-f="${f}" aria-pressed="${S.f === f}" aria-label="${FACES[f]}">${dieHTML(f, '', 40)}</button>`).join('')}</div>
+        <div class="qty"><button type="button" data-act="qty" data-d="-1" aria-label="One fewer"${S.q <= 1 ? ' disabled' : ''}>-</button><output aria-live="polite">${S.q}</output><button type="button" data-act="qty" data-d="1" aria-label="One more"${S.q >= totalDice() ? ' disabled' : ''}>+</button></div>
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="bid"${ok ? '' : ' disabled'}>Bid ${bidText({ q: S.q, f: S.f })}</button>${S.bid ? '<button class="btn btn-alt btn-big" type="button" data-act="liar">Liar!</button>' : ''}</div>
+        ${!ok && S.bid ? `<p class="hint">Bid more than ${bidText(S.bid)}: more dice, or the same amount of a higher number.</p>` : ''}
+      </div>
+      ${tableHTML()}
+      <div class="actions center"><button class="textbtn" type="button" data-act="check">Check my dice again</button></div>
+    </section>`;
+  }
+  function viewCheck() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Check your dice</p>
+      <h2 class="big">Who is peeking?</h2>
+      <div class="pick">${alive().map(i => `<button type="button" data-act="checkwho" data-i="${i}">${esc(S.players[i].name)}</button>`).join('')}</div>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="table">Back to the table</button></div>
+    </section>`;
+  }
+  function viewRecheck() { return P.header() + cupHTML(S.players[S.peeker], 'table'); }
+  function viewReveal() {
+    const R = S.result, b = R.bid, caller = S.players[R.caller].name, bidder = S.players[b.by].name, loser = S.players[R.loser].name;
+    const hands = S.players.map((p, i) => p.dice.length ? `<div class="hand"><b>${esc(p.name)}</b><div class="dice">${p.dice.map(v => dieHTML(v, v === b.f ? 'hit' : (wild() && v === 1 && b.f !== 1 ? 'hit' : ''), 38)).join('')}</div></div>` : '').join('');
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(caller)} called liar on ${esc(bidder)}</p>
+      <h2 class="big count">${bidText({ q: R.count, f: b.f })}</h2>
+      <p class="verdict">${esc(bidder)} bid ${bidText(b)}${wild() && b.f !== 1 ? ', counting wild ones' : ''}. ${R.stands ? 'The bid was good.' : 'The bid was a lie.'} ${esc(loser)} loses a die${R.out ? ' and is out' : ''}.</p>
+      <div class="hands">${hands}</div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="nextRound">${alive().length <= 1 ? 'See who won' : 'Next round'}</button></div>
+      ${tableHTML()}
+    </section>`;
+  }
+  function viewFinal() {
+    const w = S.players[alive()[0]];
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Last pirate standing</p>
+      <h2 class="big">${esc(w.name)} wins</h2>
+      <p class="lead">With ${P.plural(w.n, 'die', 'dice')} left.</p>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, peek: viewPeek, table: viewTable, check: viewCheck, recheckPass: () => P.header() + P.passScreen({ eyebrow: 'Check your dice', name: S.players[S.peeker].name, lead: 'Only ' + esc(S.players[S.peeker].name) + ' looks.', act: 'recheck' }), recheck: viewRecheck, reveal: viewReveal, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 2, max: 6 });
+    const cup = document.getElementById('cup');
+    if (cup) P.holdToReveal(cup, () => { if (!S.peeked) { S.peeked = true; const d = document.getElementById('doneBtn'); if (d) d.disabled = false; } sfx.tick(600); });
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+  function begin(names) {
+    S.players = names.map(name => ({ name, n: S.settings.dice, dice: [] }));
+    S.round = 0;
+    newRound(Math.floor(Math.random() * S.players.length));
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': sfx.unlock(); P.stayAwake(); begin(editor.get()); break;
+      case 'me': S.peeked = false; S.screen = 'peek'; render(); break;
+      case 'seen':
+        S.at++;
+        S.screen = S.at >= S.order.length ? 'table' : 'pass';
+        if (S.screen === 'table') S.q = Math.min(totalDice(), minQty(S.f));
+        render();
+        break;
+      case 'face': {
+        S.f = Number(b.getAttribute('data-f'));
+        if (!valid(S.q, S.f)) S.q = Math.min(totalDice(), minQty(S.f));
+        sfx.tick(1400);
+        render();
+        break;
+      }
+      case 'qty': S.q = Math.max(1, Math.min(totalDice(), S.q + Number(b.getAttribute('data-d')))); render(); break;
+      case 'bid': placeBid(); break;
+      case 'liar': challenge(); break;
+      case 'check': S.screen = 'check'; render(); break;
+      case 'checkwho': S.peeker = Number(b.getAttribute('data-i')); S.screen = 'recheckPass'; render(); break;
+      case 'recheck': S.peeked = false; S.screen = 'recheck'; render(); break;
+      case 'table': S.screen = 'table'; render(); break;
+      case 'nextRound': afterReveal(); break;
+      case 'again': begin(S.players.map(p => p.name)); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.name === 'dice') { S.settings.dice = Number(e.target.value); persist(); }
+    if (e.target.name === 'wild') { S.settings.wild = e.target.value; persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

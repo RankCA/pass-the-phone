@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Farkle | Pass the Phone</title>
+<meta name="description" content="Roll six dice, keep the ones that score and push your luck. Roll nothing worth keeping and you lose everything from that turn.">
+<meta name="theme-color" content="#f2b632">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&family=Sora:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a mustard diner table with cherry-red buttons and big chunky dice. */
+:root{
+  color-scheme:light;
+  --bg:#f2b632;
+  --fg:#2a1d05;
+  --muted:#4d3a12;
+  --panel:#fff6dc;
+  --line:rgba(42,29,5,.28);
+  --field:#ffffff;
+  --field-ink:#2a1d05;
+  --accent:#c62828;
+  --accent-ink:#ffffff;
+  --accent-shadow:#7a1414;
+  --btn2:#fff6dc;
+  --focus:#2a1d05;
+  --f-display:"Luckiest Guy","Arial Black",sans-serif;
+  --f-body:"Sora",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(circle at 20% 0%,rgba(255,255,255,.35),transparent 40%),var(--bg)}
+.title{color:#fff;-webkit-text-stroke:3px var(--fg);paint-order:stroke fill;text-shadow:0 6px 0 var(--fg);letter-spacing:.02em}
+.big{letter-spacing:.01em}
+.btn{font-family:var(--f-display);font-weight:400;letter-spacing:.03em}
+.label,.howto summary{font-family:var(--f-display);font-weight:400;letter-spacing:.03em}
+.hero{display:block;width:min(70vw,260px);height:auto;margin-top:8px}
+.panel{box-shadow:0 6px 0 rgba(42,29,5,.18)}
+.btn:disabled{opacity:1;background:#fff6dc;color:var(--muted);box-shadow:inset 0 0 0 2px var(--line)}
+.die{display:inline-grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);width:var(--s,clamp(40px,12.6vw,60px));aspect-ratio:1;padding:15%;border-radius:22%;background:#fff;box-shadow:inset 0 -4px 0 rgba(0,0,0,.14),0 0 0 3px var(--fg)}
+.die span{display:block;width:80%;aspect-ratio:1;place-self:center;border-radius:50%}
+.die span.on{background:var(--fg)}
+.roll{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:18px}
+.dbtn{padding:0;border:0;border-radius:16px;background:transparent;cursor:pointer;touch-action:manipulation;transition:transform .12s ease}
+.dbtn[aria-pressed="true"]{transform:translateY(-8px)}
+.dbtn[aria-pressed="true"] .die{background:#ffe08a;box-shadow:inset 0 -4px 0 rgba(0,0,0,.14),0 0 0 4px var(--accent)}
+.dbtn:disabled{cursor:default}
+.kept{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:10px}
+.kept .die{--s:34px;box-shadow:0 0 0 2px var(--fg)}
+.turnbox{max-width:440px;margin:16px auto 0;padding:14px 16px;border-radius:18px;background:var(--panel);text-align:center;box-shadow:0 6px 0 rgba(42,29,5,.18)}
+.turnbox small{display:block;font-weight:800;font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.turnbox b{display:block;font-family:var(--f-display);font-weight:400;font-size:clamp(40px,11vw,60px);line-height:1.05}
+.turnbox p{margin:4px 0 0;font-size:16px}
+.farkle{font-family:var(--f-display);font-size:clamp(60px,18vw,120px);line-height:1;color:var(--accent);text-shadow:0 5px 0 var(--fg)}
+.board{list-style:none;margin:18px auto 0;padding:0;display:grid;gap:6px;max-width:440px;text-align:left}
+.board li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--panel);font-weight:800}
+.board li.now{box-shadow:inset 0 0 0 3px var(--accent)}
+.board li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.board li small{font-weight:600;font-size:14px;color:var(--muted)}
+.board li b{font-family:var(--f-display);font-weight:400;font-size:22px;font-variant-numeric:tabular-nums}
+.ptable{width:100%;border-collapse:collapse;font-size:16px;margin-top:6px}
+.ptable td{padding:5px 2px;border-bottom:1px solid var(--line)}
+.ptable td:last-child{text-align:right;font-weight:800}
+.howto{color:var(--fg)}
+.howto summary{color:var(--fg)}
+.note{margin:10px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
+.final-banner{margin:14px auto 0;max-width:30em;padding:10px 14px;border-radius:14px;background:var(--fg);color:#fff6dc;font-weight:800;font-size:16px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script src="scoring.js?v=97b58d07"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc, F = window.FARKLE;
+  const KEY = 'ptp.farkle';
+  const app = document.getElementById('app');
+  const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+  const d6 = () => 1 + Math.floor(Math.random() * 6);
+  const dieHTML = (n, size) => '<span class="die" role="img" aria-label="' + n + '"' + (size ? ' style="--s:' + size + 'px"' : '') + '>' + Array.from({ length: 9 }, (_, k) => '<span' + (PIPS[n].includes(k) ? ' class="on"' : '') + '></span>').join('') + '</span>';
+  const fmt = n => n.toLocaleString('en-GB');
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ target: 10000, entry: 500 }, saved.settings || {}),
+    screen: 'setup', players: [], turn: 0, dice: [], sel: [], kept: [], pts: 0, phase: 'start', finalBy: -1, busy: false, hot: false
+  };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+
+  const me = () => S.players[S.turn];
+  const picked = () => S.sel.map(i => S.dice[i]);
+  const pickScore = () => F.score(picked());
+  const canBank = () => {
+    const s = pickScore();
+    if (!s) return false;
+    return me().on || S.pts + s >= S.settings.entry;
+  };
+
+  /* ---------- Turn flow ---------- */
+  function startTurn() {
+    S.dice = [];
+    S.sel = [];
+    S.kept = [];
+    S.pts = 0;
+    S.hot = false;
+    S.phase = 'start';
+    S.screen = 'play';
+    render();
+  }
+  function roll(n) {
+    if (S.busy) return;
+    S.busy = true;
+    S.sel = [];
+    S.phase = 'rolling';
+    S.dice = Array.from({ length: n }, d6);
+    render();
+    P.vibrate(20);
+    let k = 0;
+    const id = setInterval(() => {
+      const box = document.getElementById('roll');
+      if (box) box.querySelectorAll('.die').forEach(d => { d.outerHTML = dieHTML(d6()); });
+      sfx.tick(600 + Math.random() * 700);
+      if (++k >= 8) {
+        clearInterval(id);
+        S.dice = Array.from({ length: n }, d6);
+        S.busy = false;
+        if (!F.canScore(S.dice)) {
+          S.phase = 'farkle';
+          sfx.lose();
+          P.vibrate([150, 60, 150]);
+        } else S.phase = 'pick';
+        render();
+      }
+    }, 70);
+  }
+  function keepAndRoll() {
+    const s = pickScore();
+    if (!s || S.busy) return;
+    S.pts += s;
+    S.kept.push(...picked());
+    sfx.pop();
+    if (S.kept.length >= 6) {
+      S.hot = true;
+      S.kept = [];
+      sfx.ding();
+      roll(6);
+    } else {
+      S.hot = false;
+      roll(6 - S.kept.length);
+    }
+  }
+  function bank() {
+    if (!canBank() || S.busy) return;
+    const p = me();
+    const gain = S.pts + pickScore();
+    p.score += gain;
+    p.on = true;
+    p.last = gain;
+    sfx.win();
+    if (S.finalBy < 0 && p.score >= S.settings.target) S.finalBy = S.turn;
+    nextTurn();
+  }
+  function nextTurn() {
+    let n = (S.turn + 1) % S.players.length;
+    if (S.finalBy >= 0 && n === S.finalBy) {
+      S.screen = 'final';
+      render();
+      sfx.win();
+      P.confetti({ colors: ['#c62828', '#ffffff', '#2a1d05', '#ffe08a'] });
+      return;
+    }
+    S.turn = n;
+    startTurn();
+  }
+
+  /* ---------- Views ---------- */
+  function boardHTML() {
+    return '<ol class="board">' + S.players.map((p, i) => '<li class="' + (i === S.turn && S.screen === 'play' ? 'now' : '') + '"><span>' + esc(p.name) + '</span>' + (p.on ? '' : '<small>Not on the board</small>') + '<b>' + fmt(p.score) + '</b></li>').join('') + '</ol>';
+  }
+  const TABLE = `<table class="ptable">
+    <tr><td>Each 1</td><td>100</td></tr><tr><td>Each 5</td><td>50</td></tr>
+    <tr><td>Three 1s</td><td>1,000</td></tr><tr><td>Three of any other number</td><td>100 times it</td></tr>
+    <tr><td>Four of a kind</td><td>1,000</td></tr><tr><td>Five of a kind</td><td>2,000</td></tr><tr><td>Six of a kind</td><td>3,000</td></tr>
+    <tr><td>1 to 6 straight</td><td>1,500</td></tr><tr><td>Three pairs, or four of a kind and a pair</td><td>1,500</td></tr><tr><td>Two sets of three</td><td>2,500</td></tr></table>`;
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Farkle</h1>
+    <svg class="hero" viewBox="0 0 260 110" aria-hidden="true"><g stroke="#2a1d05" stroke-width="5"><rect x="14" y="30" width="62" height="62" rx="14" fill="#fff" transform="rotate(-10 45 61)"/><rect x="98" y="18" width="62" height="62" rx="14" fill="#ffe08a" transform="rotate(6 129 49)"/><rect x="184" y="34" width="62" height="62" rx="14" fill="#fff" transform="rotate(14 215 65)"/></g><g fill="#2a1d05"><circle cx="45" cy="61" r="6"/><circle cx="116" cy="34" r="6"/><circle cx="142" cy="64" r="6"/><circle cx="129" cy="49" r="6"/><circle cx="200" cy="50" r="6"/><circle cx="228" cy="54" r="6"/><circle cx="196" cy="78" r="6"/><circle cx="224" cy="82" r="6"/></g></svg>
+    <p class="tagline">Roll six dice, keep the ones that score and push your luck. Roll nothing worth keeping and you lose everything from that turn.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Play to</span>${P.seg('target', [[5000, '5,000'], [10000, '10,000']], S.settings.target)}</div>
+      <div class="sec"><span class="label">To get on the board</span>${P.seg('entry', [[0, 'Any score'], [500, 'Bank 500 first']], S.settings.entry)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Let's roll</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>On your turn, roll all six dice. Tap the ones that score to keep them, then roll the rest or bank your points.</li>
+        <li>You must keep at least one scoring die every roll. If a roll has nothing that scores, that is a farkle and you lose the points from that turn.</li>
+        <li>Keep all six dice and you have hot dice. Roll all six again and keep adding.</li>
+        <li>When someone reaches the target, everyone else gets one last turn. Highest score wins.</li>
+      </ol>
+      ${TABLE}
+    </details>`;
+  }
+  function viewPlay() {
+    const p = me(), s = pickScore(), ph = S.phase;
+    const left = 6 - S.kept.length - S.sel.length;
+    let main = '';
+    if (ph === 'start') main = `<div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="first">Roll 6 dice</button></div>`;
+    else if (ph === 'farkle') main = `<p class="farkle">Farkle!</p><p class="lead">${S.pts ? 'Nothing to keep, so ' + esc(p.name) + ' loses ' + fmt(S.pts) + ' points from this turn.' : 'Nothing to keep this time.'}</p><div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="pass">Next player</button></div>`;
+    else if (ph === 'pick') {
+      const rollN = left === 0 ? 6 : left;
+      main = `<div class="actions center">
+        <button class="btn btn-main btn-big" type="button" data-act="keep"${s ? '' : ' disabled'}>${s ? 'Keep ' + fmt(s) + ', roll ' + rollN : 'Tap dice to keep'}</button>
+        <button class="btn btn-alt btn-big" type="button" data-act="bank"${canBank() ? '' : ' disabled'}>Bank ${fmt(S.pts + s)}</button></div>
+        ${S.sel.length && !s ? '<p class="note">That set does not score. Every die you keep has to count.</p>' : ''}
+        ${s && !canBank() ? '<p class="note">You need ' + fmt(S.settings.entry) + ' in one turn to get on the board.</p>' : ''}`;
+    }
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(p.name)}'s turn</p>
+      ${S.finalBy >= 0 ? `<p class="final-banner">Last round. ${esc(S.players[S.finalBy].name)} reached ${fmt(S.settings.target)}. Beat ${fmt(S.players[S.finalBy].score)} to win.</p>` : ''}
+      <div class="turnbox"><small>This turn</small><b>${fmt(S.pts + (ph === 'pick' ? s : 0))}</b><p>${esc(p.name)} has ${fmt(p.score)}${S.hot && ph !== 'farkle' ? '. Hot dice!' : ''}</p>
+        ${S.kept.length ? '<div class="kept" aria-label="Kept this turn">' + S.kept.map(v => dieHTML(v, 34)).join('') + '</div>' : ''}</div>
+      ${S.dice.length && ph !== 'start' ? `<div class="roll" id="roll">${S.dice.map((v, i) => `<button type="button" class="dbtn" data-act="tog" data-i="${i}" aria-pressed="${S.sel.includes(i)}"${ph === 'pick' ? '' : ' disabled'} aria-label="Die showing ${v}${S.sel.includes(i) ? ', kept' : ''}">${dieHTML(v)}</button>`).join('')}</div>` : ''}
+      ${main}
+      ${boardHTML()}
+      <details class="howto"><summary>What scores</summary>${TABLE}</details>
+    </section>`;
+  }
+  function viewFinal() {
+    const rows = S.players.slice().sort((a, b) => b.score - a.score);
+    const best = rows[0].score, won = rows.filter(r => r.score === best).map(r => r.name);
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Game over</p>
+      <h2 class="big">${esc(P.listNames(won))} ${won.length > 1 ? 'win' : 'wins'}</h2>
+      <p class="lead">With ${fmt(best)} points.</p>
+      ${boardHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, play: viewPlay, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 1, max: 10 });
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+  function begin(names) {
+    S.players = names.map(name => ({ name, score: 0, on: S.settings.entry === 0, last: 0 }));
+    S.turn = 0;
+    S.finalBy = -1;
+    startTurn();
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': sfx.unlock(); P.stayAwake(); begin(editor.get()); break;
+      case 'first': roll(6); break;
+      case 'tog': {
+        const i = Number(b.getAttribute('data-i'));
+        const at = S.sel.indexOf(i);
+        if (at >= 0) S.sel.splice(at, 1); else S.sel.push(i);
+        sfx.tick(at >= 0 ? 900 : 1500);
+        render();
+        break;
+      }
+      case 'keep': keepAndRoll(); break;
+      case 'bank': bank(); break;
+      case 'pass': nextTurn(); break;
+      case 'again': begin(S.players.map(p => p.name)); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.name === 'target') { S.settings.target = Number(e.target.value); persist(); }
+    if (e.target.name === 'entry') { S.settings.entry = Number(e.target.value); persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

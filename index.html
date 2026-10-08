@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pass the Phone</title>
-<meta name="description" content="25 party games that need one phone: Fast Money, Landlord, Impostor, Werewolf, Don't Say It, Fishbowl, Tune In and more.">
+<meta name="description" content="29 party games that need one phone: Fast Money, Landlord, Impostor, Werewolf, Don't Say It, Fishbowl, Tune In and more.">
 <meta name="theme-color" content="#f6f7fb">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -101,7 +101,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font
         <circle cx="50" cy="84" r="3.5" fill="#15131a"/>
       </svg>
     </h1>
-    <p class="intro">25 party games for one phone and a room full of people. Pick one and pass it around.</p>
+    <p class="intro">29 party games for one phone and a room full of people. Pick one and pass it around.</p>
   </header>
 
   <section class="roster" aria-labelledby="roster-h">
@@ -119,13 +119,14 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font
   </section>
 
   <nav class="filters" id="filters" aria-label="Filter games">
-    <button class="filter" type="button" data-filter="all" aria-pressed="true">All 25 games</button>
+    <button class="filter" type="button" data-filter="all" aria-pressed="true">All 29 games</button>
     <button class="filter" type="button" data-filter="bluff" aria-pressed="false">Bluffing</button>
     <button class="filter" type="button" data-filter="words" aria-pressed="false">Words</button>
     <button class="filter" type="button" data-filter="teams" aria-pressed="false">Teams</button>
     <button class="filter" type="button" data-filter="drawing" aria-pressed="false">Drawing</button>
     <button class="filter" type="button" data-filter="vote" aria-pressed="false">Voting</button>
     <button class="filter" type="button" data-filter="quick" aria-pressed="false">Quick</button>
+    <button class="filter" type="button" data-filter="board" aria-pressed="false">Board and dice</button>
     <button class="filter" type="button" data-filter="two" aria-pressed="false">Two players</button>
   </nav>
   <main class="grid" aria-label="Games" id="grid">
@@ -154,7 +155,7 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font
         <ul class="tags"><li>2 to 8 players</li><li>One host</li></ul>
       </div>
     </a>
-    <a class="card" href="landlord/" data-tags="">
+    <a class="card" href="landlord/" data-tags="board">
       <div class="art" style="--bg:#14384f">
         <svg viewBox="0 0 320 200" aria-hidden="true"><rect x="50" y="24" width="220" height="154" rx="16" fill="#fbf6e9" stroke="#0a1c28" stroke-width="5"/><g stroke="#0a1c28" stroke-width="4"><rect x="50" y="24" width="55" height="34" fill="#d63a33"/><rect x="105" y="24" width="55" height="34" fill="#f2c12e"/><rect x="160" y="24" width="55" height="34" fill="#2e9e5b"/><rect x="215" y="24" width="55" height="34" fill="#2b4fa3"/></g><path d="M80 162v-40l32-28 32 28v40z" fill="#2e9e5b" stroke="#0a1c28" stroke-width="5" stroke-linejoin="round"/><rect x="102" y="134" width="20" height="28" fill="#fbf6e9" stroke="#0a1c28" stroke-width="4"/><g transform="rotate(-10 194 126)"><rect x="170" y="102" width="48" height="48" rx="10" fill="#fff" stroke="#0a1c28" stroke-width="4"/><circle cx="182" cy="114" r="4.5" fill="#0a1c28"/><circle cx="194" cy="126" r="4.5" fill="#0a1c28"/><circle cx="206" cy="138" r="4.5" fill="#0a1c28"/></g><circle cx="244" cy="140" r="22" fill="#f6c344" stroke="#0a1c28" stroke-width="4"/><text x="244" y="150" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-size="28" font-weight="800" fill="#0a1c28">&#163;</text></svg>
       </div>
@@ -162,6 +163,46 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f);font
         <h2>Landlord</h2>
         <p>Roll, buy streets, build houses and collect rent until everyone else goes bust.</p>
         <ul class="tags"><li>2 to 6</li><li>Board game</li></ul>
+      </div>
+    </a>
+    <a class="card" href="flock/" data-tags="words">
+      <div class="art" style="--bg:#dff0ff">
+        <svg viewBox="0 0 320 200" aria-hidden="true"><circle cx="270" cy="40" r="20" fill="#ffd23f"/><rect x="0" y="152" width="320" height="48" fill="#7fc36b"/><g transform="translate(18 66) scale(1.05)"><g fill="#3b3b3b"><rect x="34" y="62" width="8" height="22" rx="3"/><rect x="54" y="64" width="8" height="22" rx="3"/><rect x="72" y="64" width="8" height="22" rx="3"/><rect x="88" y="62" width="8" height="22" rx="3"/></g><path d="M30 50a14 14 0 0 1 10-24 16 16 0 0 1 26-8 16 16 0 0 1 26 6 14 14 0 0 1 8 26 13 13 0 0 1-14 18 16 16 0 0 1-26 2 15 15 0 0 1-24-2 13 13 0 0 1-6-18z" fill="#fff" stroke="#1f2a1b" stroke-width="4"/><ellipse cx="22" cy="42" rx="15" ry="18" fill="#3b3b3b" stroke="#1f2a1b" stroke-width="4"/><circle cx="17" cy="39" r="3" fill="#fff"/><circle cx="26" cy="39" r="3" fill="#fff"/><path d="M8 30q-6-2-8 4M34 28q6-4 9 1" stroke="#1f2a1b" stroke-width="4" fill="none" stroke-linecap="round"/></g><g transform="translate(176 66) scale(1.05)"><g fill="#3b3b3b"><rect x="34" y="62" width="8" height="22" rx="3"/><rect x="54" y="64" width="8" height="22" rx="3"/><rect x="72" y="64" width="8" height="22" rx="3"/><rect x="88" y="62" width="8" height="22" rx="3"/></g><path d="M30 50a14 14 0 0 1 10-24 16 16 0 0 1 26-8 16 16 0 0 1 26 6 14 14 0 0 1 8 26 13 13 0 0 1-14 18 16 16 0 0 1-26 2 15 15 0 0 1-24-2 13 13 0 0 1-6-18z" fill="#fff" stroke="#1f2a1b" stroke-width="4"/><ellipse cx="22" cy="42" rx="15" ry="18" fill="#3b3b3b" stroke="#1f2a1b" stroke-width="4"/><circle cx="17" cy="39" r="3" fill="#fff"/><circle cx="26" cy="39" r="3" fill="#fff"/><path d="M8 30q-6-2-8 4M34 28q6-4 9 1" stroke="#1f2a1b" stroke-width="4" fill="none" stroke-linecap="round"/></g><g transform="translate(108 86) scale(.9)"><g fill="#111"><rect x="34" y="62" width="8" height="22" rx="3"/><rect x="54" y="64" width="8" height="22" rx="3"/><rect x="72" y="64" width="8" height="22" rx="3"/><rect x="88" y="62" width="8" height="22" rx="3"/></g><path d="M30 50a14 14 0 0 1 10-24 16 16 0 0 1 26-8 16 16 0 0 1 26 6 14 14 0 0 1 8 26 13 13 0 0 1-14 18 16 16 0 0 1-26 2 15 15 0 0 1-24-2 13 13 0 0 1-6-18z" fill="#2b2b2b" stroke="#1f2a1b" stroke-width="4"/><ellipse cx="22" cy="42" rx="15" ry="18" fill="#111" stroke="#1f2a1b" stroke-width="4"/><circle cx="17" cy="39" r="3" fill="#fff"/><circle cx="26" cy="39" r="3" fill="#fff"/><path d="M8 30q-6-2-8 4M34 28q6-4 9 1" stroke="#1f2a1b" stroke-width="4" fill="none" stroke-linecap="round"/></g></svg>
+      </div>
+      <div class="meta">
+        <h2>Flock</h2>
+        <p>Everyone answers the same question in secret. Match the most popular answer, but stand alone and you get the black sheep.</p>
+        <ul class="tags"><li>3 to 16</li><li>Think alike</li></ul>
+      </div>
+    </a>
+    <a class="card" href="shade-hunt/" data-tags="words">
+      <div class="art" style="--bg:#17171c">
+        <svg viewBox="0 0 320 200" aria-hidden="true"><rect x="42" y="27" width="26" height="26" rx="4" fill="hsl(0 82% 26%)"/><rect x="72" y="27" width="26" height="26" rx="4" fill="hsl(0 82% 34%)"/><rect x="102" y="27" width="26" height="26" rx="4" fill="hsl(0 82% 42%)"/><rect x="132" y="27" width="26" height="26" rx="4" fill="hsl(0 82% 50%)"/><rect x="162" y="27" width="26" height="26" rx="4" fill="hsl(0 82% 58%)"/><rect x="192" y="27" width="26" height="26" rx="4" fill="hsl(0 82% 66%)"/><rect x="222" y="27" width="26" height="26" rx="4" fill="hsl(0 82% 74%)"/><rect x="252" y="27" width="26" height="26" rx="4" fill="hsl(0 82% 82%)"/><rect x="42" y="57" width="26" height="26" rx="4" fill="hsl(40 82% 26%)"/><rect x="72" y="57" width="26" height="26" rx="4" fill="hsl(40 82% 34%)"/><rect x="102" y="57" width="26" height="26" rx="4" fill="hsl(40 82% 42%)"/><rect x="132" y="57" width="26" height="26" rx="4" fill="hsl(40 82% 50%)"/><rect x="162" y="57" width="26" height="26" rx="4" fill="hsl(40 82% 58%)"/><rect x="192" y="57" width="26" height="26" rx="4" fill="hsl(40 82% 66%)"/><rect x="222" y="57" width="26" height="26" rx="4" fill="hsl(40 82% 74%)"/><rect x="252" y="57" width="26" height="26" rx="4" fill="hsl(40 82% 82%)"/><rect x="42" y="87" width="26" height="26" rx="4" fill="hsl(120 82% 26%)"/><rect x="72" y="87" width="26" height="26" rx="4" fill="hsl(120 82% 34%)"/><rect x="102" y="87" width="26" height="26" rx="4" fill="hsl(120 82% 42%)"/><rect x="132" y="87" width="26" height="26" rx="4" fill="hsl(120 82% 50%)"/><rect x="162" y="87" width="26" height="26" rx="4" fill="hsl(120 82% 58%)"/><rect x="192" y="87" width="26" height="26" rx="4" fill="hsl(120 82% 66%)"/><rect x="222" y="87" width="26" height="26" rx="4" fill="hsl(120 82% 74%)"/><rect x="252" y="87" width="26" height="26" rx="4" fill="hsl(120 82% 82%)"/><rect x="42" y="117" width="26" height="26" rx="4" fill="hsl(200 82% 26%)"/><rect x="72" y="117" width="26" height="26" rx="4" fill="hsl(200 82% 34%)"/><rect x="102" y="117" width="26" height="26" rx="4" fill="hsl(200 82% 42%)"/><rect x="132" y="117" width="26" height="26" rx="4" fill="hsl(200 82% 50%)"/><rect x="162" y="117" width="26" height="26" rx="4" fill="hsl(200 82% 58%)"/><rect x="192" y="117" width="26" height="26" rx="4" fill="hsl(200 82% 66%)"/><rect x="222" y="117" width="26" height="26" rx="4" fill="hsl(200 82% 74%)"/><rect x="252" y="117" width="26" height="26" rx="4" fill="hsl(200 82% 82%)"/><rect x="42" y="147" width="26" height="26" rx="4" fill="hsl(275 82% 26%)"/><rect x="72" y="147" width="26" height="26" rx="4" fill="hsl(275 82% 34%)"/><rect x="102" y="147" width="26" height="26" rx="4" fill="hsl(275 82% 42%)"/><rect x="132" y="147" width="26" height="26" rx="4" fill="hsl(275 82% 50%)"/><rect x="162" y="147" width="26" height="26" rx="4" fill="hsl(275 82% 58%)"/><rect x="192" y="147" width="26" height="26" rx="4" fill="hsl(275 82% 66%)"/><rect x="222" y="147" width="26" height="26" rx="4" fill="hsl(275 82% 74%)"/><rect x="252" y="147" width="26" height="26" rx="4" fill="hsl(275 82% 82%)"/><rect x="160" y="85" width="34" height="34" rx="6" fill="none" stroke="#fff" stroke-width="4"/><circle cx="117" cy="130" r="11" fill="#fff" stroke="#17171c" stroke-width="3"/><circle cx="207" cy="70" r="11" fill="#fff" stroke="#17171c" stroke-width="3"/></svg>
+      </div>
+      <div class="meta">
+        <h2>Shade Hunt</h2>
+        <p>One player sees a secret colour and gives a one-word clue. Everyone hunts for it on a grid of 240 shades.</p>
+        <ul class="tags"><li>3 to 10</li><li>Clues</li></ul>
+      </div>
+    </a>
+    <a class="card" href="liars-dice/" data-tags="bluff board">
+      <div class="art" style="--bg:#2a180e">
+        <svg viewBox="0 0 320 200" aria-hidden="true"><path d="M44 166 58 50h70l14 116z" fill="#8a4b25" stroke="#120a05" stroke-width="6" stroke-linejoin="round"/><path d="M52 92h82M48 128h90" stroke="#120a05" stroke-width="5"/><rect x="32" y="162" width="122" height="16" rx="6" fill="#6b3a1c" stroke="#120a05" stroke-width="6"/><g transform="rotate(-12 200 124)"><rect x="172" y="96" width="56" height="56" rx="12" fill="#f7f1e3" stroke="#120a05" stroke-width="4"/><circle cx="186" cy="110" r="5" fill="#2a1708"/><circle cx="200" cy="124" r="5" fill="#2a1708"/><circle cx="214" cy="138" r="5" fill="#2a1708"/></g><g transform="rotate(10 264 138)"><rect x="236" y="110" width="56" height="56" rx="12" fill="#f7f1e3" stroke="#120a05" stroke-width="4"/><circle cx="250" cy="124" r="5" fill="#2a1708"/><circle cx="278" cy="124" r="5" fill="#2a1708"/><circle cx="264" cy="138" r="5" fill="#2a1708"/><circle cx="250" cy="152" r="5" fill="#2a1708"/><circle cx="278" cy="152" r="5" fill="#2a1708"/></g><g transform="rotate(6 224 68)"><rect x="196" y="40" width="56" height="56" rx="12" fill="#f7f1e3" stroke="#120a05" stroke-width="4"/><circle cx="210" cy="54" r="5" fill="#2a1708"/><circle cx="238" cy="82" r="5" fill="#2a1708"/></g></svg>
+      </div>
+      <div class="meta">
+        <h2>Liar's Dice</h2>
+        <p>Peek at your own dice, then bid on what is under every cup. Raise the bid or call liar.</p>
+        <ul class="tags"><li>2 to 6</li><li>Bluffing</li></ul>
+      </div>
+    </a>
+    <a class="card" href="farkle/" data-tags="board">
+      <div class="art" style="--bg:#f2b632">
+        <svg viewBox="0 0 320 200" aria-hidden="true"><g transform="rotate(-12 68 106)"><rect x="40" y="78" width="56" height="56" rx="12" fill="#ffffff" stroke="#2a1d05" stroke-width="4"/><circle cx="54" cy="92" r="5" fill="#2a1d05"/><circle cx="82" cy="92" r="5" fill="#2a1d05"/><circle cx="68" cy="106" r="5" fill="#2a1d05"/><circle cx="54" cy="120" r="5" fill="#2a1d05"/><circle cx="82" cy="120" r="5" fill="#2a1d05"/></g><g transform="rotate(6 160 78)"><rect x="132" y="50" width="56" height="56" rx="12" fill="#ffe08a" stroke="#2a1d05" stroke-width="4"/><circle cx="160" cy="78" r="5" fill="#2a1d05"/></g><g transform="rotate(14 250 112)"><rect x="222" y="84" width="56" height="56" rx="12" fill="#ffffff" stroke="#2a1d05" stroke-width="4"/><circle cx="236" cy="98" r="5" fill="#2a1d05"/><circle cx="264" cy="98" r="5" fill="#2a1d05"/><circle cx="236" cy="112" r="5" fill="#2a1d05"/><circle cx="264" cy="112" r="5" fill="#2a1d05"/><circle cx="236" cy="126" r="5" fill="#2a1d05"/><circle cx="264" cy="126" r="5" fill="#2a1d05"/></g></svg>
+      </div>
+      <div class="meta">
+        <h2>Farkle</h2>
+        <p>Roll six dice, keep what scores and push your luck. Roll nothing worth keeping and the turn is gone.</p>
+        <ul class="tags"><li>1 to 10</li><li>Dice</li></ul>
       </div>
     </a>
     <a class="card" href="impostor/" data-tags="bluff">

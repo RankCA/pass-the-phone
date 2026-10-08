@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Shade Hunt | Pass the Phone</title>
+<meta name="description" content="One player sees a secret colour and gives a one-word clue. Everyone else hunts for it on a grid of 240 shades. Closest guesses score.">
+<meta name="theme-color" content="#17171c">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500;700;800&family=Unbounded:wght@700;900&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a dark gallery wall so the colours glow. Plain white type, white buttons. */
+:root{
+  color-scheme:dark;
+  --bg:#17171c;
+  --fg:#f4f2ee;
+  --muted:#bdbac8;
+  --panel:rgba(255,255,255,.06);
+  --line:rgba(244,242,238,.28);
+  --field:#f4f2ee;
+  --field-ink:#17171c;
+  --accent:#f4f2ee;
+  --accent-ink:#17171c;
+  --accent-shadow:#6d6a78;
+  --focus:#ffd23f;
+  --f-display:"Unbounded","Arial Black",sans-serif;
+  --f-body:"Hanken Grotesk",system-ui,-apple-system,sans-serif;
+}
+.title{font-weight:900;font-size:clamp(40px,11.5vw,92px);letter-spacing:-.02em}
+.title span{background:linear-gradient(90deg,#ff5d73,#ffb347,#ffe066,#5ee08a,#5cc8ff,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent}
+.big{font-weight:900;font-size:clamp(28px,7.5vw,50px)}
+.btn,.label,.howto summary,.opt-box b{font-family:var(--f-body);font-weight:800}
+.btn{font-size:20px}
+.btn-big{font-size:22px}
+.strip{display:flex;height:16px;margin-top:14px;border-radius:999px;overflow:hidden;max-width:420px}
+.strip i{flex:1}
+.grid{display:grid;grid-template-columns:22px repeat(12,minmax(0,1fr));gap:2px;max-width:540px;margin:14px auto 0;user-select:none;-webkit-user-select:none}
+.cl,.rl{display:grid;place-items:center;font-weight:800;font-size:13px;color:var(--muted)}
+.cell{position:relative;display:grid;place-items:center;aspect-ratio:1;min-width:0;margin:0;padding:0;border:0;border-radius:4px;cursor:pointer;touch-action:manipulation}
+.cell:disabled{cursor:default}
+.cell.d0{z-index:2;outline:3px solid #fff;outline-offset:1px}
+.cell.d1{box-shadow:inset 0 0 0 2px rgba(255,255,255,.9)}
+.cell.d2{box-shadow:inset 0 0 0 2px rgba(255,255,255,.4)}
+.mk{display:grid;place-items:center;width:min(22px,92%);aspect-ratio:1;border-radius:50%;background:#fff;color:#17171c;font-weight:800;font-size:13px;line-height:1;box-shadow:0 0 0 2px #17171c}
+.mk.two{border-radius:6px}
+.mk.now{animation:pulse .8s ease-in-out infinite alternate}
+@keyframes pulse{to{box-shadow:0 0 0 2px #17171c,0 0 0 5px #fff}}
+.mk.star{background:#17171c;color:#fff;box-shadow:0 0 0 2px #fff}
+.prompt{position:sticky;top:0;z-index:5;margin:14px -16px 0;padding:10px 16px;background:rgba(23,23,28,.94);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);text-align:center}
+.prompt p{margin:0}
+.prompt .who{font-family:var(--f-display);font-weight:900;font-size:clamp(20px,5.5vw,28px);line-height:1.15;overflow-wrap:anywhere}
+.prompt .sub{margin-top:4px;font-size:16px;color:var(--muted)}
+.prompt .actions{margin-top:10px}
+.swatch{display:grid;place-items:center;gap:4px;height:100%;width:100%;border-radius:calc(var(--radius) - 4px)}
+.swatch b{font-family:var(--f-display);font-weight:900;font-size:clamp(36px,11vw,56px);line-height:1}
+.swatch small{font-weight:800;font-size:15px}
+.reveal-front{background:repeating-linear-gradient(135deg,#26262e 0 14px,#1f1f26 14px 28px);box-shadow:inset 0 0 0 2px var(--line);color:var(--fg)}
+.reveal-front b{font-family:var(--f-display);font-weight:900;font-size:clamp(22px,6vw,30px)}
+.reveal-front small{font-size:16px;color:var(--muted)}
+.reveal-back{padding:10px;background:#fff}
+.rules{margin:10px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
+.res{list-style:none;margin:16px auto 0;padding:0;display:grid;gap:6px;max-width:440px;text-align:left}
+.res li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--panel);font-weight:700}
+.res li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.res li b{font-family:var(--f-display);font-weight:900;font-size:18px}
+.res .mk{width:24px;flex:none}
+.scores b{font-family:var(--f-display);font-weight:900}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.shade';
+  const app = document.getElementById('app');
+  const COLS = 12, ROWS = 20, LET = 'ABCDEFGHIJKL';
+  const light = c => 22 + c * 6;
+  const colour = (r, c) => 'hsl(' + (r * 18) + ' ' + (c < 9 ? 82 : 82 - (c - 8) * 10) + '% ' + light(c) + '%)';
+  const code = (r, c) => LET[c] + (r + 1);
+  const dist = (a, b) => Math.max(Math.abs(a.r - b.r), Math.abs(a.c - b.c));
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ laps: 1 }, saved.settings || {}),
+    screen: 'setup', players: [], tags: {}, scores: {}, order: [], turn: 0, target: null, peeked: false,
+    clue: 1, gi: 0, marks: {}, pending: null, last: null
+  };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+
+  const giver = () => S.order[S.turn];
+  function guessers() {
+    const g = giver(), i = S.players.indexOf(g);
+    return S.players.slice(i + 1).concat(S.players.slice(0, i));
+  }
+  function makeTags(names) {
+    const out = {};
+    names.forEach(n => { out[n] = n.charAt(0).toUpperCase(); });
+    names.forEach(n => {
+      if (names.filter(m => out[m] === out[n]).length > 1) out[n] = (n.charAt(0).toUpperCase() + (n.charAt(1) || '').toLowerCase()).trim();
+    });
+    names.forEach((n, i) => { if (names.filter(m => out[m] === out[n]).length > 1) out[n] = String(i + 1); });
+    return out;
+  }
+  const taken = () => {
+    const t = {};
+    Object.entries(S.marks).forEach(([n, list]) => list.forEach((m, k) => { t[m.r + ',' + m.c] = { n, k }; }));
+    return t;
+  };
+
+  /* ---------- Turn flow ---------- */
+  function startTurn() {
+    S.target = { r: Math.floor(Math.random() * ROWS), c: Math.floor(Math.random() * COLS) };
+    S.peeked = false;
+    S.clue = 1;
+    S.gi = 0;
+    S.marks = {};
+    S.pending = null;
+    S.screen = 'pass';
+    render();
+  }
+  function lockIn() {
+    if (!S.pending) return;
+    const n = guessers()[S.gi];
+    (S.marks[n] = S.marks[n] || []).push(S.pending);
+    S.pending = null;
+    sfx.pop();
+    S.gi++;
+    if (S.gi >= guessers().length) S.screen = S.clue === 1 ? 'between' : 'reveal';
+    if (S.screen === 'reveal') score();
+    render();
+  }
+  function score() {
+    const t = S.target, pts = {};
+    let g = 0;
+    guessers().forEach(n => {
+      let p = 0;
+      (S.marks[n] || []).forEach(m => { const d = dist(m, t); p += d === 0 ? 3 : d === 1 ? 2 : d === 2 ? 1 : 0; if (d <= 1) g++; });
+      pts[n] = p;
+    });
+    pts[giver()] = g;
+    Object.entries(pts).forEach(([n, p]) => { S.scores[n] = (S.scores[n] || 0) + p; });
+    S.last = pts;
+    sfx.whoosh();
+    setTimeout(() => (Object.values(pts).some(p => p >= 3) ? sfx.ding() : sfx.pop()), 250);
+  }
+
+  /* ---------- Drawing ---------- */
+  function gridHTML(o) {
+    const t = taken();
+    let h = '<div class="grid" aria-label="Colour grid, 12 columns from A to L and 20 rows">' + '<span></span>' + [...LET].map(l => '<span class="cl">' + l + '</span>').join('');
+    for (let r = 0; r < ROWS; r++) {
+      h += '<span class="rl">' + (r + 1) + '</span>';
+      for (let c = 0; c < COLS; c++) {
+        const key = r + ',' + c, here = t[key];
+        let cls = '', inner = '', label = code(r, c);
+        if (o.target) {
+          const d = dist({ r, c }, o.target);
+          if (d <= 2) cls = ' d' + d;
+          if (d === 0) { inner = '<span class="mk star" aria-hidden="true">&#9733;</span>'; label += ', the target'; }
+        }
+        if (here) { inner = '<span class="mk' + (here.k ? ' two' : '') + '" aria-hidden="true">' + esc(S.tags[here.n]) + '</span>'; label += ', ' + here.n; }
+        if (S.pending && S.pending.r === r && S.pending.c === c) { inner = '<span class="mk now' + (S.clue === 2 ? ' two' : '') + '" aria-hidden="true">' + esc(S.tags[guessers()[S.gi]]) + '</span>'; label += ', your pick'; }
+        const off = !o.pick || (here && true);
+        h += '<button type="button" class="cell' + cls + '" style="background:' + colour(r, c) + '" data-cell="' + key + '" aria-label="' + esc(label) + '"' + (off ? ' disabled' : '') + '>' + inner + '</button>';
+      }
+    }
+    return h + '</div>';
+  }
+  function strip() {
+    return '<div class="strip" aria-hidden="true">' + Array.from({ length: 20 }, (_, r) => '<i style="background:' + colour(r, 5) + '"></i>').join('') + '</div>';
+  }
+  function boardHTML() {
+    const rows = S.players.map(n => [n, S.scores[n] || 0]);
+    return P.scoreList(rows);
+  }
+
+  /* ---------- Views ---------- */
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Shade <span>Hunt</span></h1>
+    ${strip()}
+    <p class="tagline">One player sees a secret colour and gives a one-word clue. Everyone else hunts for it on a grid of 240 shades.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Clue givers</span>${P.seg('laps', [[1, 'Everyone once'], [2, 'Everyone twice']], S.settings.laps)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Start the hunt</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>The clue giver holds the phone and secretly sees a colour from the grid.</li>
+        <li>They say one word out loud to describe it. No colour names, and no pointing.</li>
+        <li>Everyone else takes a turn to tap where they think it is. Then the clue giver says up to two more words, and everyone taps a second guess.</li>
+        <li>Spot on scores 3. Touching it scores 2. Two away scores 1. The clue giver scores 1 for every guess touching the target.</li>
+        <li>Everyone gives clues the same number of times. Most points wins.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    return P.header() + P.passScreen({ eyebrow: 'Turn ' + (S.turn + 1) + ' of ' + S.order.length, name: giver(), lead: esc(giver()) + ' gives the clues this turn. Nobody else looks.', act: 'me' });
+  }
+  function viewPeek() {
+    const t = S.target, dark = light(t.c) > 56;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(giver())}, this is your colour</p>
+      <div class="reveal" id="card" tabindex="0" role="button" aria-label="Press and hold to see the colour">
+        <div class="reveal-in">
+          <div class="reveal-face reveal-front"><b>Hold to see it</b><small>Keep the screen to yourself.</small></div>
+          <div class="reveal-face reveal-back"><div class="swatch" style="background:${colour(t.r, t.c)};color:${dark ? '#17171c' : '#ffffff'}"><b>${code(t.r, t.c)}</b><small>Column ${LET[t.c]}, row ${t.r + 1}</small></div></div>
+        </div>
+      </div>
+      <p class="rules">Think of a one-word clue. No colour names, and no pointing.</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="ready"${S.peeked ? '' : ' disabled'} id="readyBtn">Got my clue</button></div>
+    </section>`;
+  }
+  function viewClue() {
+    const n = guessers()[S.gi];
+    return P.header() + `
+    <section class="center">
+      <div class="prompt">
+        <p class="eyebrow" style="margin:0">Clue ${S.clue} from ${esc(giver())}</p>
+        <p class="who">${esc(n)}, tap your guess</p>
+        <p class="sub">${S.pending ? 'You picked ' + code(S.pending.r, S.pending.c) + '. Tap another square to change it.' : (S.clue === 1 ? 'Listen to the one-word clue first.' : 'Listen to the new clue first.')}</p>
+        <div class="actions center"><button class="btn btn-main" type="button" data-act="lock"${S.pending ? '' : ' disabled'}>${S.pending ? 'Lock in ' + code(S.pending.r, S.pending.c) : 'Pick a square'}</button></div>
+      </div>
+      ${gridHTML({ pick: true })}
+    </section>`;
+  }
+  function viewBetween() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Second clue</p>
+      <h2 class="big">${esc(giver())}, say up to two more words</h2>
+      <p class="lead">Still no colour names. Then everyone taps a second guess.</p>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="skip">Skip to the answer</button><button class="btn btn-main btn-big" type="button" data-act="clue2">Guess again</button></div>
+      ${gridHTML({})}
+    </section>`;
+  }
+  function viewReveal() {
+    const t = S.target, g = giver();
+    const rows = [g].concat(guessers()).map(n => `<li><span class="mk${n === g ? ' star' : ''}" aria-hidden="true">${n === g ? '&#9733;' : esc(S.tags[n])}</span><span>${esc(n)}${n === g ? ' gave the clues' : ''}</span><b>+${S.last[n] || 0}</b></li>`).join('');
+    const lastTurn = S.turn >= S.order.length - 1;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">The colour was</p>
+      <h2 class="big">${code(t.r, t.c)}</h2>
+      <ol class="res">${rows}</ol>
+      ${gridHTML({ target: t })}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="nextTurn">${lastTurn ? 'See who won' : 'Next clue giver'}</button></div>
+      ${boardHTML()}
+    </section>`;
+  }
+  function viewFinal() {
+    const rows = S.players.map(n => [n, S.scores[n] || 0]).sort((a, b) => b[1] - a[1]);
+    const best = rows[0][1], won = rows.filter(r => r[1] === best).map(r => r[0]);
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Game over</p>
+      <h2 class="big">${esc(P.listNames(won))} ${won.length > 1 ? 'win' : 'wins'}</h2>
+      ${boardHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, peek: viewPeek, clue: viewClue, between: viewBetween, reveal: viewReveal, final: viewFinal };
+  function render() {
+    const keepScroll = S.screen === 'clue' && shown === 'clue' ? window.scrollY : null;
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 3, max: 10 });
+    if (S.screen === 'peek') {
+      P.holdToReveal(document.getElementById('card'), () => {
+        if (!S.peeked) { S.peeked = true; const b = document.getElementById('readyBtn'); if (b) b.disabled = false; sfx.pop(); }
+      });
+    }
+    if (keepScroll != null) window.scrollTo(0, keepScroll);
+    else if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+  function begin(names) {
+    S.players = names;
+    S.tags = makeTags(names);
+    S.scores = {};
+    S.order = [];
+    for (let k = 0; k < S.settings.laps; k++) S.order.push(...names);
+    S.turn = 0;
+    startTurn();
+  }
+
+  document.addEventListener('click', e => {
+    const cell = e.target.closest('.cell[data-cell]');
+    if (cell && !cell.disabled && S.screen === 'clue') {
+      const [r, c] = cell.getAttribute('data-cell').split(',').map(Number);
+      S.pending = { r, c };
+      sfx.tick(1200 + r * 20);
+      render();
+      return;
+    }
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': sfx.unlock(); P.stayAwake(); begin(editor.get()); break;
+      case 'me': S.screen = 'peek'; render(); break;
+      case 'ready': S.screen = 'clue'; S.clue = 1; S.gi = 0; render(); break;
+      case 'lock': lockIn(); break;
+      case 'clue2': S.clue = 2; S.gi = 0; S.screen = 'clue'; render(); break;
+      case 'skip': S.screen = 'reveal'; score(); render(); break;
+      case 'nextTurn':
+        if (S.turn >= S.order.length - 1) {
+          S.screen = 'final';
+          render();
+          sfx.win();
+          P.confetti({ colors: ['#ff5d73', '#ffb347', '#ffe066', '#5ee08a', '#5cc8ff', '#a78bfa'] });
+        } else { S.turn++; startTurn(); }
+        break;
+      case 'again': begin(S.players); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.name === 'laps') { S.settings.laps = Number(e.target.value); persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
