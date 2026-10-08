@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Spy Grid | Pass the Phone</title>
+<meta name="description" content="Two teams, 25 words and one secret key. Clue givers link their team's words with one-word clues. Avoid the trap.">
+<meta name="theme-color" content="#1b2430">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;700;800&family=Special+Elite&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a spy's desk. Slate table, cream index cards, an orange team and a blue team. */
+:root{
+  color-scheme:dark;
+  --bg:#1b2430;
+  --fg:#f3ead7;
+  --muted:#c3cbd6;
+  --panel:rgba(243,234,215,.07);
+  --line:rgba(243,234,215,.3);
+  --field:#f3ead7;
+  --field-ink:#1b2430;
+  --accent:#f3ead7;
+  --accent-ink:#1b2430;
+  --accent-shadow:#7b8494;
+  --fox:#f08a24;
+  --fox-ink:#1b1206;
+  --owl:#2f6fdb;
+  --owl-ink:#ffffff;
+  --by:#d9ccb0;
+  --trap:#0d0f12;
+  --focus:#ffd23f;
+  --f-display:"Special Elite","Courier New",monospace;
+  --f-body:"Barlow Semi Condensed",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(ellipse 90% 50% at 50% 0%,rgba(255,255,255,.05),transparent 70%),linear-gradient(180deg,#1f2a38,#141b24)}
+.title{font-size:clamp(46px,13vw,96px)}
+.big{font-size:clamp(32px,8.5vw,54px)}
+.btn,.label,.howto summary{font-family:var(--f-body);font-weight:800}
+.btn{font-size:21px}
+.hero{display:block;width:min(70vw,260px);height:auto;margin-top:10px}
+.teams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.team{min-width:0;padding:10px 12px;border-radius:14px;background:var(--panel);box-shadow:inset 0 0 0 2px var(--c)}
+.team h3{margin:0 0 4px;font-size:19px;font-weight:800;color:var(--fg)}
+.team ul{margin:0;padding-left:1.1em;font-size:16px}
+.team li.giver{font-weight:800}
+.team small{display:block;margin-top:4px;font-size:14px;color:var(--muted)}
+.status{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding:10px 14px;border-radius:14px;background:var(--panel)}
+.status .pill{padding:4px 12px;border-radius:999px;font-weight:800;font-size:16px}
+.pill.fox{background:var(--fox);color:var(--fox-ink)}
+.pill.owl{background:var(--owl);color:var(--owl-ink)}
+.status b{font-size:18px}
+.turn{margin:14px 0 0;text-align:center;font-weight:800;font-size:20px}
+.turn span{padding:2px 10px;border-radius:999px}
+.grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;max-width:560px;margin:12px auto 0}
+.word{display:grid;place-items:center;min-height:58px;padding:4px 3px;border:0;border-radius:10px;background:#f3ead7;color:#1b2430;font:800 clamp(13px,3.9vw,18px)/1.05 var(--f-body);text-align:center;overflow-wrap:anywhere;cursor:pointer;touch-action:manipulation;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)}
+.word[aria-pressed="true"]{box-shadow:inset 0 0 0 4px #ffd23f}
+.word:disabled{cursor:default}
+.word.k0{background:var(--fox);color:var(--fox-ink)}
+.word.k1{background:var(--owl);color:var(--owl-ink)}
+.word.k2{background:var(--by);color:#1b2430}
+.word.k3{background:var(--trap);color:#fff;box-shadow:inset 0 0 0 3px #e5484d}
+.word.dim{text-decoration:line-through;text-decoration-thickness:2px}
+.keycard .reveal-front{background:repeating-linear-gradient(45deg,#26313f 0 12px,#1f2833 12px 24px);box-shadow:inset 0 0 0 3px var(--line);color:var(--fg)}
+.keycard .reveal-front b{font-family:var(--f-display);font-size:clamp(24px,7vw,34px)}
+.keycard .reveal-front small{font-size:17px;color:var(--muted)}
+.keycard.reveal{aspect-ratio:auto;height:min(118vw,520px)}
+.keycard .reveal-back{padding:8px;background:#141b24;justify-content:flex-start}
+.keycard .reveal-back .grid{width:100%;margin:0;gap:4px}
+.keycard .reveal-back .word{min-height:48px;font-size:clamp(12px,3.4vw,16px)}
+.keycard .reveal-back small{margin-top:6px;font-size:15px;color:var(--muted)}
+.result{margin:12px auto 0;max-width:30em;text-align:center;font-weight:700;font-size:18px}
+.bar{position:sticky;bottom:0;z-index:5;margin:14px -16px 0;padding:10px 16px max(10px,env(safe-area-inset-bottom));background:rgba(20,27,36,.95);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.bar .actions{margin-top:0}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:center;margin-top:10px;font-size:15px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:14px;margin-right:5px;border-radius:4px;vertical-align:-2px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script src="words.js?v=ce0666c0"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.spygrid';
+  const app = document.getElementById('app');
+  const deck = P.deck('spygrid', window.SPY_WORDS || []);
+  const TEAM = [{ name: 'Fox', cls: 'fox', color: 'var(--fox)' }, { name: 'Owl', cls: 'owl', color: 'var(--owl)' }];
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    screen: 'setup', players: [], mix: null, teams: [[], []], giver: [0, 0], first: 0,
+    words: [], key: [], open: [], turn: 0, sel: -1, msg: '', peekTeam: 0, peeked: false, back: 'board', winner: -1, why: ''
+  };
+  let editor = null, shown = null;
+
+  const left = t => S.key.filter((k, i) => k === t && !S.open[i]).length;
+  const giverName = t => S.teams[t][S.giver[t] % S.teams[t].length];
+
+  /* ---------- Setup and dealing ---------- */
+  function makeTeams(names, reshuffle) {
+    if (reshuffle || !S.mix || S.mix.length !== names.length) S.mix = P.shuffle(names.map((n, i) => i));
+    S.teams = P.splitTeams(names, S.mix);
+  }
+  function deal() {
+    S.words = deck.draw(25);
+    const spots = P.shuffle([...Array(25).keys()]);
+    S.key = Array(25).fill(2);
+    const other = 1 - S.first;
+    spots.slice(0, 9).forEach(i => { S.key[i] = S.first; });
+    spots.slice(9, 17).forEach(i => { S.key[i] = other; });
+    S.key[spots[17]] = 3;
+    S.open = Array(25).fill(false);
+    S.turn = S.first;
+    S.sel = -1;
+    S.msg = '';
+    S.winner = -1;
+    S.peekTeam = S.first;
+    S.screen = 'peekpass';
+    render();
+  }
+  function reveal(i) {
+    if (S.open[i] || S.winner >= 0) return;
+    S.open[i] = true;
+    S.sel = -1;
+    const k = S.key[i], t = S.turn, w = S.words[i];
+    if (k === 3) {
+      S.winner = 1 - t;
+      S.why = TEAM[t].name + ' team found the trap.';
+      S.msg = w + ' was the trap.';
+      sfx.boom();
+      P.vibrate([200, 80, 200]);
+      S.screen = 'final';
+      render();
+      return;
+    }
+    if (left(0) === 0 || left(1) === 0) {
+      S.winner = left(0) === 0 ? 0 : 1;
+      S.why = TEAM[S.winner].name + ' team found all their words.';
+      S.screen = 'final';
+      render();
+      sfx.win();
+      P.confetti({ colors: ['#f08a24', '#2f6fdb', '#f3ead7', '#ffd23f'] });
+      return;
+    }
+    if (k === t) { S.msg = w + ' is yours. Keep guessing, or end your turn.'; sfx.ding(); }
+    else {
+      S.msg = k === 2 ? w + ' is a bystander. ' + TEAM[1 - t].name + ' team, your turn.' : w + ' belongs to ' + TEAM[1 - t].name + ' team. Their turn.';
+      S.turn = 1 - t;
+      sfx.buzz(0.4);
+    }
+    render();
+  }
+
+  /* ---------- Views ---------- */
+  function teamsHTML() {
+    return '<div class="teams">' + [0, 1].map(t => `<div class="team" style="--c:${TEAM[t].color}"><h3>${TEAM[t].name} team</h3><ul>${S.teams[t].map(n => `<li${n === giverName(t) ? ' class="giver"' : ''}>${esc(n)}</li>`).join('')}</ul><small>Clue giver: ${esc(giverName(t) || 'nobody yet')}</small></div>`).join('') + '</div>';
+  }
+  function gridHTML(showKey, pick) {
+    return '<div class="grid">' + S.words.map((w, i) => {
+      const open = S.open[i];
+      const cls = showKey || open ? ' k' + S.key[i] : '';
+      const dim = showKey && open && S.screen !== 'final' ? ' dim' : '';
+      return `<button type="button" class="word${cls}${dim}" data-act="${pick ? 'pick' : 'none'}" data-i="${i}" aria-pressed="${S.sel === i}"${pick && !open ? '' : ' disabled'} aria-label="${esc(w)}${open || showKey ? ', ' + ['Fox', 'Owl', 'bystander', 'the trap'][S.key[i]] : ''}">${esc(w)}</button>`;
+    }).join('') + '</div>';
+  }
+  function legendHTML() {
+    return '<div class="legend"><span><i style="background:var(--fox)"></i>Fox</span><span><i style="background:var(--owl)"></i>Owl</span><span><i style="background:var(--by)"></i>Bystander</span><span><i style="background:var(--trap);box-shadow:inset 0 0 0 2px #e5484d"></i>Trap</span></div>';
+  }
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Spy Grid</h1>
+    <svg class="hero" viewBox="0 0 260 110" aria-hidden="true">${[0, 1, 2, 3, 4].map(c => [0, 1, 2].map(r => `<rect x="${12 + c * 48}" y="${8 + r * 33}" width="42" height="27" rx="5" fill="${['#f3ead7', '#f08a24', '#2f6fdb', '#d9ccb0'][(c * 3 + r * 2) % 4]}"/>`).join('')).join('')}<rect x="108" y="41" width="42" height="27" rx="5" fill="#0d0f12" stroke="#e5484d" stroke-width="3"/></svg>
+    <p class="tagline">Two teams, 25 words and one secret key. Clue givers link their team's words with one-word clues. Avoid the trap.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Teams</span><div id="teams">${S.players.length >= 4 ? teamsHTML() : '<p class="hint">Add at least 4 players to make two teams.</p>'}</div>
+        <div class="actions"><button class="btn btn-alt" type="button" data-act="shuffle">Shuffle teams</button></div></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Deal the grid</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Each team has a clue giver. Only the clue givers look at the key, which shows which words belong to which team.</li>
+        <li>On your team's turn, your clue giver says one word and a number, like "Ocean, 2". The word links that many of your team's words.</li>
+        <li>Your team taps a word and then Reveal. Get one of yours and you can keep guessing, up to one more than the number.</li>
+        <li>Hit a bystander or the other team's word and your turn ends. Hit the trap and your team loses straight away.</li>
+        <li>The first team to find all their words wins. The team that starts has 9 words, the other has 8.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPeekPass() {
+    const t = S.peekTeam;
+    return P.header() + P.passScreen({ eyebrow: TEAM[t].name + ' team clue giver', name: giverName(t), lead: 'Only the clue giver looks at the key.', act: 'me' });
+  }
+  function viewKey(after) {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">The secret key</p>
+      <div class="reveal keycard" id="card" tabindex="0" role="button" aria-label="Press and hold to see the key">
+        <div class="reveal-in">
+          <div class="reveal-face reveal-front"><b>Hold to see the key</b><small>Clue givers only.</small></div>
+          <div class="reveal-face reveal-back">${gridHTML(true, false)}${legendHTML()}</div>
+        </div>
+      </div>
+      <p class="hint">${TEAM[S.first].name} team goes first and has 9 words.</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="${after}" id="doneBtn"${S.peeked ? '' : ' disabled'}>Done</button></div>
+    </section>`;
+  }
+  function viewBoard() {
+    const t = S.turn;
+    return P.header() + `
+    <section>
+      <div class="status"><span class="pill fox">Fox ${left(0)} left</span><span class="pill owl">Owl ${left(1)} left</span></div>
+      <p class="turn"><span class="pill ${TEAM[t].cls}">${TEAM[t].name} team</span> is guessing. ${esc(giverName(t))} gives the clue.</p>
+      ${S.msg ? `<p class="result" aria-live="polite">${esc(S.msg)}</p>` : ''}
+      ${gridHTML(false, true)}
+      <div class="bar"><div class="actions center">
+        ${S.sel >= 0 ? `<button class="btn btn-main" type="button" data-act="reveal">Reveal ${esc(S.words[S.sel])}</button>` : `<button class="btn btn-main" type="button" disabled>Tap a word</button>`}
+        <button class="btn btn-alt" type="button" data-act="endturn">End ${TEAM[t].name} turn</button>
+      </div></div>
+      <div class="actions center"><button class="textbtn" type="button" data-act="keyagain">Clue givers: check the key</button></div>
+    </section>`;
+  }
+  function viewFinal() {
+    const w = S.winner;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(S.why)}</p>
+      <h2 class="big">${TEAM[w].name} team wins</h2>
+      <p class="lead">${esc(P.listNames(S.teams[w]))}</p>
+      ${gridHTML(true, false)}
+      ${legendHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change teams</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = {
+    setup: viewSetup, peekpass: viewPeekPass, peek: () => viewKey('peeked'), board: viewBoard, final: viewFinal,
+    keypass: () => P.header() + P.passScreen({ eyebrow: 'Check the key', name: 'a clue giver', lead: 'Everyone else looks away.', act: 'keyme' }),
+    keycheck: () => viewKey('board')
+  };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') {
+      editor = P.playerEditor(document.getElementById('players'), {
+        min: 4, max: 16,
+        onChange(names) {
+          S.players = names;
+          makeTeams(names, false);
+          const box = document.getElementById('teams');
+          if (box) box.innerHTML = names.length >= 4 ? teamsHTML() : '<p class="hint">Add at least 4 players to make two teams.</p>';
+        }
+      });
+      if (!S.players.length) { S.players = editor.get(); makeTeams(S.players, false); const box = document.getElementById('teams'); if (box) box.innerHTML = teamsHTML(); }
+    }
+    const card = document.getElementById('card');
+    if (card) P.holdToReveal(card, () => { if (!S.peeked) { S.peeked = true; const d = document.getElementById('doneBtn'); if (d) d.disabled = false; sfx.pop(); } });
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'shuffle': S.players = editor.get(); makeTeams(S.players, true); render(); sfx.whoosh(); break;
+      case 'start':
+        S.players = editor.get();
+        makeTeams(S.players, false);
+        sfx.unlock();
+        P.stayAwake();
+        deal();
+        break;
+      case 'me': S.peeked = false; S.screen = 'peek'; render(); break;
+      case 'peeked':
+        if (S.peekTeam === S.first) { S.peekTeam = 1 - S.first; S.screen = 'peekpass'; }
+        else S.screen = 'board';
+        render();
+        break;
+      case 'pick': {
+        const i = Number(b.getAttribute('data-i'));
+        S.sel = S.sel === i ? -1 : i;
+        sfx.tick(1300);
+        render();
+        break;
+      }
+      case 'reveal': if (S.sel >= 0) reveal(S.sel); break;
+      case 'endturn': S.turn = 1 - S.turn; S.sel = -1; S.msg = TEAM[S.turn].name + ' team, your turn.'; sfx.pop(); render(); break;
+      case 'keyagain': S.screen = 'keypass'; render(); break;
+      case 'keyme': S.peeked = false; S.screen = 'keycheck'; render(); break;
+      case 'board': S.screen = 'board'; render(); break;
+      case 'again':
+        S.first = 1 - S.first;
+        S.giver = [S.giver[0] + 1, S.giver[1] + 1];
+        deal();
+        break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

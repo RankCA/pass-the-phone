@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Close Call | Pass the Phone</title>
+<meta name="description" content="Everyone guesses a number in secret. Then bet chips on whose guess is closest without going over. You do not need to know the answer to win.">
+<meta name="theme-color" content="#fff6e5">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;800&family=Dela+Gothic+One&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: a bright quiz show table. Cream felt, poker-chip red, blue and yellow, one heavy headline font. */
+:root{
+  color-scheme:light;
+  --bg:#fff6e5;
+  --fg:#1a1a2e;
+  --muted:#4a4a63;
+  --panel:#ffffff;
+  --line:rgba(26,26,46,.2);
+  --field:#ffffff;
+  --field-ink:#1a1a2e;
+  --accent:#d6283b;
+  --accent-ink:#ffffff;
+  --accent-shadow:#7d1220;
+  --blue:#2457c5;
+  --gold:#f5b700;
+  --focus:#2457c5;
+  --f-display:"Dela Gothic One","Arial Black",sans-serif;
+  --f-body:"DM Sans",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(circle at 10% 0%,rgba(245,183,0,.18),transparent 40%),radial-gradient(circle at 100% 30%,rgba(36,87,197,.1),transparent 40%),var(--bg)}
+.title{font-size:clamp(44px,12.5vw,96px);color:var(--fg)}
+.title span{color:var(--accent)}
+.big{font-size:clamp(28px,7.5vw,46px)}
+.btn{font-family:var(--f-body);font-weight:800;font-size:19px}
+.btn-big{font-size:21px}
+.label,.howto summary{font-family:var(--f-body);font-weight:800}
+.panel{box-shadow:0 1px 0 var(--line),0 16px 30px -22px rgba(26,26,46,.5)}
+.btn:disabled{opacity:1;background:#fff;color:var(--muted);box-shadow:inset 0 0 0 2px var(--line)}
+.hero{display:block;width:min(66vw,250px);height:auto;margin-top:6px}
+.q{margin:10px auto 0;max-width:20em;font-family:var(--f-display);font-weight:400;font-size:clamp(24px,6.4vw,36px);line-height:1.2;text-wrap:balance}
+.field input{font-size:28px;text-align:center;box-shadow:inset 0 0 0 2px var(--line)}
+.slots{display:grid;gap:8px;max-width:480px;margin:16px auto 0;text-align:left}
+.slot{display:grid;grid-template-columns:60px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;border-radius:16px;background:#fff;color:var(--fg);font:inherit;text-align:left;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
+.slot:disabled{cursor:default}
+.slot .odds{display:grid;place-items:center;height:44px;border-radius:12px;background:var(--fg);color:#fff;font-family:var(--f-display);font-size:18px}
+.slot b{display:block;font-family:var(--f-display);font-weight:400;font-size:22px;line-height:1.1;overflow-wrap:anywhere}
+.slot small{display:block;font-size:15px;color:var(--muted);overflow-wrap:anywhere}
+.slot.low b{font-family:var(--f-body);font-weight:800;font-size:18px}
+.slot.win{background:#fff3c4;box-shadow:inset 0 0 0 4px var(--gold)}
+.chips{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:120px}
+.chip{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--c);color:#fff;font-weight:800;font-size:13px;box-shadow:inset 0 0 0 3px rgba(255,255,255,.55),0 1px 2px rgba(0,0,0,.3)}
+.answer{display:inline-block;margin-top:8px;padding:6px 18px;border-radius:14px;background:var(--fg);color:#fff;font-family:var(--f-display);font-size:clamp(34px,10vw,56px);line-height:1.1}
+.who{display:inline-flex;align-items:center;gap:8px;margin-top:6px;font-weight:800;font-size:18px}
+.gains{list-style:none;margin:16px auto 0;padding:0;display:grid;gap:6px;max-width:440px;text-align:left}
+.gains li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:#fff;font-weight:700;box-shadow:inset 0 0 0 1px var(--line)}
+.gains li.top{box-shadow:inset 0 0 0 3px var(--gold)}
+.gains li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.gains li small{font-size:15px;color:var(--muted)}
+.gains li b{font-family:var(--f-display);font-weight:400;font-size:22px;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script src="questions.js?v=7c3b433f"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.closecall';
+  const app = document.getElementById('app');
+  const QS = window.CLOSE_QUESTIONS || [{ q: 'How many keys are on a standard piano?', a: 88 }];
+  const deck = P.deck('closecall', QS, x => x.q);
+  const CHIPS = ['#d6283b', '#2457c5', '#18794a', '#7b3fbf', '#b45309', '#0f766e', '#a8326e', '#3d4a5c'];
+  const fmt = n => (Math.round(n * 100) / 100).toLocaleString('en-GB');
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ count: 7 }, saved.settings || {}),
+    screen: 'setup', players: [], scores: {}, qn: 0, q: null, guesses: {}, at: 0, slots: [], bets: [], bettor: 0, result: null
+  };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const colorOf = n => CHIPS[S.players.indexOf(n) % CHIPS.length];
+  const initial = n => n.charAt(0).toUpperCase();
+
+  /* ---------- Rounds ---------- */
+  function nextQuestion() {
+    S.qn++;
+    S.q = deck.one(S.q ? [S.q] : []);
+    S.guesses = {};
+    S.at = 0;
+    S.bets = [];
+    S.bettor = 0;
+    S.result = null;
+    S.screen = 'question';
+    render();
+  }
+  function buildSlots() {
+    const values = [...new Set(Object.values(S.guesses))].sort((a, b) => a - b);
+    const k = values.length;
+    S.slots = [{ low: true, value: null, names: [], odds: 6 }].concat(values.map((v, i) => {
+      const d = Math.abs(i - (k - 1) / 2);
+      return { low: false, value: v, names: S.players.filter(n => S.guesses[n] === v), odds: Math.min(5, 2 + Math.round(d - 0.01)) };
+    }));
+  }
+  function settle() {
+    const a = S.q.a;
+    let win = 0;
+    S.slots.forEach((s, i) => { if (!s.low && s.value <= a) win = i; });
+    const gains = {};
+    S.players.forEach(n => { gains[n] = 0; });
+    S.bets.forEach(b => { if (b.slot === win) gains[b.name] += S.slots[win].odds; });
+    if (win > 0) S.slots[win].names.forEach(n => { gains[n] += 3; });
+    Object.entries(gains).forEach(([n, g]) => { S.scores[n] = (S.scores[n] || 0) + g; });
+    S.result = { win, gains };
+  }
+
+  /* ---------- Views ---------- */
+  function slotsHTML(o) {
+    return '<div class="slots">' + S.slots.map((s, i) => {
+      const chips = S.bets.filter(b => b.slot === i).map(b => `<span class="chip" style="--c:${colorOf(b.name)}" aria-hidden="true">${esc(initial(b.name))}</span>`).join('');
+      const label = s.low ? 'Smaller than every guess' : fmt(s.value);
+      const by = s.low ? 'Pick this if every guess is too high' : P.listNames(s.names);
+      const win = o.result && S.result.win === i;
+      return `<button type="button" class="slot${s.low ? ' low' : ''}${win ? ' win' : ''}" data-act="bet" data-i="${i}"${o.bet ? '' : ' disabled'} aria-label="${esc(label)}, pays ${s.odds} to 1. ${esc(by)}"><span class="odds">${s.odds} to 1</span><span><b>${esc(label)}</b><small>${esc(by)}</small></span><span class="chips">${chips}</span></button>`;
+    }).join('') + '</div>';
+  }
+  function scoresHTML() {
+    const rows = S.players.map(n => [n, S.scores[n] || 0]).sort((a, b) => b[1] - a[1]);
+    const top = rows[0] ? rows[0][1] : 0;
+    return '<ol class="gains">' + rows.map(r => `<li class="${top > 0 && r[1] === top ? 'top' : ''}"><span class="chip" style="--c:${colorOf(r[0])}" aria-hidden="true">${esc(initial(r[0]))}</span><span>${esc(r[0])}</span>${S.result && S.result.gains[r[0]] ? `<small>+${S.result.gains[r[0]]}</small>` : ''}<b>${r[1]}</b></li>`).join('') + '</ol>';
+  }
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Close <span>Call</span></h1>
+    <svg class="hero" viewBox="0 0 250 100" aria-hidden="true"><g stroke="#1a1a2e" stroke-width="4"><ellipse cx="60" cy="74" rx="40" ry="14" fill="#d6283b"/><ellipse cx="60" cy="62" rx="40" ry="14" fill="#2457c5"/><ellipse cx="60" cy="50" rx="40" ry="14" fill="#f5b700"/></g><rect x="128" y="20" width="108" height="62" rx="12" fill="#fff" stroke="#1a1a2e" stroke-width="4"/><text x="182" y="62" text-anchor="middle" font-family="Dela Gothic One, Arial Black, sans-serif" font-size="30" fill="#1a1a2e">1912</text></svg>
+    <p class="tagline">Everyone guesses a number in secret. Then bet chips on whose guess is closest without going over. You do not need to know the answer to win.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Questions</span>${P.seg('count', [[5, '5'], [7, '7'], [10, '10']], S.settings.count)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Place your bets</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Read the question out loud. Pass the phone so everyone can type a number in secret.</li>
+        <li>The guesses go up in order. Guesses in the middle pay 2 to 1, and they pay more the further out they are.</li>
+        <li>Each player puts 2 chips on the guesses they think will win. Both on one guess is fine. Other people's guesses count too.</li>
+        <li>The winning guess is the closest one that does not go over. If every guess is too high, Smaller than every guess wins and pays 6 to 1.</li>
+        <li>Each chip on the winner scores its odds. Whoever wrote the winning guess also scores 3. Most points after the last question wins.</li>
+      </ol>
+    </details>`;
+  }
+  function viewQuestion() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Question ${S.qn} of ${S.settings.count}</p>
+      <p class="q">${esc(S.q.q)}</p>
+      <p class="lead">Read it out loud. Then pass the phone so everyone can guess in secret.</p>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="begin">Start guessing</button><button class="btn btn-alt" type="button" data-act="skip">Another question</button></div>
+    </section>`;
+  }
+  function viewPass() {
+    const n = S.players[S.at];
+    return P.header() + P.passScreen({ eyebrow: 'Guess ' + (S.at + 1) + ' of ' + S.players.length, name: n, lead: 'Only ' + esc(n) + ' looks.', act: 'me' });
+  }
+  function viewGuess() {
+    const n = S.players[S.at];
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(n)}</p>
+      <p class="q">${esc(S.q.q)}</p>
+      <div class="field"><label for="num">Your guess</label><input id="num" type="text" inputmode="decimal" autocomplete="off" maxlength="12" placeholder="0"></div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="lock" id="lockBtn" disabled>Lock it in</button></div>
+    </section>`;
+  }
+  function viewBet() {
+    const n = S.players[S.bettor], mine = S.bets.filter(b => b.name === n).length;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Place your bets</p>
+      <p class="q">${esc(S.q.q)}</p>
+      <p class="who"><span class="chip" style="--c:${colorOf(n)}" aria-hidden="true">${esc(initial(n))}</span>${esc(n)}, place ${mine === 0 ? '2 chips' : mine === 1 ? '1 more chip' : 'no more chips'}</p>
+      ${slotsHTML({ bet: mine < 2 })}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="undo"${mine ? '' : ' disabled'}>Take a chip back</button><button class="btn btn-main btn-big" type="button" data-act="betdone"${mine === 2 ? '' : ' disabled'}>${S.bettor < S.players.length - 1 ? 'Next player' : 'Show the answer'}</button></div>
+    </section>`;
+  }
+  function viewReveal() {
+    const s = S.slots[S.result.win];
+    const last = S.qn >= S.settings.count;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">The answer is</p>
+      <span class="answer">${fmt(S.q.a)}${S.q.u ? ' ' + esc(S.q.u) : ''}</span>
+      <p class="lead">${s.low ? 'Every guess was too high, so Smaller than every guess wins.' : 'Closest without going over: ' + esc(fmt(s.value)) + ' from ' + esc(P.listNames(s.names)) + '.'}</p>
+      ${slotsHTML({ result: true })}
+      ${scoresHTML()}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="${last ? 'final' : 'next'}">${last ? 'See who won' : 'Next question'}</button></div>
+    </section>`;
+  }
+  function viewFinal() {
+    const rows = S.players.map(n => [n, S.scores[n] || 0]).sort((a, b) => b[1] - a[1]);
+    const best = rows[0][1], won = rows.filter(r => r[1] === best).map(r => r[0]);
+    S.result = null;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Game over</p>
+      <h2 class="big">${esc(P.listNames(won))} ${won.length > 1 ? 'win' : 'wins'}</h2>
+      <p class="lead">With ${P.plural(best, 'point')}.</p>
+      ${scoresHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, question: viewQuestion, pass: viewPass, guess: viewGuess, bet: viewBet, reveal: viewReveal, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 3, max: 8 });
+    if (S.screen === 'guess') { const f = document.getElementById('num'); if (f) f.focus(); }
+    if (S.screen !== shown || S.screen === 'pass') window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+  const parse = v => { const t = String(v).replace(/,/g, '').trim(); return t !== '' && isFinite(Number(t)) ? Number(t) : null; };
+  function lock() {
+    const v = parse((document.getElementById('num') || {}).value || '');
+    if (v === null) return;
+    S.guesses[S.players[S.at]] = v;
+    sfx.pop();
+    S.at++;
+    if (S.at >= S.players.length) { buildSlots(); S.bettor = 0; S.screen = 'bet'; sfx.whoosh(); }
+    else S.screen = 'pass';
+    render();
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': S.players = editor.get(); S.scores = {}; S.qn = 0; S.q = null; sfx.unlock(); P.stayAwake(); nextQuestion(); break;
+      case 'skip': S.qn--; nextQuestion(); break;
+      case 'begin': S.at = 0; S.screen = 'pass'; render(); break;
+      case 'me': S.screen = 'guess'; render(); break;
+      case 'lock': lock(); break;
+      case 'bet': {
+        const n = S.players[S.bettor];
+        if (S.bets.filter(x => x.name === n).length >= 2) break;
+        S.bets.push({ name: n, slot: Number(b.getAttribute('data-i')) });
+        sfx.tone(700, { type: 'triangle', dur: 0.08, gain: 0.12 });
+        render();
+        break;
+      }
+      case 'undo': {
+        const n = S.players[S.bettor];
+        for (let i = S.bets.length - 1; i >= 0; i--) if (S.bets[i].name === n) { S.bets.splice(i, 1); break; }
+        render();
+        break;
+      }
+      case 'betdone':
+        if (S.bettor < S.players.length - 1) { S.bettor++; render(); break; }
+        settle();
+        S.screen = 'reveal';
+        render();
+        sfx.ding();
+        break;
+      case 'next': nextQuestion(); break;
+      case 'final': S.screen = 'final'; render(); sfx.win(); P.confetti({ colors: ['#d6283b', '#2457c5', '#f5b700', '#1a1a2e'] }); break;
+      case 'again': S.scores = {}; S.qn = 0; nextQuestion(); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('input', e => {
+    if (e.target.id === 'num') { const btn = document.getElementById('lockBtn'); if (btn) btn.disabled = parse(e.target.value) === null; }
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'num') { e.preventDefault(); lock(); } });
+  document.addEventListener('change', e => { if (e.target.name === 'count') { S.settings.count = Number(e.target.value); persist(); } });
+
+  render();
+})();
+</script>
+</body>
+</html>

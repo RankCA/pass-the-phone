@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Inside Job | Pass the Phone</title>
+<meta name="description" content="Find the secret word with yes or no questions before the clock runs out. Then work out who knew it all along.">
+<meta name="theme-color" content="#22252b">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: an interrogation room. Concrete walls, one warm lamp, amber for anything that matters. */
+:root{
+  color-scheme:dark;
+  --bg:#22252b;
+  --fg:#f2efe8;
+  --muted:#c4c0b6;
+  --panel:rgba(242,239,232,.07);
+  --line:rgba(242,239,232,.28);
+  --field:#f2efe8;
+  --field-ink:#22252b;
+  --accent:#f5b301;
+  --accent-ink:#1d1a12;
+  --accent-shadow:#8f6a05;
+  --focus:#f5b301;
+  --f-display:"Bebas Neue","Arial Narrow",sans-serif;
+  --f-body:"Inter",system-ui,-apple-system,sans-serif;
+}
+body{background:radial-gradient(ellipse 70% 45% at 50% -5%,rgba(255,214,120,.16),transparent 70%),linear-gradient(180deg,#272b32,#1b1d22)}
+.title{font-size:clamp(64px,19vw,140px);letter-spacing:.02em;line-height:.9}
+.big{font-size:clamp(44px,12vw,76px);letter-spacing:.01em;line-height:.95}
+.btn{font-family:var(--f-body);font-weight:800;font-size:19px}
+.btn-big{font-size:21px}
+.label,.howto summary{font-family:var(--f-body);font-weight:800;font-size:18px}
+.hero{display:block;width:min(56vw,210px);height:auto;margin-top:6px}
+.rolecard .reveal-front{background:repeating-linear-gradient(0deg,#2c3038 0 2px,#262a31 2px 6px);box-shadow:inset 0 0 0 2px var(--line);color:var(--fg)}
+.rolecard .reveal-front b{font-family:var(--f-display);font-weight:400;font-size:clamp(34px,10vw,46px);letter-spacing:.02em}
+.rolecard .reveal-front small{font-size:16px;color:var(--muted)}
+.rolecard .reveal-back{background:#f2efe8;color:#1d1a12}
+.rolecard .reveal-back small{font-weight:800;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:#5a4a1a}
+.rolecard .reveal-back b{font-family:var(--f-display);font-weight:400;font-size:clamp(40px,12vw,58px);line-height:1}
+.rolecard .reveal-back p{margin:0;max-width:22em;font-size:16px;line-height:1.35}
+.rolecard .reveal-back .word{display:inline-block;margin-top:4px;padding:4px 14px;border-radius:10px;background:#1d1a12;color:#f5b301;font-family:var(--f-display);font-size:clamp(30px,9vw,42px);letter-spacing:.03em}
+.clock{display:inline-block;margin-top:14px;padding:6px 26px;border-radius:16px;background:var(--panel);font-family:var(--f-display);font-size:clamp(70px,22vw,120px);line-height:1;letter-spacing:.03em;font-variant-numeric:tabular-nums}
+.clock.low{background:#fff;color:#b3261e}
+.host{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:6px 14px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:16px}
+.verdict{margin:6px 0 0;font-family:var(--f-display);font-size:clamp(40px,11vw,64px);line-height:1;letter-spacing:.01em}
+.tally{list-style:none;margin:16px auto 0;padding:0;display:grid;gap:6px;max-width:440px;text-align:left}
+.tally li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--panel);font-weight:700}
+.tally li.top{box-shadow:inset 0 0 0 2px var(--accent)}
+.tally li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.tally li b{font-family:var(--f-display);font-size:26px;font-weight:400}
+.tally small{font-size:14px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script src="words.js?v=2f1a8bd5"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const KEY = 'ptp.inside';
+  const app = document.getElementById('app');
+  const deck = P.deck('inside', window.INSIDE_WORDS || ['Penguin']);
+
+  const saved = P.store.get(KEY, {}) || {};
+  const S = {
+    settings: Object.assign({ time: 240, talk: 90 }, saved.settings || {}),
+    screen: 'setup', players: [], hostAt: 0, insider: '', word: '', order: [], at: 0, peeked: false,
+    clock: null, finder: '', accused: '', outcome: '', scores: {}, round: 0, gains: {}
+  };
+  let editor = null, shown = null;
+  function persist() { P.store.set(KEY, { settings: S.settings }); }
+  const host = () => S.players[S.hostAt % S.players.length];
+  const others = () => S.players.filter(n => n !== host());
+
+  /* ---------- Rounds ---------- */
+  function newRound() {
+    S.round++;
+    S.word = deck.one([S.word]);
+    S.insider = P.pick(others());
+    S.order = [host()].concat(others());
+    S.at = 0;
+    S.finder = '';
+    S.accused = '';
+    S.gains = {};
+    if (S.clock) S.clock.stop();
+    S.clock = null;
+    S.screen = 'pass';
+    render();
+  }
+  function startClock(ms, onEnd) {
+    if (S.clock) S.clock.stop();
+    S.clock = P.countdown(ms, {
+      tickLast: 10,
+      onTick(left) {
+        const el = document.getElementById('clock');
+        if (el) { el.textContent = P.clock(left); el.classList.toggle('low', left <= 10000); }
+      },
+      onEnd
+    });
+  }
+  function settle(caught) {
+    S.gains = {};
+    if (S.outcome === 'timeout') { /* nobody scores */ }
+    else if (caught) { [host()].concat(others().filter(n => n !== S.insider)).forEach(n => { S.gains[n] = 1; }); }
+    else S.gains[S.insider] = 2;
+    Object.entries(S.gains).forEach(([n, g]) => { S.scores[n] = (S.scores[n] || 0) + g; });
+  }
+
+  /* ---------- Views ---------- */
+  function tallyHTML() {
+    const rows = S.players.map(n => [n, S.scores[n] || 0]).sort((a, b) => b[1] - a[1]);
+    const top = rows[0] ? rows[0][1] : 0;
+    return '<ol class="tally">' + rows.map(r => `<li class="${top > 0 && r[1] === top ? 'top' : ''}"><span>${esc(r[0])}</span>${S.gains[r[0]] ? `<small>+${S.gains[r[0]]}</small>` : ''}<b>${r[1]}</b></li>`).join('') + '</ol>';
+  }
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Inside Job</h1>
+    <svg class="hero" viewBox="0 0 210 110" aria-hidden="true"><path d="M105 6 60 66h90z" fill="rgba(255,214,120,.35)"/><path d="M90 6h30l-4 10h-22z" fill="#f5b301" stroke="#111" stroke-width="3"/><circle cx="60" cy="86" r="16" fill="#3a3f48" stroke="#111" stroke-width="4"/><path d="M38 108c2-14 10-20 22-20s20 6 22 20" fill="#3a3f48" stroke="#111" stroke-width="4"/><circle cx="150" cy="86" r="16" fill="#3a3f48" stroke="#111" stroke-width="4"/><path d="M128 108c2-14 10-20 22-20s20 6 22 20" fill="#3a3f48" stroke="#111" stroke-width="4"/><circle cx="105" cy="80" r="17" fill="#f5b301" stroke="#111" stroke-width="4"/><path d="M82 108c2-15 11-21 23-21s21 6 23 21" fill="#f5b301" stroke="#111" stroke-width="4"/><path d="M98 78h4M108 78h4" stroke="#111" stroke-width="3" stroke-linecap="round"/></svg>
+    <p class="tagline">Find the secret word with yes or no questions before the clock runs out. Then work out who knew it all along.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div></div>
+      <div class="sec"><span class="label">Time to find the word</span>${P.seg('time', [[180, '3 min'], [240, '4 min'], [300, '5 min']], S.settings.time)}</div>
+      <div class="sec"><span class="label">Time to find the insider</span>${P.seg('talk', [[60, '1 min'], [90, '90 sec'], [120, '2 min']], S.settings.talk)}</div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Deal the roles</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>One player is the host each round, and everyone knows who. The host sees the secret word and can only answer yes, no or not sure.</li>
+        <li>One other player is the insider. They know the word too, and secretly steer the questions towards it.</li>
+        <li>Everyone asks the host yes or no questions. Find the word before the clock runs out, or nobody wins.</li>
+        <li>Once the word is found, talk it over and point at who you think the insider is.</li>
+        <li>Catch the insider and the host and everyone else score a point. If the insider gets away, they score 2.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    const n = S.order[S.at];
+    return P.header() + P.passScreen({ eyebrow: 'Round ' + S.round + '. Card ' + (S.at + 1) + ' of ' + S.order.length, name: n, lead: n === host() ? esc(n) + ' is the host this round.' : 'Only ' + esc(n) + ' looks.', act: 'me' });
+  }
+  function viewCard() {
+    const n = S.order[S.at], role = n === host() ? 'host' : n === S.insider ? 'insider' : 'guesser';
+    const back = role === 'host'
+      ? `<small>You are the host</small><span class="word">${esc(S.word)}</span><p>Answer questions with yes, no or not sure. Nothing else.</p>`
+      : role === 'insider'
+        ? `<small>You are the insider</small><span class="word">${esc(S.word)}</span><p>Steer the questions towards it without getting caught.</p>`
+        : `<small>You are a guesser</small><b>Find the word</b><p>Ask the host yes or no questions. Then catch the insider.</p>`;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(n)}, this is your card</p>
+      <div class="reveal rolecard" id="card" tabindex="0" role="button" aria-label="Press and hold to see your card">
+        <div class="reveal-in">
+          <div class="reveal-face reveal-front"><b>Hold to read</b><small>Keep it to yourself.</small></div>
+          <div class="reveal-face reveal-back">${back}</div>
+        </div>
+      </div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="seen" id="doneBtn"${S.peeked ? '' : ' disabled'}>${S.at < S.order.length - 1 ? 'Done. Pass it on' : 'Done'}</button></div>
+    </section>`;
+  }
+  function viewAsk() {
+    const running = S.clock && S.clock.running;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Round ${S.round}. Find the word</p>
+      <span class="host">Host: ${esc(host())}</span>
+      <div><span class="clock" id="clock">${P.clock(S.clock ? S.clock.left : S.settings.time * 1000)}</span></div>
+      <p class="lead">Ask ${esc(host())} yes or no questions. Shout it out when you think you know the word.</p>
+      <div class="actions center">
+        ${S.clock ? `<button class="btn btn-alt" type="button" data-act="pause">${running ? 'Pause' : 'Carry on'}</button>` : '<button class="btn btn-alt btn-big" type="button" data-act="go">Start the clock</button>'}
+        <button class="btn btn-main btn-big" type="button" data-act="found">Someone said it</button>
+      </div>
+    </section>`;
+  }
+  function viewFound() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">The word was ${esc(S.word)}</p>
+      <h2 class="big">Who said it?</h2>
+      <div class="pick">${others().map(n => `<button type="button" data-act="finder" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="ask">Back to the questions</button></div>
+    </section>`;
+  }
+  function viewTalk() {
+    const running = S.clock && S.clock.running;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(S.finder)} found ${esc(S.word)}</p>
+      <h2 class="big">Find the insider</h2>
+      <div><span class="clock" id="clock">${P.clock(S.clock ? S.clock.left : S.settings.talk * 1000)}</span></div>
+      <p class="lead">Who knew too much? Was it ${esc(S.finder)}, or someone who kept nudging the questions?</p>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="pause">${running ? 'Pause' : 'Carry on'}</button><button class="btn btn-main btn-big" type="button" data-act="vote">Vote now</button></div>
+    </section>`;
+  }
+  function viewVote() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">The vote</p>
+      <h2 class="big">Point on three</h2>
+      <p class="lead">Count down out loud and point at the insider. ${esc(host())} taps whoever got the most fingers.</p>
+      <div class="pick">${others().map(n => `<button type="button" data-act="accuse" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="accuse" data-n="">It was a tie</button></div>
+    </section>`;
+  }
+  function viewResult() {
+    const caught = S.outcome === 'caught';
+    const head = S.outcome === 'timeout' ? 'Out of time' : caught ? 'Insider caught' : 'Insider got away';
+    const line = S.outcome === 'timeout'
+      ? 'Nobody found ' + S.word + ', so nobody wins this round.'
+      : caught ? 'Everyone pointed at ' + S.insider + ', and they were the insider.'
+        : (S.accused ? 'Everyone pointed at ' + S.accused + ', but the insider was ' + S.insider + '.' : 'The vote was tied, so ' + S.insider + ' slips away.');
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">The insider was ${esc(S.insider)}</p>
+      <h2 class="verdict">${head}</h2>
+      <p class="lead">${esc(line)}</p>
+      ${tallyHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change setup</button><button class="btn btn-main btn-big" type="button" data-act="next">Next round</button></div>
+      <p class="hint">${esc(S.players[(S.hostAt + 1) % S.players.length])} hosts next.</p>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, card: viewCard, ask: viewAsk, found: viewFound, talk: viewTalk, vote: viewVote, result: viewResult };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 4, max: 12 });
+    const card = document.getElementById('card');
+    if (card) P.holdToReveal(card, () => { if (!S.peeked) { S.peeked = true; const d = document.getElementById('doneBtn'); if (d) d.disabled = false; } });
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+  function timeUp() {
+    S.outcome = 'timeout';
+    settle(false);
+    S.screen = 'result';
+    render();
+    sfx.buzz(0.8);
+    P.vibrate([200, 80, 200]);
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start':
+        S.players = editor.get();
+        S.scores = {};
+        S.round = 0;
+        S.hostAt = Math.floor(Math.random() * S.players.length);
+        sfx.unlock();
+        P.stayAwake();
+        newRound();
+        break;
+      case 'me': S.peeked = false; S.screen = 'card'; render(); break;
+      case 'seen':
+        S.at++;
+        if (S.at >= S.order.length) { S.screen = 'ask'; S.clock = null; }
+        else S.screen = 'pass';
+        render();
+        break;
+      case 'go': startClock(S.settings.time * 1000, timeUp); S.clock.start(); sfx.beep(true); render(); break;
+      case 'pause':
+        if (!S.clock) break;
+        if (S.clock.running) S.clock.stop(); else S.clock.start();
+        render();
+        break;
+      case 'found': if (S.clock) S.clock.stop(); S.screen = 'found'; render(); break;
+      case 'ask': if (S.clock && S.clock.left > 0) S.clock.start(); S.screen = 'ask'; render(); break;
+      case 'finder':
+        S.finder = b.getAttribute('data-n');
+        sfx.ding();
+        startClock(S.settings.talk * 1000, () => { S.screen = 'vote'; render(); sfx.beep(true); });
+        S.clock.start();
+        S.screen = 'talk';
+        render();
+        break;
+      case 'vote': if (S.clock) S.clock.stop(); S.screen = 'vote'; render(); break;
+      case 'accuse':
+        S.accused = b.getAttribute('data-n');
+        S.outcome = S.accused && S.accused === S.insider ? 'caught' : 'escaped';
+        settle(S.outcome === 'caught');
+        S.screen = 'result';
+        render();
+        if (S.outcome === 'caught') { sfx.win(); P.confetti({ colors: ['#f5b301', '#f2efe8', '#c4c0b6'] }); } else sfx.lose();
+        break;
+      case 'next': S.hostAt++; newRound(); break;
+      case 'setup': if (S.clock) S.clock.stop(); S.screen = 'setup'; render(); break;
+    }
+  });
+  document.addEventListener('change', e => {
+    if (e.target.name === 'time' || e.target.name === 'talk') { S.settings[e.target.name] = Number(e.target.value); persist(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

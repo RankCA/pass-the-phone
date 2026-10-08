@@ -12,6 +12,10 @@ Party games for one phone and a room full of people. Open the site on one phone,
 | Shade Hunt | 3 to 10 | One player sees a secret colour and gives a one-word clue. Everyone hunts for it on a grid of 240 shades. |
 | Liar's Dice | 2 to 6 | Peek at your own dice, then bid on what is under every cup. Raise the bid or call liar. |
 | Farkle | 1 to 10 | Roll six dice, keep what scores and push your luck. Scoring rules live in `farkle/scoring.js`. |
+| Spy Grid | 4 or more | Two teams, 25 words and one secret key. Clue givers link their team's words with one word. Avoid the trap. |
+| Inside Job | 4 to 12 | Find the secret word with yes or no questions, then catch the player who knew it all along. |
+| Mole | 5 to 10 | A crew plans five jobs while hidden moles try to wreck them. Votes and sabotage happen in secret on the phone. |
+| Close Call | 3 to 8 | Everyone guesses a number in secret, then bets on whose guess is closest without going over. |
 | Impostor | 3 to 12 | Everyone reads a secret word except the impostor. One-word clues, then a vote. |
 | Werewolf | 5 to 16 | The phone deals secret roles and reads the night out loud, so nobody has to sit out as narrator. |
 | Tune In | 2 to 12 | One player sees a hidden target on a dial and gives a clue. The rest turn the dial. |

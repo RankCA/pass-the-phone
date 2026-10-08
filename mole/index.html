@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mole | Pass the Phone</title>
+<meta name="description" content="A crew plans five jobs, but some of the crew are moles. Pull off three jobs before the moles wreck three. Nobody is knocked out.">
+<meta name="theme-color" content="#123d73">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Public+Sans:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<style>
+/* Layout: the heist blueprint. Blue paper, white grid lines, stamped red when a job goes wrong. */
+:root{
+  color-scheme:dark;
+  --bg:#123d73;
+  --fg:#f4f8ff;
+  --muted:#cfdcf2;
+  --panel:rgba(244,248,255,.09);
+  --line:rgba(244,248,255,.35);
+  --field:#f4f8ff;
+  --field-ink:#0d2b52;
+  --accent:#f4f8ff;
+  --accent-ink:#0d2b52;
+  --accent-shadow:#6d8fbf;
+  --good:#3ddc84;
+  --bad:#ff6b6b;
+  --focus:#ffd23f;
+  --f-display:"Black Ops One","Impact",sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,sans-serif;
+}
+body{background-color:#123d73;background-image:linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px);background-size:24px 24px}
+.title{font-size:clamp(64px,18vw,128px);letter-spacing:.04em}
+.big{font-size:clamp(34px,9vw,58px);letter-spacing:.02em}
+.btn{font-family:var(--f-body);font-weight:800;font-size:19px}
+.btn-big{font-size:21px}
+.label,.howto summary{font-family:var(--f-body);font-weight:800}
+.hero{display:block;width:min(60vw,230px);height:auto;margin-top:8px}
+.jobs{display:flex;justify-content:center;gap:10px;margin-top:16px}
+.job{display:grid;place-items:center;width:52px;height:52px;border-radius:50%;box-shadow:inset 0 0 0 3px var(--line);font-family:var(--f-display);font-size:20px;color:var(--fg)}
+.job.now{box-shadow:inset 0 0 0 3px #ffd23f}
+.job.ok{background:var(--good);color:#06301a;box-shadow:none}
+.job.fail{background:var(--bad);color:#3a0505;box-shadow:none}
+.rejects{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;font-size:15px;color:var(--muted)}
+.rejects i{width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--line)}
+.rejects i.on{background:#ffd23f;box-shadow:none}
+.crewpick{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:8px;margin-top:14px}
+.crewpick button{min-height:54px;padding:8px 10px;border:0;border-radius:14px;background:var(--panel);color:var(--fg);font:800 18px/1.15 var(--f-body);overflow-wrap:anywhere;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
+.crewpick button[aria-pressed="true"]{background:var(--fg);color:#0d2b52;box-shadow:none}
+.rolecard .reveal-front{background:repeating-linear-gradient(45deg,#174a8a 0 14px,#13427c 14px 28px);box-shadow:inset 0 0 0 3px var(--line);color:var(--fg)}
+.rolecard .reveal-front b{font-family:var(--f-display);font-weight:400;font-size:clamp(28px,8vw,38px)}
+.rolecard .reveal-front small{font-size:16px;color:var(--muted)}
+.rolecard .reveal-back{background:#f4f8ff;color:#0d2b52}
+.rolecard .reveal-back.mole{background:#3a0a0a;color:#ffe3e3}
+.rolecard .reveal-back b{font-family:var(--f-display);font-weight:400;font-size:clamp(34px,10vw,50px);line-height:1}
+.rolecard .reveal-back p{margin:0;max-width:22em;font-size:16px;line-height:1.35}
+.choice{display:grid;gap:12px;max-width:420px;margin:18px auto 0}
+.choice button{min-height:76px;border:0;border-radius:18px;font:800 22px/1.1 var(--f-body);cursor:pointer}
+.choice .ok{background:var(--good);color:#06301a}
+.choice .fail{background:var(--bad);color:#3a0505}
+.tally{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:16px}
+.tally span{display:grid;place-items:center;min-width:96px;min-height:70px;padding:8px 12px;border-radius:14px;font-weight:800;font-size:18px}
+.tally .ok{background:var(--good);color:#06301a}
+.tally .fail{background:var(--bad);color:#3a0505}
+.hint{opacity:1}
+.stamp{display:inline-block;margin-top:12px;padding:2px 16px;border:5px solid currentColor;border-radius:10px;background:#0d2b52;font-family:var(--f-display);font-size:clamp(40px,12vw,64px);transform:rotate(-4deg)}
+.stamp.ok{color:var(--good)}
+.stamp.fail{color:var(--bad)}
+.moles{margin:12px 0 0;font-size:18px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="../shared/party.js?v=ab12cd68"></script>
+<script>
+(function () {
+  'use strict';
+  const P = window.Party, sfx = P.sfx, esc = P.esc;
+  const app = document.getElementById('app');
+  const SIZES = { 5: [2, 3, 2, 3, 3], 6: [2, 3, 4, 3, 4], 7: [2, 3, 3, 4, 4], 8: [3, 4, 4, 5, 5], 9: [3, 4, 4, 5, 5], 10: [3, 4, 4, 5, 5] };
+  const MOLES = { 5: 2, 6: 2, 7: 3, 8: 3, 9: 3, 10: 4 };
+
+  const S = {
+    screen: 'setup', players: [], moles: [], leader: 0, job: 0, results: [], rejects: 0, crew: [], at: 0, peeked: false, cards: [], last: null, winner: ''
+  };
+  let editor = null, shown = null;
+
+  const n = () => S.players.length;
+  const size = () => SIZES[n()][S.job];
+  const needFails = () => (S.job === 3 && n() >= 7 ? 2 : 1);
+  const leader = () => S.players[S.leader % n()];
+  const wins = k => S.results.filter(r => r === k).length;
+
+  function deal(names) {
+    S.players = names;
+    S.moles = P.shuffle(names.slice()).slice(0, MOLES[names.length]);
+    S.leader = Math.floor(Math.random() * names.length);
+    S.job = 0;
+    S.results = [];
+    S.rejects = 0;
+    S.crew = [];
+    S.at = 0;
+    S.winner = '';
+    S.screen = 'pass';
+    render();
+  }
+  function nextLeader() { S.leader++; S.crew = []; }
+  function endCheck() {
+    if (wins('ok') >= 3) { S.winner = 'crew'; S.screen = 'final'; }
+    else if (wins('fail') >= 3 || S.rejects >= 5) { S.winner = 'moles'; S.screen = 'final'; }
+    if (S.screen === 'final') { render(); if (S.winner === 'crew') { sfx.win(); P.confetti({ colors: ['#3ddc84', '#f4f8ff', '#ffd23f'] }); } else sfx.lose(); return true; }
+    return false;
+  }
+
+  /* ---------- Views ---------- */
+  function jobsHTML() {
+    return '<div class="jobs" aria-label="Jobs">' + SIZES[n()].map((s, i) => {
+      const r = S.results[i];
+      return `<span class="job${r ? ' ' + r : i === S.job ? ' now' : ''}" aria-label="Job ${i + 1}: ${r === 'ok' ? 'done' : r === 'fail' ? 'failed' : s + ' people'}">${r === 'ok' ? 'OK' : r === 'fail' ? 'X' : s}</span>`;
+    }).join('') + '</div>' + (n() >= 7 ? '<p class="hint center">Job 4 only fails with two mess ups.</p>' : '') +
+      `<div class="rejects" aria-label="${S.rejects} crews turned down">Turned down <i class="${S.rejects >= 1 ? 'on' : ''}"></i><i class="${S.rejects >= 2 ? 'on' : ''}"></i><i class="${S.rejects >= 3 ? 'on' : ''}"></i><i class="${S.rejects >= 4 ? 'on' : ''}"></i><i class="${S.rejects >= 5 ? 'on' : ''}"></i></div>`;
+  }
+  function viewSetup() {
+    return P.header() + `
+    <h1 class="title">Mole</h1>
+    <svg class="hero" viewBox="0 0 230 110" aria-hidden="true"><rect x="10" y="10" width="210" height="90" rx="8" fill="none" stroke="#f4f8ff" stroke-width="3" stroke-dasharray="6 6"/><rect x="34" y="34" width="56" height="44" fill="none" stroke="#f4f8ff" stroke-width="4"/><path d="M118 34h70v44h-70z" fill="none" stroke="#f4f8ff" stroke-width="4"/><circle cx="153" cy="56" r="12" fill="none" stroke="#f4f8ff" stroke-width="4"/><path d="M153 44v24M141 56h24" stroke="#f4f8ff" stroke-width="3"/><path d="M90 56h28" stroke="#ff6b6b" stroke-width="5" stroke-dasharray="4 5"/><text x="62" y="64" text-anchor="middle" font-family="Black Ops One, Impact, sans-serif" font-size="20" fill="#f4f8ff">HQ</text></svg>
+    <p class="tagline">A crew plans five jobs, but some of the crew are moles. Pull off three jobs before the moles wreck three.</p>
+    <div class="panel">
+      <div class="sec"><span class="label">Players</span><div id="players"></div><p class="hint">5 to 10 players. With 5 or 6 there are 2 moles, with 7 to 9 there are 3, and with 10 there are 4.</p></div>
+      <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Deal the roles</button></div>
+    </div>
+    <details class="howto">
+      <summary>How to play</summary>
+      <ol>
+        <li>Pass the phone round. Everyone secretly learns if they are crew or a mole. Moles also see who the other moles are.</li>
+        <li>Each job has a leader. They pick who goes on the job. Then everyone votes out loud, thumbs up or down.</li>
+        <li>If most say no, the next player leads. Five crews turned down in a row and the moles win.</li>
+        <li>If most say yes, pass the phone to each person on the job. Crew always pull it off. Moles can choose to mess it up.</li>
+        <li>One mess up and the job fails. With 7 or more players, job 4 needs two to fail. Three jobs done and the crew wins. Three failed and the moles win.</li>
+      </ol>
+    </details>`;
+  }
+  function viewPass() {
+    const nm = S.players[S.at];
+    return P.header() + P.passScreen({ eyebrow: 'Secret role ' + (S.at + 1) + ' of ' + n(), name: nm, lead: 'Only ' + esc(nm) + ' looks.', act: 'me' });
+  }
+  function viewRole() {
+    const nm = S.players[S.at], mole = S.moles.includes(nm);
+    const mates = S.moles.filter(m => m !== nm);
+    const back = mole
+      ? `<div class="reveal-face reveal-back mole"><b>Mole</b><p>Wreck three jobs without getting caught.</p><p>The other ${mates.length === 1 ? 'mole is' : 'moles are'} <strong>${esc(P.listNames(mates))}</strong>.</p></div>`
+      : `<div class="reveal-face reveal-back"><b>Crew</b><p>Pull off three jobs. Keep the moles off your crews.</p></div>`;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(nm)}, this is your role</p>
+      <div class="reveal rolecard" id="card" tabindex="0" role="button" aria-label="Press and hold to see your role">
+        <div class="reveal-in"><div class="reveal-face reveal-front"><b>Hold to read</b><small>Keep it to yourself.</small></div>${back}</div>
+      </div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="seen" id="doneBtn"${S.peeked ? '' : ' disabled'}>${S.at < n() - 1 ? 'Done. Pass it on' : 'Done'}</button></div>
+    </section>`;
+  }
+  function viewPlan() {
+    const need = size(), full = S.crew.length === need;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Job ${S.job + 1} of 5</p>
+      <h2 class="big">${esc(leader())} leads</h2>
+      ${jobsHTML()}
+      <p class="lead">${esc(leader())}, pick ${need} people for the job. You can pick yourself.${needFails() === 2 ? ' This job only fails with two mess ups.' : ''}</p>
+      <div class="crewpick">${S.players.map(p => `<button type="button" data-act="crew" data-n="${esc(p)}" aria-pressed="${S.crew.includes(p)}">${esc(p)}</button>`).join('')}</div>
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="propose"${full ? '' : ' disabled'}>${full ? 'Put it to a vote' : 'Pick ' + (need - S.crew.length) + ' more'}</button></div>
+    </section>`;
+  }
+  function viewVote() {
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Job ${S.job + 1}. Proposed crew</p>
+      <h2 class="big">${esc(P.listNames(S.crew))}</h2>
+      <p class="lead">Count down out loud, then everyone shows thumbs up or thumbs down.</p>
+      <div class="actions center"><button class="btn btn-alt btn-big" type="button" data-act="reject">Most said no</button><button class="btn btn-main btn-big" type="button" data-act="approve">Most said yes</button></div>
+      ${jobsHTML()}
+    </section>`;
+  }
+  function viewJobPass() {
+    const nm = S.crew[S.at];
+    return P.header() + P.passScreen({ eyebrow: 'On the job ' + (S.at + 1) + ' of ' + S.crew.length, name: nm, lead: 'Only ' + esc(nm) + ' looks.', act: 'onjob' });
+  }
+  function viewChoose() {
+    const nm = S.crew[S.at], mole = S.moles.includes(nm);
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${esc(nm)}, on the job</p>
+      <h2 class="big">What do you do?</h2>
+      <div class="choice"><button class="ok" type="button" data-act="play" data-v="ok">Pull it off</button>${mole ? '<button class="fail" type="button" data-act="play" data-v="fail">Mess it up</button>' : ''}</div>
+      <p class="hint">${mole ? 'Only you can see this choice.' : 'Crew always pull it off.'}</p>
+    </section>`;
+  }
+  function viewOutcome() {
+    const L = S.last;
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">Job ${L.job + 1}</p>
+      <span class="stamp ${L.ok ? 'ok' : 'fail'}">${L.ok ? 'Done' : 'Failed'}</span>
+      <p class="lead">${L.fails === 0 ? 'Everyone pulled it off.' : L.fails === 1 ? 'One person messed it up.' : L.fails + ' people messed it up.'}${!L.ok ? '' : L.fails ? ' It still worked, because this job needed two mess ups.' : ''}</p>
+      <div class="tally">${L.cards.map(c => `<span class="${c}">${c === 'ok' ? 'Pulled off' : 'Messed up'}</span>`).join('')}</div>
+      ${jobsHTML()}
+      <div class="actions center"><button class="btn btn-main btn-big" type="button" data-act="continue">Carry on</button></div>
+    </section>`;
+  }
+  function viewFinal() {
+    const crewWin = S.winner === 'crew';
+    return P.header() + `
+    <section class="center">
+      <p class="eyebrow">${crewWin ? 'Three jobs done' : S.rejects >= 5 ? 'Five crews turned down' : 'Three jobs wrecked'}</p>
+      <h2 class="big">${crewWin ? 'The crew wins' : 'The moles win'}</h2>
+      <p class="moles">The moles were <strong>${esc(P.listNames(S.moles))}</strong>.</p>
+      ${jobsHTML()}
+      <div class="actions center"><button class="btn btn-alt" type="button" data-act="setup">Change players</button><button class="btn btn-main btn-big" type="button" data-act="again">Play again</button></div>
+    </section>`;
+  }
+
+  const VIEWS = { setup: viewSetup, pass: viewPass, role: viewRole, plan: viewPlan, vote: viewVote, jobpass: viewJobPass, choose: viewChoose, outcome: viewOutcome, final: viewFinal };
+  function render() {
+    app.innerHTML = (VIEWS[S.screen] || viewSetup)();
+    if (S.screen === 'setup') editor = P.playerEditor(document.getElementById('players'), { min: 5, max: 10 });
+    const card = document.getElementById('card');
+    if (card) P.holdToReveal(card, () => { if (!S.peeked) { S.peeked = true; const d = document.getElementById('doneBtn'); if (d) d.disabled = false; } });
+    if (S.screen !== shown) window.scrollTo(0, 0);
+    shown = S.screen;
+  }
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    switch (b.getAttribute('data-act')) {
+      case 'start': sfx.unlock(); P.stayAwake(); deal(editor.get()); break;
+      case 'me': S.peeked = false; S.screen = 'role'; render(); break;
+      case 'seen':
+        S.at++;
+        S.screen = S.at >= n() ? 'plan' : 'pass';
+        render();
+        break;
+      case 'crew': {
+        const nm = b.getAttribute('data-n'), at = S.crew.indexOf(nm);
+        if (at >= 0) S.crew.splice(at, 1);
+        else if (S.crew.length < size()) S.crew.push(nm);
+        sfx.tick(1300);
+        render();
+        break;
+      }
+      case 'propose': if (S.crew.length === size()) { S.screen = 'vote'; render(); } break;
+      case 'reject':
+        S.rejects++;
+        sfx.buzz(0.4);
+        if (endCheck()) break;
+        nextLeader();
+        S.screen = 'plan';
+        render();
+        break;
+      case 'approve': S.rejects = 0; S.cards = []; S.at = 0; S.crew = P.shuffle(S.crew.slice()); S.screen = 'jobpass'; sfx.pop(); render(); break;
+      case 'onjob': S.screen = 'choose'; render(); break;
+      case 'play': {
+        const v = b.getAttribute('data-v');
+        S.cards.push(v === 'fail' && S.moles.includes(S.crew[S.at]) ? 'fail' : 'ok');
+        S.at++;
+        sfx.pop();
+        if (S.at < S.crew.length) { S.screen = 'jobpass'; render(); break; }
+        const fails = S.cards.filter(c => c === 'fail').length, ok = fails < needFails();
+        S.last = { job: S.job, ok, fails, cards: P.shuffle(S.cards.slice()) };
+        S.results[S.job] = ok ? 'ok' : 'fail';
+        S.screen = 'outcome';
+        render();
+        if (ok) sfx.ding(); else { sfx.buzz(0.7); P.vibrate([150, 60, 150]); }
+        break;
+      }
+      case 'continue':
+        if (endCheck()) break;
+        S.job++;
+        nextLeader();
+        S.screen = 'plan';
+        render();
+        break;
+      case 'again': deal(S.players); break;
+      case 'setup': S.screen = 'setup'; render(); break;
+    }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
