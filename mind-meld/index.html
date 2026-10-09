@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;700&display=swap">
-<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<link rel="stylesheet" href="../shared/base.css?v=21cb0b0f">
 <style>
 /* Layout: two soft circles drifting toward each other. Pastel peach meets periwinkle, and each round's words sit where they overlap. */
 :root{
@@ -52,14 +52,16 @@ body{background:linear-gradient(160deg,#ffd2c2 0%,#f6d7f0 50%,#c9d4ff 100%);back
 .face-back b{display:block;font-size:clamp(20px,5vw,28px);overflow-wrap:anywhere}
 .face-back small{display:block;font-size:14px;color:var(--muted)}
 .melded .face-back{box-shadow:0 0 0 4px var(--accent)}
+.note{margin:14px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
 .verdict{margin:22px 0 0;font-weight:700;font-size:clamp(40px,11vw,74px);line-height:1}
 .used{margin-top:18px;font-size:15px;color:var(--muted)}
-.err{color:#c2185b}
+.err{color:#a31550}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=29268f09"></script>
 <script>
 (function () {
   'use strict';
@@ -82,6 +84,11 @@ body{background:linear-gradient(160deg,#ffd2c2 0%,#f6d7f0 50%,#c9d4ff 100%);back
       <div class="sec"><span class="label">Players</span><div id="players"></div><p class="hint">Two players is classic. Up to six makes it much harder.</p></div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Start melding</button></div>
       ${S.best ? `<p class="hint">Best on this phone: melded in ${P.plural(S.best, 'round')}.</p>` : ''}
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone types on their own phone. Make a game, then send the code to your friends.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -216,7 +223,191 @@ body{background:linear-gradient(160deg,#ffd2c2 0%,#f6d7f0 50%,#c9d4ff 100%);back
     if (e.key === 'Enter' && e.target.id === 'word') { e.preventDefault(); submitWord(); }
   });
 
-  render();
+  /* ---------- Online: everyone types on their own phone ---------- */
+  const cleanWord = t => String(t == null ? '' : t).replace(/\s+/g, ' ').trim().slice(0, 30);
+  function meldNew(F) {
+    F.round = 1;
+    F.rid++;
+    F.last = [];
+    F.used = [];
+    F.words = {};
+    F.shown = [];
+    F.melded = false;
+    F.phase = 'type';
+  }
+  function meldReveal(F) {
+    F.shown = F.players.filter(p => F.words[p.id]).map(p => [p.id, F.words[p.id]]);
+    F.melded = F.shown.length === F.players.length && F.shown.every(x => P.sameAnswer(x[1], F.shown[0][1]));
+    F.phase = 'reveal';
+  }
+  function meldAnimate(v, F) {
+    const rid = F.rid, total = F.shown.length;
+    v.local.meldRun = rid;
+    let n = P.reducedMotion() ? 0 : 3;
+    const step = () => {
+      if (v.local.meldRun !== rid) return;
+      const big = document.getElementById('omeld');
+      if (n > 0) { if (big) big.textContent = n; sfx.beep(false); n--; setTimeout(step, 600); return; }
+      if (big) big.textContent = F.melded ? 'In sync' : 'Reveal';
+      sfx.beep(true);
+      document.querySelectorAll('.cards .card').forEach(c => c.classList.add('flip'));
+      setTimeout(() => {
+        if (v.local.meldRun !== rid) return;
+        v.local.meldFlipped = rid;
+        v.redraw();
+        if (F.melded) {
+          sfx.win();
+          P.confetti({ colors: ['#ff9f80', '#8fa2ff', '#6c5ce7', '#ffffff'] });
+          if (!S.best || F.round < S.best) { S.best = F.round; persist(); }
+        } else sfx.tone(330, { type: 'triangle', to: 220, dur: 0.4, gain: 0.12 });
+      }, 900 + total * 160);
+    };
+    step();
+  }
+  const ONLINE = {
+    game: 'mind-meld', title: 'Mind Meld', min: 2, max: 6,
+    start(players) {
+      const F = { players, rid: 0, game: 1 };
+      meldNew(F);
+      return F;
+    },
+    view(F) {
+      const v = Object.assign({}, F);
+      v.typed = Object.keys(F.words);
+      delete v.words;
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach(p => { out[p.id] = { r: F.rid, w: F.words[p.id] || '' }; });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(p => p.id === from)) return false;
+      const host = from === ctx.host;
+      if (a.t === 'again') {
+        if (a.g !== F.game || !((F.phase === 'reveal' && F.melded) || F.phase === 'gaveup')) return false;
+        F.game++;
+        meldNew(F);
+        return true;
+      }
+      if (a.r !== F.rid) return false;
+      switch (a.t) {
+        case 'word': {
+          const w = cleanWord(a.w);
+          if (F.phase !== 'type' || !w || F.used.some(u => P.sameAnswer(u, w))) return false;
+          F.words[from] = w;
+          if (F.players.every(p => F.words[p.id])) meldReveal(F);
+          return true;
+        }
+        case 'show':
+          if (!host || F.phase !== 'type' || Object.keys(F.words).length < 2) return false;
+          meldReveal(F);
+          return true;
+        case 'next':
+          if (F.phase !== 'reveal' || F.melded) return false;
+          F.used = F.used.concat(F.shown.map(x => x[1]));
+          F.last = F.shown.map(x => x[1]);
+          F.round++;
+          F.rid++;
+          F.words = {};
+          F.shown = [];
+          F.phase = 'type';
+          return true;
+        case 'giveup':
+          if (F.phase !== 'reveal' || F.melded) return false;
+          F.used = F.used.concat(F.shown.map(x => x[1]));
+          F.rid++;
+          F.phase = 'gaveup';
+          return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      if (F.players.length < 2) return 'open';
+      gone.forEach(id => { delete F.words[id]; });
+      if (F.phase === 'type' && F.players.every(p => F.words[p.id])) meldReveal(F);
+    },
+    render(v) {
+      const F = v.pub, me = v.me;
+      const nm = id => { const p = F.players.find(x => x.id === id); return p ? p.name : 'Someone'; };
+      const send = a => Online.sendAttr(Object.assign({ r: F.rid }, a));
+      if (F.phase === 'type') {
+        const mine = v.mine && v.mine.r === F.rid ? v.mine.w : '';
+        const editing = v.local.meldEdit === F.rid;
+        const waiting = F.players.filter(p => !F.typed.includes(p.id)).map(p => p.id);
+        const err = v.local.meldErr && v.local.meldErr.r === F.rid ? v.local.meldErr.text : '';
+        const field = mine && !editing
+          ? `<p class="lead">Your word is <b>${esc(mine)}</b>.</p><div class="actions center"><button class="btn btn-alt" type="button" data-ui="edit">Change it</button></div>`
+          : `<div class="field"><label for="omw-${F.rid}">${F.last.length ? 'A word that links them' : 'Any word'}</label><input id="omw-${F.rid}" data-keep data-enter="word" type="text" maxlength="30" autocomplete="off" autocapitalize="off" enterkeyhint="done" placeholder="One word" value="${esc(mine)}"></div>
+             <p class="err" role="alert">${esc(err)}</p>
+             <div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="word"${v.pending ? ' disabled' : ''}>Lock it in</button></div>`;
+        return `<section class="center">
+          <p class="eyebrow">Round ${F.round}</p>
+          ${F.last.length ? `<h2 class="big">Find the link</h2>${linksHTML(F.last)}` : '<h2 class="big">Any word at all</h2><p class="lead">Everyone secretly types any word that comes to mind.</p>'}
+          ${field}
+          <p class="note">${waiting.length ? 'Waiting for ' + esc(P.listNames(waiting.map(nm))) + '.' : 'Everyone is ready.'}</p>
+          ${F.used.length ? `<p class="used">Already used: ${esc(F.used.join(', '))}</p>` : ''}
+          ${v.host && F.typed.length >= 2 && waiting.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'show' })}>Show the words now</button></div>` : ''}
+        </section>`;
+      }
+      if (F.phase === 'reveal') {
+        const flipped = v.local.meldFlipped === F.rid;
+        const armed = v.local.meldGiveUp === F.rid;
+        return `<section class="center">
+          <p class="eyebrow">Round ${F.round}</p>
+          <h2 class="big" id="omeld">${flipped ? (F.melded ? 'In sync' : 'Reveal') : 'Three, two, one'}</h2>
+          <div class="cards${F.melded ? ' melded' : ''}">${F.shown.map((x, k) => `<div class="card${flipped ? ' flip' : ''}" style="--d:${k * 160}ms"><div class="card-in"><div class="face face-front">${esc(nm(x[0]))}</div><div class="face face-back"><b>${esc(x[1])}</b><small>${esc(nm(x[0]))}</small></div></div></div>`).join('')}</div>
+          <div${flipped ? '' : ' hidden'}>
+            ${F.melded ? `<p class="verdict">Mind meld!</p><p class="lead">You all said ${esc(F.shown[0][1])} in ${P.plural(F.round, 'round')}.</p>
+              <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Meld again</button></div>`
+            : `<p class="verdict">Not yet</p><p class="lead">Now find the word that links these.</p>
+              <div class="actions center"><button class="btn btn-alt" type="button" data-ui="giveup">${armed ? 'Tap again to give up' : 'Give up'}</button><button class="btn btn-main btn-big" type="button" ${send({ t: 'next' })}>Next round</button></div>`}
+          </div>
+        </section>`;
+      }
+      return `<section class="center">
+        <p class="eyebrow">Out of sync</p>
+        <h2 class="big">No meld this time</h2>
+        <p class="lead">You got through ${P.plural(F.round, 'round')} and ${P.plural(F.used.length, 'word')}.</p>
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Try again</button></div>
+      </section>`;
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'word') {
+        const f = document.getElementById('omw-' + F.rid);
+        const w = cleanWord(f ? f.value : '');
+        if (!w) { if (f) f.focus(); return; }
+        if (F.used.some(u => P.sameAnswer(u, w))) { v.local.meldErr = { r: F.rid, text: 'That word was already used. Pick a new one.' }; sfx.buzz(0.3); v.redraw(); return; }
+        v.local.meldErr = null;
+        v.local.meldEdit = null;
+        v.send({ t: 'word', r: F.rid, w });
+        sfx.whoosh();
+      } else if (name === 'edit') {
+        v.local.meldEdit = F.rid;
+        v.redraw();
+      } else if (name === 'giveup') {
+        if (v.local.meldGiveUp === F.rid) { v.local.meldGiveUp = null; v.send({ t: 'giveup', r: F.rid }); return; }
+        v.local.meldGiveUp = F.rid;
+        v.redraw();
+        setTimeout(() => { if (v.local.meldGiveUp === F.rid) { v.local.meldGiveUp = null; v.redraw(); } }, 3000);
+      }
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (F.phase !== 'reveal') return;
+      // Somebody arriving mid reveal sees the words straight away.
+      if (!B || B.game !== F.game) { if (v.local.meldFlipped !== F.rid) { v.local.meldFlipped = F.rid; v.redraw(); } return; }
+      if (B.phase !== 'reveal' || B.rid !== F.rid) meldAnimate(v, F);
+    }
+  };
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

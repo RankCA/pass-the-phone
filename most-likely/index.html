@@ -26,6 +26,7 @@
   --muted:#e4c6ce;
   --f-varsity:"Graduate","Rockwell","Georgia",serif;
   --f-body:"Libre Franklin","Segoe UI",system-ui,-apple-system,sans-serif;
+  --ol-display:var(--f-varsity);
 }
 *,*::before,*::after{box-sizing:border-box}
 [hidden]{display:none!important}
@@ -53,7 +54,7 @@ button{font:inherit;color:inherit}
 .pp-row{display:flex;align-items:center;gap:8px}
 .pp-num{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:50%;background:var(--maroon);color:var(--cream);font-family:var(--f-varsity);font-size:14px}
 .pp-input{flex:1;min-width:0;width:0;height:46px;padding:0 12px;border:0;border-bottom:2px solid var(--maroon);border-radius:4px 4px 0 0;background:rgba(255,255,255,.55);color:var(--ink);font:600 18px/1 var(--f-body)}
-.pp-input::placeholder{color:#a3838e;font-weight:400}
+.pp-input::placeholder{color:#8a6573;font-weight:400}
 .pp-input:focus{outline:none;background:#fff}
 .pp-remove{display:grid;place-items:center;flex:none;width:42px;height:42px;border:0;border-radius:50%;background:transparent;color:var(--maroon);cursor:pointer}
 .pp-remove:hover{background:rgba(107,26,51,.1)}
@@ -123,6 +124,11 @@ button{font:inherit;color:inherit}
 .entry h3{margin:0;font-family:var(--f-varsity);font-weight:400;font-size:22px;line-height:1.1;overflow-wrap:anywhere}
 .entry ul{margin:10px 0 0;padding-left:1.1em;display:grid;gap:4px;font-size:15px}
 .entry p{margin:10px 0 0;font-size:15px;color:#6e4a57}
+.textbtn{background:none;border:0;padding:8px;color:var(--muted);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font-size:15px}
+.online{margin-top:20px;padding:16px 20px;border-radius:6px;box-shadow:inset 0 0 0 2px rgba(251,241,220,.3)}
+.online p{margin:0;color:var(--muted)}
+.online .label{color:var(--cream)}
+.waiting{margin:16px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
 .howto{margin-top:26px;color:var(--muted)}
 .howto summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-family:var(--f-varsity);font-size:20px;color:var(--cream)}
 .howto ol{margin:4px 0 0;padding-left:1.3em;display:grid;gap:8px}
@@ -135,6 +141,7 @@ button{font:inherit;color:inherit}
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=29268f09"></script>
 <script src="prompts.js?v=38dd9e0d"></script>
 <script>
 (function () {
@@ -185,6 +192,11 @@ button{font:inherit;color:inherit}
         <div class="seg" role="radiogroup">${[[8, '8'], [12, '12'], [20, '20']].map(([v, t]) => `<label><input type="radio" name="count" id="count-${v}" value="${v}"${S.settings.count === v ? ' checked' : ''}><span>${t}</span></label>`).join('')}</div>
       </div>
       <div class="actions"><button class="btn btn-maroon btn-big" type="button" data-act="start">Open the yearbook</button></div>
+    </div>
+    <div class="online">
+      <span class="label">Play online</span>
+      <p>Everyone votes in secret on their own phone. Make a game, then send the code to your friends.</p>
+      <div class="actions"><a class="btn btn-line" href="?lobby=new">Make an online game</a><a class="btn btn-line" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -364,7 +376,155 @@ button{font:inherit;color:inherit}
     else if (t.id === 'self') { S.settings.self = t.checked; persist(); }
   });
 
-  render();
+  /* ---------- Online: everyone votes in secret on their own phone ---------- */
+  function likelyTally(F) {
+    const c = {};
+    Object.keys(F.votes).forEach(k => { const t = F.votes[k]; c[t] = (c[t] || 0) + 1; });
+    const max = Math.max(0, ...Object.values(c));
+    F.counts = c;
+    F.winners = max ? F.players.filter(p => c[p.id] === max).map(p => p.id) : [];
+    F.winners.forEach(id => { (F.wins[id] = F.wins[id] || []).push(F.prompts[F.idx]); });
+    F.phase = 'results';
+  }
+  function likelyFresh(F) {
+    F.qid++;
+    F.phase = 'vote';
+    F.votes = {};
+    F.counts = {};
+    F.winners = [];
+  }
+  const ONLINE = {
+    game: 'most-likely', title: 'Most Likely To', min: 3, max: 12, header,
+    ui: { main: 'btn btn-gold btn-big', alt: 'btn btn-line', inAlt: 'btn btn-maroon', panel: 'page', eyebrow: 'eyebrow', big: 'big', lead: 'lead', label: 'label', textbtn: 'textbtn' },
+    options() {
+      return `<span class="label">Questions</span><div class="seg" role="radiogroup">${[[8, '8'], [12, '12'], [20, '20']].map(([v, t]) => `<label><input type="radio" name="o-count" id="o-count-${v}" value="${v}"${S.settings.count === v ? ' checked' : ''}><span>${t}</span></label>`).join('')}</div>
+        <div class="sec"><label class="check"><input type="checkbox" id="o-self"${S.settings.self ? ' checked' : ''}><span>Players can vote for themselves</span></label></div>`;
+    },
+    readOptions() { return { count: S.settings.count, self: S.settings.self }; },
+    start(players, o) {
+      const F = { players, self: !!o.self, prompts: deck.draw(o.count), idx: 0, qid: 0, wins: {}, game: 1 };
+      likelyFresh(F);
+      return F;
+    },
+    view(F) {
+      const v = Object.assign({}, F);
+      v.voted = Object.keys(F.votes);
+      delete v.votes;
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach(p => { out[p.id] = { q: F.qid, vote: F.votes[p.id] || null }; });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(p => p.id === from)) return false;
+      const host = from === ctx.host;
+      if (a.t === 'again') {
+        if (F.phase !== 'final' || a.g !== F.game) return false;
+        F.prompts = deck.draw(F.prompts.length);
+        F.idx = 0;
+        F.wins = {};
+        F.game++;
+        likelyFresh(F);
+        return true;
+      }
+      if (a.q !== F.qid) return false;
+      switch (a.t) {
+        case 'vote':
+          if (F.phase !== 'vote' || !F.players.some(p => p.id === a.id) || (!F.self && a.id === from)) return false;
+          F.votes[from] = a.id;
+          if (F.players.every(p => F.votes[p.id])) likelyTally(F);
+          return true;
+        case 'count':
+          if (!host || F.phase !== 'vote' || !Object.keys(F.votes).length) return false;
+          likelyTally(F);
+          return true;
+        case 'skip': {
+          if (!host || F.phase !== 'vote') return false;
+          const fresh = deck.one(F.prompts);
+          if (fresh) F.prompts[F.idx] = fresh;
+          likelyFresh(F);
+          return true;
+        }
+        case 'next':
+          if (F.phase !== 'results') return false;
+          if (F.idx >= F.prompts.length - 1) { F.qid++; F.phase = 'final'; }
+          else { F.idx++; likelyFresh(F); }
+          return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      if (F.players.length < 3) return 'open';
+      Object.keys(F.votes).forEach(k => { if (gone.includes(k) || gone.includes(F.votes[k])) delete F.votes[k]; });
+      gone.forEach(id => { delete F.wins[id]; });
+      if (F.phase === 'vote' && F.players.every(p => F.votes[p.id])) likelyTally(F);
+    },
+    render(v) {
+      const F = v.pub, me = v.me, q = F.prompts[F.idx];
+      const nm = id => { const p = F.players.find(x => x.id === id); return p ? p.name : 'Someone'; };
+      const names = ids => esc(listNames(ids.map(nm)));
+      const card = `<div class="prompt"><span class="num">${F.idx + 1} of ${F.prompts.length}</span><small>Who is most likely to</small><b>${esc(q)}?</b></div>`;
+      if (F.phase === 'vote') {
+        const mine = v.mine && v.mine.q === F.qid ? v.mine.vote : null;
+        const waiting = F.players.filter(p => !F.voted.includes(p.id)).map(p => p.id);
+        const send = a => Online.sendAttr(Object.assign({ q: F.qid }, a));
+        return `<section class="center">
+          <p class="eyebrow">Secret vote</p>
+          ${card}
+          <div class="votes">${F.players.map(p => `<button class="vote-btn" type="button" ${send({ t: 'vote', id: p.id })} aria-pressed="${mine === p.id}"${!F.self && p.id === me ? ' disabled' : ''}>${esc(p.name)}${p.id === me ? '<small>you</small>' : ''}</button>`).join('')}</div>
+          <p class="waiting">${mine ? 'Vote saved. You can change it until everyone has voted. ' : ''}${waiting.length ? 'Still voting: ' + names(waiting) + '.' : 'Counting the votes.'}</p>
+          ${v.host ? `<div class="actions center"><button class="btn btn-line" type="button" ${send({ t: 'skip' })}>Skip this question</button>${F.voted.length && waiting.length ? `<button class="btn btn-line" type="button" ${send({ t: 'count' })}>Count the votes now</button>` : ''}</div>` : ''}
+        </section>`;
+      }
+      if (F.phase === 'results') {
+        const max = Math.max(0, ...F.players.map(p => F.counts[p.id] || 0));
+        const rows = F.players.map(p => ({ p, n: F.counts[p.id] || 0 })).sort((a, b) => b.n - a.n);
+        const last = F.idx >= F.prompts.length - 1;
+        return `<section class="center">
+          <p class="eyebrow">${F.winners.length > 1 ? 'It is a tie' : 'And the title goes to'}</p>
+          <div class="ribbons">${F.winners.map((id, k) => `<span class="ribbon" style="animation-delay:${400 + k * 150}ms">${esc(nm(id))}</span>`).join('')}</div>
+          <p class="lead">Most likely to ${esc(q)}.</p>
+          <div class="bars" aria-label="Votes">${rows.map((r, k) => `<div class="bar${F.winners.includes(r.p.id) ? ' win' : ''}"><span class="n">${esc(r.p.name)}</span><span class="track"><span class="fill" style="--w:${max ? Math.round(r.n / max * 100) : 0}%;--d:${k * 90}ms"></span></span><span class="c">${r.n}</span></div>`).join('')}</div>
+          <div class="actions center"><button class="btn btn-gold btn-big" type="button" ${Online.sendAttr({ t: 'next', q: F.qid })}>${last ? 'See the yearbook' : 'Next question'}</button></div>
+        </section>`;
+      }
+      const entries = F.players.map((p, i) => ({ p, i, titles: F.wins[p.id] || [] })).sort((a, b) => b.titles.length - a.titles.length);
+      const top = entries[0] && entries[0].titles.length ? entries.filter(e => e.titles.length === entries[0].titles.length) : [];
+      return `<section class="center">
+        <p class="eyebrow">The yearbook</p>
+        <h2 class="big">Class superlatives</h2>
+        <p class="lead">${top.length ? esc(listNames(top.map(e => e.p.name))) + ' earned the most titles, with ' + P.plural(top[0].titles.length, 'title') + '.' : 'Nobody earned a title this time.'}</p>
+        <div class="book">${entries.map(e => `<article class="entry">
+          <header><span class="face" style="--c:${FACES[e.i % FACES.length]}" aria-hidden="true">${esc(e.p.name.trim()[0] || '?').toUpperCase()}</span><h3>${esc(e.p.name)}${e.p.id === me ? ' (you)' : ''}</h3></header>
+          ${e.titles.length ? `<ul>${e.titles.map(t => `<li>Most likely to ${esc(t)}</li>`).join('')}</ul>` : '<p>Flew under the radar.</p>'}
+        </article>`).join('')}</div>
+        <div class="actions center"><button class="btn btn-gold btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div>
+      </section>`;
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.phase === 'vote' && B.phase === 'vote' && F.qid === B.qid && F.voted.length > B.voted.length) sfx.tick();
+      if (F.phase === 'results' && B.phase !== 'results') {
+        sfx.noise({ filter: 'bandpass', freq: 300, to: 900, dur: 0.5, gain: 0.18, q: 2 });
+        setTimeout(() => { sfx.win(); }, 380);
+      }
+      if (F.phase === 'final' && B.phase !== 'final') { sfx.win(); P.confetti({ colors: ['#f2c14e', '#fbf1dc', '#f3b5c3', '#6b1a33'] }); }
+    }
+  };
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'o-count') { S.settings.count = Number(t.value); persist(); }
+    else if (t.id === 'o-self') { S.settings.self = t.checked; persist(); }
+  });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

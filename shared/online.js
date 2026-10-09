@@ -46,7 +46,12 @@
   const GAMES = {
     'four-in-a-row': { title: 'Four in a Row', min: 2, max: 2, blurb: 'Two players, one grid. Line up four.' },
     flock: { title: 'Flock', min: 3, max: 12, blurb: 'Give the answer everyone else gives.' },
-    impostor: { title: 'Impostor', min: 3, max: 12, blurb: 'One of you does not know the secret word.' }
+    impostor: { title: 'Impostor', min: 3, max: 12, blurb: 'One of you does not know the secret word.' },
+    'most-likely': { title: 'Most Likely To', min: 3, max: 12, blurb: 'Vote in secret for yearbook titles.' },
+    'two-of-a-kind': { title: 'Two of a Kind', min: 3, max: 12, blurb: 'Fill the blank and match exactly one other player.' },
+    'hot-takes': { title: 'Hot Takes', min: 3, max: 12, blurb: 'Guess how many people agreed with the take.' },
+    'odd-one-out': { title: 'Odd One Out', min: 3, max: 12, blurb: 'One player got a different question.' },
+    'mind-meld': { title: 'Mind Meld', min: 2, max: 6, blurb: 'Link your words until you all say the same one.' }
   };
 
   /* ---------- Connection ---------- */

@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Outfit:wght@400;600;800&display=swap">
-<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<link rel="stylesheet" href="../shared/base.css?v=21cb0b0f">
 <style>
 /* Layout: a grid of identical squares with one pink circle hiding in it. Everything is square and orderly except the odd one. */
 :root{
@@ -56,11 +56,22 @@ body{background-color:#2fc39b;background-image:linear-gradient(rgba(13,43,36,.07
 .qs div.odd{box-shadow:inset 0 0 0 3px var(--accent)}
 .qs small{display:block;font-weight:800;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .qs b{display:block;margin-top:4px;font-size:20px;line-height:1.3;overflow-wrap:anywhere}
+.answers{list-style:none;margin:20px auto 0;padding:0;display:grid;gap:8px;max-width:520px;text-align:left}
+.answers li{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 16px;border-radius:8px;background:#fff;box-shadow:inset 0 0 0 3px var(--ink);font-weight:700}
+.answers li span{min-width:0;overflow-wrap:anywhere}
+.answers li b{font-family:var(--f-display);font-weight:400;font-size:22px;text-align:right;overflow-wrap:anywhere}
+.fingers{display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:8px;max-width:520px;margin:18px auto 0}
+.fingers button{min-height:56px;border:0;border-radius:8px;background:#fff;color:var(--ink);font-family:var(--f-display);font-size:24px;cursor:pointer;box-shadow:inset 0 0 0 3px var(--ink);touch-action:manipulation}
+.fingers button[aria-pressed="true"],.pick button[aria-pressed="true"]{background:var(--ink);color:#e9fff8}
+.note{margin:14px auto 0;max-width:30em;font-size:16px}
+.online{margin-top:22px;padding:16px 18px;border-radius:6px;background:rgba(255,255,255,.35)}
+.online p{margin:0}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=29268f09"></script>
 <script src="questions.js?v=8314841d"></script>
 <script>
 (function () {
@@ -95,6 +106,11 @@ body{background-color:#2fc39b;background-image:linear-gradient(rgba(13,43,36,.07
     <div class="panel">
       <div class="sec"><span class="label">Players</span><div id="players"></div></div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Deal the questions</button>${has ? '<button class="btn btn-alt" type="button" data-act="reset">Reset scores</button>' : ''}</div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone reads their question and answers on their own phone, then the answers show up together. Make a game, then send the code.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     ${has ? P.scoreList(Object.entries(S.scores)) : ''}
     <details class="howto">
@@ -223,7 +239,243 @@ body{background-color:#2fc39b;background-image:linear-gradient(rgba(13,43,36,.07
     }
   });
 
-  render();
+  /* ---------- Online: everyone answers on their own phone ---------- */
+  const ANSWER_HOW = {
+    fingers: 'Pick a number from 0 to 10.',
+    point: 'Pick a player.',
+    hand: 'Hand up or hand down.',
+    word: 'Type one word.'
+  };
+  function oddDeal(F) {
+    F.n++;
+    F.pair = deck.one();
+    F.flip = Math.random() < 0.5;
+    F.odd = P.pick(F.players).id;
+    F.phase = 'read';
+    F.read = [];
+    F.answers = {};
+    F.votes = {};
+    F.accused = null;
+    F.winner = null;
+  }
+  const qMain = F => (F.flip ? F.pair.b : F.pair.a);
+  const qOdd = F => (F.flip ? F.pair.a : F.pair.b);
+  function oddAnswerOk(F, a) {
+    const t = F.pair.type;
+    if (t === 'fingers') return Number.isInteger(a) && a >= 0 && a <= 10;
+    if (t === 'point') return F.players.some(p => p.id === a);
+    if (t === 'hand') return a === 'up' || a === 'down';
+    return typeof a === 'string' && a.trim().length > 0;
+  }
+  function oddTally(F) {
+    const c = {};
+    Object.keys(F.votes).forEach(k => { const t = F.votes[k]; c[t] = (c[t] || 0) + 1; });
+    const top = Math.max(0, ...Object.values(c));
+    const lead = Object.keys(c).filter(id => c[id] === top);
+    F.accused = lead.length === 1 ? lead[0] : 'tie';
+    F.winner = F.accused === F.odd ? 'group' : 'odd';
+    F.players.forEach(p => {
+      if (F.winner === 'group' && p.id !== F.odd) F.scores[p.id] = (F.scores[p.id] || 0) + 1;
+      if (F.winner === 'odd' && p.id === F.odd) F.scores[p.id] = (F.scores[p.id] || 0) + 2;
+    });
+    F.phase = 'result';
+  }
+  const ONLINE = {
+    game: 'odd-one-out', title: 'Odd One Out', min: 3, max: 12,
+    start(players) {
+      const F = { players, scores: {}, n: 0, game: 1 };
+      oddDeal(F);
+      return F;
+    },
+    view(F) {
+      const v = { players: F.players, scores: F.scores, n: F.n, game: F.game, type: F.pair.type, phase: F.phase, read: F.read,
+        answered: Object.keys(F.answers), voted: Object.keys(F.votes), accused: F.accused, winner: F.winner };
+      if (F.phase === 'talk' || F.phase === 'vote' || F.phase === 'result') v.answers = F.answers;
+      if (F.phase === 'result') Object.assign(v, { odd: F.odd, qMain: qMain(F), qOdd: qOdd(F), votes: F.votes });
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach(p => { out[p.id] = { n: F.n, q: p.id === F.odd ? qOdd(F) : qMain(F), a: F.answers[p.id] == null ? null : F.answers[p.id], vote: F.votes[p.id] || null }; });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(p => p.id === from) || a.n !== F.n) return false;
+      const host = from === ctx.host;
+      const toTalk = () => { F.phase = 'talk'; };
+      switch (a.t) {
+        case 'read':
+          if (F.phase !== 'read' || F.read.includes(from)) return false;
+          F.read.push(from);
+          if (F.players.every(p => F.read.includes(p.id))) F.phase = 'answer';
+          return true;
+        case 'go':
+          if (!host || F.phase !== 'read') return false;
+          F.phase = 'answer';
+          return true;
+        case 'answer': {
+          let v = a.a;
+          if (F.pair.type === 'word') v = String(v == null ? '' : v).trim().split(/\s+/)[0].slice(0, 24);
+          if (F.phase !== 'answer' || !oddAnswerOk(F, v)) return false;
+          F.answers[from] = v;
+          if (F.players.every(p => F.answers[p.id] != null)) toTalk();
+          return true;
+        }
+        case 'show':
+          if (!host || F.phase !== 'answer' || Object.keys(F.answers).length < 2) return false;
+          toTalk();
+          return true;
+        case 'votenow':
+          if (F.phase !== 'talk') return false;
+          F.phase = 'vote';
+          return true;
+        case 'vote':
+          if (F.phase !== 'vote' || a.id === from || !F.players.some(p => p.id === a.id)) return false;
+          F.votes[from] = a.id;
+          if (F.players.every(p => F.votes[p.id])) oddTally(F);
+          return true;
+        case 'count':
+          if (!host || F.phase !== 'vote' || !Object.keys(F.votes).length) return false;
+          oddTally(F);
+          return true;
+        case 'next':
+          if (F.phase !== 'result') return false;
+          oddDeal(F);
+          return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      gone.forEach(id => { delete F.scores[id]; });
+      if (F.players.length < 3) return 'open';
+      if (F.phase === 'result') return;
+      // The odd one walked out, so deal a fresh question.
+      if (gone.includes(F.odd)) { oddDeal(F); return; }
+      F.read = F.read.filter(id => !gone.includes(id));
+      Object.keys(F.answers).forEach(k => { if (gone.includes(k) || (F.pair.type === 'point' && gone.includes(F.answers[k]))) delete F.answers[k]; });
+      Object.keys(F.votes).forEach(k => { if (gone.includes(k) || gone.includes(F.votes[k])) delete F.votes[k]; });
+      if (F.phase === 'read' && F.players.every(p => F.read.includes(p.id))) F.phase = 'answer';
+      if (F.phase === 'answer' && F.players.every(p => F.answers[p.id] != null)) F.phase = 'talk';
+      if (F.phase === 'vote' && F.players.every(p => F.votes[p.id])) oddTally(F);
+    },
+    render(v) {
+      const F = v.pub, me = v.me;
+      const m = v.mine && v.mine.n === F.n ? v.mine : null;
+      const nm = id => { const p = F.players.find(x => x.id === id); return p ? p.name : 'Someone'; };
+      const names = ids => esc(P.listNames(ids.map(nm)));
+      const send = a => Online.sendAttr(Object.assign({ n: F.n }, a));
+      const shown = a => (F.type === 'point' ? nm(a) : F.type === 'hand' ? (a === 'up' ? 'Hand up' : 'Hand down') : String(a));
+      const card = hint => `<div class="reveal" id="ocard" tabindex="0" role="button" aria-label="Press and hold to read your question">
+        <div class="reveal-in">
+          <div class="reveal-face reveal-front"><b>Your question</b><small>${hint}</small></div>
+          <div class="reveal-face reveal-back"><small>Your question</small><b>${m ? esc(m.q) : 'Dealing'}</b><p>${ANSWER_HOW[F.type]}</p></div>
+        </div>
+      </div>`;
+      const waitFor = list => (list.length ? 'Waiting for ' + names(list) + '.' : '');
+      if (F.phase === 'read') {
+        const done = F.read.includes(me);
+        const waiting = F.players.filter(p => !F.read.includes(p.id)).map(p => p.id);
+        return `<section class="center">
+          <p class="eyebrow">For your eyes only</p>
+          ${card('Press and hold to read')}
+          ${done ? `<p class="lead">${waitFor(waiting)}</p>`
+            : `<div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="read" id="oread"${v.local.oddPeek === F.n && m ? '' : ' disabled'}>I've read it</button></div>
+               <p class="note">One player has a different question, and they do not know it.</p>`}
+          ${v.host && waiting.length && waiting.length < F.players.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'go' })}>Start without them</button></div>` : ''}
+        </section>`;
+      }
+      if (F.phase === 'answer') {
+        const mine = m ? m.a : null;
+        let input;
+        if (F.type === 'fingers') input = `<div class="fingers">${Array.from({ length: 11 }, (_, k) => `<button type="button" ${send({ t: 'answer', a: k })} aria-pressed="${mine === k}">${k}</button>`).join('')}</div>`;
+        else if (F.type === 'point') input = `<div class="pick">${F.players.map(p => `<button type="button" ${send({ t: 'answer', a: p.id })} aria-pressed="${mine === p.id}">${esc(p.name)}${p.id === me ? ' (you)' : ''}</button>`).join('')}</div>`;
+        else if (F.type === 'hand') input = `<div class="pick"><button type="button" ${send({ t: 'answer', a: 'up' })} aria-pressed="${mine === 'up'}">Hand up</button><button type="button" ${send({ t: 'answer', a: 'down' })} aria-pressed="${mine === 'down'}">Hand down</button></div>`;
+        else input = `<div class="field"><label for="oword-${F.n}">One word</label><input id="oword-${F.n}" data-keep data-enter="word" type="text" maxlength="24" autocomplete="off" autocapitalize="off" enterkeyhint="done" value="${mine == null ? '' : esc(mine)}"></div>
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="word"${v.pending ? ' disabled' : ''}>${mine == null ? 'Lock it in' : 'Change my word'}</button></div>`;
+        const waiting = F.players.filter(p => !F.answered.includes(p.id)).map(p => p.id);
+        return `<section class="center">
+          <p class="eyebrow">Answer in secret</p>
+          ${card('Hold to read it again')}
+          <span class="how">${ANSWER_HOW[F.type]}</span>
+          ${input}
+          <p class="note">${mine == null ? 'Nobody sees your answer until everyone has answered.' : 'Saved. You can change it until everyone is done.'} ${waitFor(waiting)}</p>
+          ${v.host && F.answered.length >= 2 && waiting.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'show' })}>Show the answers now</button></div>` : ''}
+        </section>`;
+      }
+      const list = `<ul class="answers">${F.players.filter(p => F.answers[p.id] != null).map(p => `<li><span>${esc(p.name)}${p.id === me ? ' (you)' : ''}</span><b>${esc(shown(F.answers[p.id]))}</b></li>`).join('')}</ul>`;
+      if (F.phase === 'talk') {
+        return `<section class="center">
+          <p class="eyebrow">Everyone's answers</p>
+          <h2 class="big">Whose answer does not fit?</h2>
+          ${list}
+          <p class="lead">Talk it over. Ask people to explain their answers. The odd one does not know they are odd, so they will defend themselves too.</p>
+          ${card('Hold to check your question')}
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" ${send({ t: 'votenow' })}>Time to vote</button></div>
+        </section>`;
+      }
+      if (F.phase === 'vote') {
+        const mineVote = m && m.vote;
+        const waiting = F.players.filter(p => !F.voted.includes(p.id)).map(p => p.id);
+        return `<section class="center">
+          <p class="eyebrow">Vote</p>
+          <h2 class="big">Who is the odd one out?</h2>
+          <div class="pick">${F.players.filter(p => p.id !== me).map(p => `<button type="button" ${send({ t: 'vote', id: p.id })} aria-pressed="${mineVote === p.id}">${esc(p.name)}</button>`).join('')}</div>
+          <p class="note">${mineVote ? 'Vote saved. You can change it until everyone has voted.' : 'Tap the player you suspect.'} ${waiting.length ? 'Still voting: ' + names(waiting) + '.' : ''}</p>
+          ${list}
+          ${v.host && F.voted.length && waiting.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'count' })}>Count the votes now</button></div>` : ''}
+        </section>`;
+      }
+      const caught = F.winner === 'group';
+      let how;
+      if (F.accused === 'tie') how = 'The vote was a tie, so the odd one slipped by.';
+      else if (F.accused !== F.odd) how = 'You voted for ' + nm(F.accused) + ', who had the same question as everyone.';
+      else how = 'You found ' + nm(F.odd) + '.';
+      return `<section class="center">
+        <p class="eyebrow">${caught ? 'Caught' : 'Got away'}</p>
+        <h2 class="big">${F.odd === me ? 'You were' : esc(nm(F.odd)) + ' was'} the odd one out</h2>
+        <p class="lead">${esc(how)} ${caught ? 'Everyone else gets 1 point.' : esc(nm(F.odd)) + ' gets 2 points.'}</p>
+        <div class="qs"><div><small>Everyone's question</small><b>${esc(F.qMain)}</b></div><div class="odd"><small>${esc(nm(F.odd))}'s question</small><b>${esc(F.qOdd)}</b></div></div>
+        ${list}
+        ${P.scoreList(F.players.map(p => [p.name + (p.id === me ? ' (you)' : ''), F.scores[p.id] || 0]))}
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${send({ t: 'next' })}>Next question</button></div>
+      </section>`;
+    },
+    bind(v) {
+      const F = v.pub, c = document.getElementById('ocard');
+      if (!c) return;
+      P.holdToReveal(c, () => {
+        if (v.local.oddPeek === F.n) return;
+        v.local.oddPeek = F.n;
+        const b = document.getElementById('oread');
+        if (b && v.mine && v.mine.n === F.n) b.disabled = false;
+      });
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'read') { el.disabled = true; v.send({ t: 'read', n: F.n }); sfx.pop(); }
+      if (name === 'word') {
+        const f = document.getElementById('oword-' + F.n);
+        const w = f ? f.value.trim().split(/\s+/)[0].slice(0, 24) : '';
+        if (!w) { if (f) f.focus(); return; }
+        v.send({ t: 'answer', n: F.n, a: w });
+        sfx.pop();
+      }
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.n !== B.n) { sfx.whoosh(); return; }
+      if (F.phase === B.phase) return;
+      if (F.phase === 'talk') { sfx.beep(true); P.vibrate(80); }
+      if (F.phase === 'result') { if (F.winner === 'group' ? F.odd !== v.me : F.odd === v.me) { sfx.win(); P.confetti({ colors: ['#ff4f8b', '#0d2b24', '#ffffff', '#2fc39b'] }); } else sfx.lose(); }
+    }
+  };
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

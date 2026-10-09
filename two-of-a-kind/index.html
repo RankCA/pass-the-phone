@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kalam:wght@700&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap">
-<link rel="stylesheet" href="../shared/base.css?v=0727191e">
+<link rel="stylesheet" href="../shared/base.css?v=21cb0b0f">
 <style>
 /* Layout: a classroom whiteboard. White board, marker blue and marker red, written-by-hand prompts. */
 :root{
@@ -60,11 +60,13 @@ body{background:linear-gradient(rgba(30,42,58,.04) 1px,transparent 1px) 0 0/100%
 .note{margin:12px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
 .field input{box-shadow:inset 0 0 0 2px var(--line);font-size:24px}
 .merge{position:sticky;bottom:12px;z-index:5}
+div.grp{cursor:default}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=29268f09"></script>
 <script src="prompts.js?v=eef90b89"></script>
 <script>
 (function () {
@@ -146,6 +148,11 @@ body{background:linear-gradient(rgba(30,42,58,.04) 1px,transparent 1px) 0 0/100%
       <div class="sec"><span class="label">Players</span><div id="players"></div></div>
       <div class="sec"><span class="label">Play to</span>${P.seg('goal', [[15, '15 points'], [20, '20 points'], [25, '25 points']], S.settings.goal)}</div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Start writing</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone writes on their own phone. Make a game, then send the code to your friends.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -262,7 +269,206 @@ body{background:linear-gradient(rgba(30,42,58,.04) 1px,transparent 1px) 0 0/100%
   document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'ans') { e.preventDefault(); lock(); } });
   document.addEventListener('change', e => { if (e.target.name === 'goal') { S.settings.goal = Number(e.target.value); persist(); } });
 
-  render();
+  /* ---------- Online: everyone writes on their own phone ---------- */
+  const oneWord = t => String(t == null ? '' : t).trim().split(/\s+/)[0].slice(0, 24);
+  function onlinePrompt(F) {
+    F.round++;
+    F.qid++;
+    F.p = deck.one([F.p]);
+    F.answers = {};
+    F.groups = [];
+    F.gains = {};
+    F.phase = 'answer';
+  }
+  function onlineGroup(F) {
+    const gs = [];
+    F.players.forEach(pl => {
+      const a = F.answers[pl.id];
+      if (!a) return;
+      const g = gs.find(x => x.keys.some(k => P.sameAnswer(k, a)));
+      if (g) { g.ids.push(pl.id); g.keys.push(a); } else gs.push({ label: a, keys: [a], ids: [pl.id] });
+    });
+    F.groups = gs.sort((a, b) => b.ids.length - a.ids.length);
+    F.phase = 'reveal';
+  }
+  const worthOf = g => (g.ids.length === 2 ? 3 : g.ids.length > 2 ? 1 : 0);
+  function onlineScore(F) {
+    F.gains = {};
+    F.groups.forEach(g => g.ids.forEach(id => { F.gains[id] = worthOf(g); }));
+    Object.keys(F.gains).forEach(id => { F.scores[id] = (F.scores[id] || 0) + F.gains[id]; });
+    const best = Math.max(...F.players.map(pl => F.scores[pl.id] || 0));
+    if (best >= F.goal) { F.winner = F.players.filter(pl => (F.scores[pl.id] || 0) === best).map(pl => pl.id); F.phase = 'final'; }
+    else F.phase = 'score';
+  }
+  function onlineBoard(F, me, gains) {
+    const rows = F.players.map(pl => [pl, F.scores[pl.id] || 0]).sort((a, b) => b[1] - a[1]);
+    const top = rows[0] ? rows[0][1] : 0;
+    return '<ol class="board">' + rows.map(([pl, n]) => `<li class="${top > 0 && n === top ? 'top' : ''}"><span>${esc(pl.name)}${pl.id === me ? ' (you)' : ''}</span>${gains && F.gains[pl.id] ? `<small>+${F.gains[pl.id]}</small>` : ''}<b>${n}</b></li>`).join('') + '</ol>';
+  }
+  const ONLINE = {
+    game: 'two-of-a-kind', title: 'Two of a Kind', min: 3, max: 12,
+    options() { return `<p class="label">Play to</p>${P.seg('o-goal', [[15, '15 points'], [20, '20 points'], [25, '25 points']], S.settings.goal)}`; },
+    readOptions() { return { goal: S.settings.goal }; },
+    start(players, o) {
+      const F = { players, goal: o.goal, scores: {}, round: 0, qid: 0, game: 1, p: '', answers: {}, groups: [], gains: {}, winner: [], phase: 'answer' };
+      onlinePrompt(F);
+      return F;
+    },
+    view(F) {
+      const v = Object.assign({}, F);
+      v.answered = F.players.filter(pl => F.answers[pl.id]).map(pl => pl.id);
+      delete v.answers;
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach(pl => { out[pl.id] = { q: F.qid, a: F.answers[pl.id] || '' }; });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(pl => pl.id === from)) return false;
+      const host = from === ctx.host;
+      if (a.t === 'again') {
+        if (F.phase !== 'final' || a.g !== F.game) return false;
+        F.scores = {};
+        F.round = 0;
+        F.game++;
+        F.winner = [];
+        onlinePrompt(F);
+        return true;
+      }
+      if (a.q !== F.qid) return false;
+      switch (a.t) {
+        case 'answer': {
+          const w = oneWord(a.a);
+          if (F.phase !== 'answer' || !w) return false;
+          F.answers[from] = w;
+          if (F.players.every(pl => F.answers[pl.id])) onlineGroup(F);
+          return true;
+        }
+        case 'reveal':
+          if (!host || F.phase !== 'answer' || Object.keys(F.answers).length < 2) return false;
+          onlineGroup(F);
+          return true;
+        case 'skip':
+          if (!host || F.phase !== 'answer') return false;
+          F.round--;
+          onlinePrompt(F);
+          return true;
+        case 'merge': {
+          if (!host || F.phase !== 'reveal' || !Array.isArray(a.sel)) return false;
+          const idx = [...new Set(a.sel.map(Number))].filter(i => i >= 0 && i < F.groups.length);
+          if (idx.length < 2) return false;
+          const picked = idx.map(i => F.groups[i]).sort((x, y) => y.ids.length - x.ids.length);
+          picked.slice(1).forEach(g => { picked[0].ids.push(...g.ids); picked[0].keys.push(...g.keys); });
+          F.groups = F.groups.filter(g => !picked.slice(1).includes(g)).sort((x, y) => y.ids.length - x.ids.length);
+          return true;
+        }
+        case 'score':
+          if (!host || F.phase !== 'reveal') return false;
+          onlineScore(F);
+          return true;
+        case 'next':
+          if (F.phase !== 'score') return false;
+          onlinePrompt(F);
+          return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(pl => !ids.includes(pl.id)).map(pl => pl.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(pl => ids.includes(pl.id));
+      if (F.players.length < 3) return 'open';
+      gone.forEach(id => { delete F.answers[id]; delete F.scores[id]; });
+      F.groups = F.groups.map(g => {
+        const keep = g.ids.map((id, i) => [id, g.keys[i]]).filter(x => !gone.includes(x[0]));
+        return { label: g.label, ids: keep.map(x => x[0]), keys: keep.map(x => x[1]) };
+      }).filter(g => g.ids.length).sort((x, y) => y.ids.length - x.ids.length);
+      if (F.phase === 'answer' && F.players.every(pl => F.answers[pl.id])) onlineGroup(F);
+    },
+    render(v) {
+      const F = v.pub, me = v.me;
+      const nm = id => { const pl = F.players.find(x => x.id === id); return pl ? pl.name : 'Someone'; };
+      const names = ids => esc(P.listNames(ids.map(nm)));
+      const playing = F.players.some(pl => pl.id === me);
+      const head = `<p class="eyebrow">Round ${F.round}</p>`;
+      if (F.phase === 'answer') {
+        const mine = v.mine && v.mine.q === F.qid ? v.mine.a : '';
+        const editing = v.local.pairEdit === F.qid;
+        const waiting = F.players.filter(pl => !F.answered.includes(pl.id)).map(pl => pl.id);
+        let body;
+        if (!playing) body = '<p class="lead">You are watching this round.</p>';
+        else if (mine && !editing) body = `<p class="lead">Locked in. Change it any time before everyone is done.</p><div class="actions center"><button class="btn btn-alt" type="button" data-ui="edit">Change it</button></div>`;
+        else {
+          body = `<div class="field"><label for="opair-${F.qid}">One word</label><input id="opair-${F.qid}" data-keep data-enter="lock" type="text" maxlength="24" autocomplete="off" autocapitalize="off" enterkeyhint="done" value="${esc(mine)}"></div>
+            <div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="lock"${v.pending ? ' disabled' : ''}>Lock it in</button></div>`;
+        }
+        const status = waiting.length ? 'Waiting for ' + names(waiting) + '.' : 'Everyone has written.';
+        const hostBtns = v.host ? `<div class="actions center"><button class="btn btn-alt" type="button" ${Online.sendAttr({ t: 'skip', q: F.qid })}>Another prompt</button>${F.answered.length >= 2 && waiting.length ? `<button class="btn btn-alt" type="button" ${Online.sendAttr({ t: 'reveal', q: F.qid })}>Show the words now</button>` : ''}</div>` : '';
+        return `<section class="center">${head}<p class="prompt${mine && !editing ? '' : ' small'}">${promptHTML(F.p, mine && !editing ? mine : '')}</p>${body}<p class="note">${status}</p>${hostBtns}${onlineBoard(F, me, false)}</section>`;
+      }
+      if (F.phase === 'reveal') {
+        const s = v.local.pairSel;
+        const sel = s && s.q === F.qid && s.n === F.groups.length ? s.list : [];
+        const groups = F.groups.map((g, i) => {
+          const inner = `<span class="n">${g.ids.length}</span><span><b>${esc(g.label)}</b><small>${names(g.ids)}</small></span><span class="pts">${worthOf(g) ? '+' + worthOf(g) + ' each' : 'No match'}</span>`;
+          return v.host ? `<button type="button" class="grp${g.ids.length === 2 ? ' pair' : ''}" data-ui="pick" data-i="${i}" aria-pressed="${sel.includes(i)}">${inner}</button>` : `<div class="grp${g.ids.length === 2 ? ' pair' : ''}">${inner}</div>`;
+        }).join('');
+        const foot = v.host
+          ? `<div class="actions center merge">${sel.length >= 2 ? `<button class="btn btn-alt" type="button" data-ui="merge">Merge these ${sel.length}</button>` : ''}<button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'score', q: F.qid })}>Score it</button></div>`
+          : `<p class="note">${esc(v.nameOf(v.hostId))} is checking the words. Say so if two groups are really the same word.</p>`;
+        return `<section class="center"><p class="prompt small">${promptHTML(F.p)}</p><p class="note">Pairs score 3 each. Bigger groups score 1.${v.host ? ' Tap groups that mean the same word, then merge them.' : ''}</p><div class="groups">${groups}</div>${foot}</section>`;
+      }
+      if (F.phase === 'score') {
+        const pairs = F.groups.filter(g => g.ids.length === 2);
+        return `<section class="center">${head}<h2 class="big">${pairs.length ? P.plural(pairs.length, 'perfect pair') : 'No perfect pairs'}</h2>
+          <p class="lead">${pairs.length ? esc(pairs.map(g => P.listNames(g.ids.map(nm)) + ' with ' + g.label).join('. ')) + '.' : 'Nobody matched exactly one other person this time.'}</p>
+          ${onlineBoard(F, me, true)}
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'next', q: F.qid })}>Next prompt</button></div></section>`;
+      }
+      const w = F.winner.map(nm);
+      return `<section class="center"><p class="eyebrow">Game over</p><h2 class="big">${esc(P.listNames(w))} ${w.length > 1 ? 'win' : 'wins'}</h2>
+        ${onlineBoard(F, me, false)}
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div></section>`;
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'lock') {
+        const f = document.getElementById('opair-' + F.qid);
+        const a = oneWord(f ? f.value : '');
+        if (!a) { if (f) f.focus(); return; }
+        v.local.pairEdit = null;
+        v.send({ t: 'answer', q: F.qid, a });
+        sfx.pop();
+      } else if (name === 'edit') {
+        v.local.pairEdit = F.qid;
+        v.redraw();
+      } else if (name === 'pick') {
+        let s = v.local.pairSel;
+        if (!s || s.q !== F.qid || s.n !== F.groups.length) s = v.local.pairSel = { q: F.qid, n: F.groups.length, list: [] };
+        const i = Number(el.getAttribute('data-i'));
+        const at = s.list.indexOf(i);
+        if (at >= 0) s.list.splice(at, 1); else s.list.push(i);
+        v.redraw();
+      } else if (name === 'merge') {
+        const s = v.local.pairSel;
+        if (s && s.list.length >= 2) { v.send({ t: 'merge', q: F.qid, sel: s.list.slice() }); s.list = []; sfx.pop(); }
+      }
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.phase === 'answer' && B.phase === 'answer' && F.qid === B.qid && F.answered.length > B.answered.length) sfx.tick();
+      if (F.phase === 'reveal' && B.phase !== 'reveal') sfx.whoosh();
+      if (F.phase === 'score' && B.phase !== 'score') { if (Object.keys(F.gains).some(id => F.gains[id] === 3)) sfx.ding(); else sfx.pop(); }
+      if (F.phase === 'final' && B.phase !== 'final') { sfx.win(); P.confetti({ colors: ['#1d4ed8', '#c81e3a', '#15803d', '#1e2a3a'] }); }
+    }
+  };
+  document.addEventListener('change', e => { if (e.target.name === 'o-goal') { S.settings.goal = Number(e.target.value); persist(); } });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>
