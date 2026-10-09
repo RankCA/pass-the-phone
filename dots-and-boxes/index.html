@@ -65,6 +65,7 @@ body{background:linear-gradient(rgba(70,120,200,.13) 1px,transparent 1px) 0 0/22
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=2e43c4ce"></script>
 <script>
 (function () {
   'use strict';
@@ -108,21 +109,25 @@ body{background:linear-gradient(rgba(70,120,200,.13) 1px,transparent 1px) 0 0/22
   }
 
   function gridHTML(play) {
-    const n = S.n, cols = [];
+    return dotsGrid(S, S.players, play ? (k, r, c) => `data-act="edge" data-k="${k}" data-r="${r}" data-c="${c}"` : null);
+  }
+  // attr(k, r, c) gives a free line's action attributes, or null leaves every line disabled.
+  function dotsGrid(G, names, attr) {
+    const n = G.n, cols = [];
     for (let i = 0; i <= 2 * n; i++) cols.push(i % 2 === 0 ? '22px' : 'minmax(0,1fr)');
     let h = `<div class="grid" style="grid-template-columns:${cols.join(' ')};grid-template-rows:${cols.map(x => x === '22px' ? '22px' : 'auto').join(' ')}">`;
     for (let r = 0; r <= 2 * n; r++) {
       for (let c = 0; c <= 2 * n; c++) {
         if (r % 2 === 0 && c % 2 === 0) h += '<span class="dot"></span>';
         else if (r % 2 === 0) {
-          const er = r / 2, ec = (c - 1) / 2, o = S.h[er][ec];
-          h += `<button type="button" class="edge h${o >= 0 ? ' on' : ''}${S.last === 'h' + er + ',' + ec ? ' last' : ''}" ${o >= 0 ? `style="--c:${COLORS[o]}" disabled` : (play ? '' : 'disabled')} data-act="edge" data-k="h" data-r="${er}" data-c="${ec}" aria-label="Line across, row ${er + 1}, gap ${ec + 1}${o >= 0 ? ', drawn' : ''}"></button>`;
+          const er = r / 2, ec = (c - 1) / 2, o = G.h[er][ec];
+          h += `<button type="button" class="edge h${o >= 0 ? ' on' : ''}${G.last === 'h' + er + ',' + ec ? ' last' : ''}" ${o >= 0 ? `style="--c:${COLORS[o]}" disabled` : (attr ? attr('h', er, ec) : 'disabled')} aria-label="Line across, row ${er + 1}, gap ${ec + 1}${o >= 0 ? ', drawn' : ''}"></button>`;
         } else if (c % 2 === 0) {
-          const er = (r - 1) / 2, ec = c / 2, o = S.v[er][ec];
-          h += `<button type="button" class="edge v${o >= 0 ? ' on' : ''}${S.last === 'v' + er + ',' + ec ? ' last' : ''}" ${o >= 0 ? `style="--c:${COLORS[o]}" disabled` : (play ? '' : 'disabled')} data-act="edge" data-k="v" data-r="${er}" data-c="${ec}" aria-label="Line down, row ${er + 1}, gap ${ec + 1}${o >= 0 ? ', drawn' : ''}"></button>`;
+          const er = (r - 1) / 2, ec = c / 2, o = G.v[er][ec];
+          h += `<button type="button" class="edge v${o >= 0 ? ' on' : ''}${G.last === 'v' + er + ',' + ec ? ' last' : ''}" ${o >= 0 ? `style="--c:${COLORS[o]}" disabled` : (attr ? attr('v', er, ec) : 'disabled')} aria-label="Line down, row ${er + 1}, gap ${ec + 1}${o >= 0 ? ', drawn' : ''}"></button>`;
         } else {
-          const o = S.box[(r - 1) / 2][(c - 1) / 2];
-          h += `<span class="box${o >= 0 ? ' own' : ''}" style="aspect-ratio:1;${o >= 0 ? '--c:' + COLORS[o] : ''}">${o >= 0 ? esc(initial(S.players[o])) : ''}</span>`;
+          const o = G.box[(r - 1) / 2][(c - 1) / 2];
+          h += `<span class="box${o >= 0 ? ' own' : ''}" style="aspect-ratio:1;${o >= 0 ? '--c:' + COLORS[o] : ''}">${o >= 0 ? esc(initial(names[o])) : ''}</span>`;
         }
       }
     }
@@ -140,6 +145,11 @@ body{background:linear-gradient(rgba(70,120,200,.13) 1px,transparent 1px) 0 0/22
       <div class="sec"><span class="label">Players</span><div id="players"></div></div>
       <div class="sec"><span class="label">Grid</span>${P.seg('size', [[3, '3 by 3'], [4, '4 by 4'], [5, '5 by 5'], [6, '6 by 6']], S.settings.size)}</div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Start drawing</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Each player uses their own phone. Make a game, then send the code to your friends.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -192,7 +202,88 @@ body{background:linear-gradient(rgba(70,120,200,.13) 1px,transparent 1px) 0 0/22
   });
   document.addEventListener('change', e => { if (e.target.name === 'size') { S.settings.size = Number(e.target.value); persist(); } });
 
-  render();
+  /* ---------- Online: each player on their own phone ---------- */
+  function dotsFresh(F) {
+    const n = F.n;
+    F.h = Array.from({ length: n + 1 }, () => Array(n).fill(-1));
+    F.v = Array.from({ length: n }, () => Array(n + 1).fill(-1));
+    F.box = Array.from({ length: n }, () => Array(n).fill(-1));
+    F.turn = 0;
+    F.last = null;
+    F.moves = 0;
+    F.over = false;
+  }
+  const dotsCount = (F, k) => F.box.flat().filter(o => o === k).length;
+  const ONLINE = {
+    game: 'dots-and-boxes', title: 'Dots and Boxes', min: 2, max: 4,
+    options() { return `<p class="label">Grid</p>${P.seg('o-size', [[3, '3 by 3'], [4, '4 by 4'], [5, '5 by 5'], [6, '6 by 6']], S.settings.size)}`; },
+    readOptions() { return { size: S.settings.size }; },
+    start(players, o) {
+      const F = { players: players.slice(0, 4), n: o.size, game: 1 };
+      dotsFresh(F);
+      return F;
+    },
+    act(F, from, a) {
+      const k = F.players.findIndex(p => p.id === from);
+      if (k < 0) return false;
+      if (a.t === 'again') {
+        if (!F.over || a.g !== F.game) return false;
+        F.players.push(F.players.shift());
+        F.game++;
+        dotsFresh(F);
+        return true;
+      }
+      if (a.t !== 'edge' || F.over || k !== F.turn || a.m !== F.moves) return false;
+      const r = Number(a.r), c = Number(a.c), arr = a.k === 'h' ? F.h : a.k === 'v' ? F.v : null;
+      if (!arr || !arr[r] || arr[r][c] !== -1) return false;
+      arr[r][c] = k;
+      F.last = a.k + r + ',' + c;
+      F.moves++;
+      const near = a.k === 'h' ? [[r - 1, c], [r, c]] : [[r, c - 1], [r, c]];
+      let made = 0;
+      near.forEach(([br, bc]) => {
+        if (br < 0 || bc < 0 || br >= F.n || bc >= F.n || F.box[br][bc] >= 0) return;
+        if (F.h[br][bc] >= 0 && F.h[br + 1][bc] >= 0 && F.v[br][bc] >= 0 && F.v[br][bc + 1] >= 0) { F.box[br][bc] = k; made++; }
+      });
+      if (!made) F.turn = (F.turn + 1) % F.players.length;
+      if (F.box.flat().every(o => o >= 0)) F.over = true;
+      return true;
+    },
+    leave(F, ids) { if (F.players.some(p => !ids.includes(p.id))) return 'open'; },
+    render(v) {
+      const F = v.pub, me = F.players.findIndex(p => p.id === v.me);
+      const names = F.players.map(p => p.name);
+      const myTurn = !F.over && me === F.turn && !v.pending;
+      const grid = dotsGrid(F, names, myTurn ? (k, r, c) => Online.sendAttr({ t: 'edge', k, r, c, m: F.moves }) : null);
+      const score = '<ol class="score">' + F.players.map((p, k) => `<li class="${k === F.turn && !F.over ? 'now' : ''}" style="--c:${COLORS[k]}"><i></i><span>${esc(p.name)}${k === me ? ' (you)' : ''}</span><b>${dotsCount(F, k)}</b></li>`).join('') + '</ol>';
+      if (!F.over) {
+        return `<section><p class="turn" style="--c:${COLORS[F.turn]}"><i></i>${F.turn === me ? 'Your turn' : esc(F.players[F.turn].name) + "'s turn"}</p>${grid}${score}</section>`;
+      }
+      const best = Math.max(...F.players.map((p, k) => dotsCount(F, k)));
+      const won = F.players.filter((p, k) => dotsCount(F, k) === best);
+      const iWon = won.some(p => p.id === v.me);
+      const title = won.length > 1 ? 'A draw between ' + esc(P.listNames(won.map(p => (p.id === v.me ? 'you' : p.name)))) : (iWon ? 'You win' : esc(won[0].name) + ' wins');
+      return `<section class="center"><p class="eyebrow">Every box is taken</p><h2 class="big">${title}</h2>${grid}${score}
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div></section>`;
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.moves > B.moves) {
+        const boxes = F.box.flat().filter(o => o >= 0).length, before = B.box.flat().filter(o => o >= 0).length;
+        if (boxes > before) { sfx.ding(); P.vibrate(20); } else sfx.tick(1200);
+      }
+      if (F.over && !B.over) {
+        const best = Math.max(...F.players.map((p, k) => dotsCount(F, k)));
+        const me = F.players.findIndex(p => p.id === v.me);
+        if (me >= 0 && dotsCount(F, me) === best) { sfx.win(); P.confetti({ colors: COLORS }); } else sfx.lose();
+      }
+    }
+  };
+  document.addEventListener('change', e => { if (e.target.name === 'o-size') { S.settings.size = Number(e.target.value); persist(); } });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

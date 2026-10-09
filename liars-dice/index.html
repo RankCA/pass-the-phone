@@ -79,6 +79,7 @@ body{background:repeating-linear-gradient(90deg,rgba(0,0,0,.08) 0 3px,transparen
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=2e43c4ce"></script>
 <script>
 (function () {
   'use strict';
@@ -177,6 +178,11 @@ body{background:repeating-linear-gradient(90deg,rgba(0,0,0,.08) 0 3px,transparen
       <div class="sec"><span class="label">Dice each</span>${P.seg('dice', [[3, '3'], [4, '4'], [5, '5']], S.settings.dice)}</div>
       <div class="sec"><span class="label">Ones are wild</span>${P.seg('wild', [['yes', 'Yes'], ['no', 'No']], S.settings.wild)}<p class="hint">Wild ones count as any number, so nobody bids on ones.</p></div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Shake the cups</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone keeps their dice under a cup on their own phone. Make a game, then send the code to your friends.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -310,7 +316,188 @@ body{background:repeating-linear-gradient(90deg,rgba(0,0,0,.08) 0 3px,transparen
     if (e.target.name === 'wild') { S.settings.wild = e.target.value; persist(); }
   });
 
-  render();
+  /* ---------- Online: every cup on its owner's phone ---------- */
+  const lAlive = F => F.players.map((p, i) => i).filter(i => F.players[i].n > 0);
+  const lTotal = F => F.players.reduce((a, p) => a + p.n, 0);
+  const lNext = (F, i) => { let n = i; do { n = (n + 1) % F.players.length; } while (F.players[n].n <= 0); return n; };
+  const lValid = (F, q, f) => q >= 1 && q <= lTotal(F) && f >= 1 && f <= 6 && (!F.wild || f !== 1) && (!F.bid || q > F.bid.q || (q === F.bid.q && f > F.bid.f));
+  const lMin = (F, f) => (!F.bid ? 1 : f > F.bid.f ? F.bid.q : F.bid.q + 1);
+  function liarRound(F, starter) {
+    F.round++;
+    F.players.forEach(p => { p.dice = Array.from({ length: p.n }, d6).sort((a, b) => a - b); });
+    F.bid = null;
+    F.bids = 0;
+    F.turn = starter;
+    F.result = null;
+    F.phase = 'bid';
+  }
+  const ONLINE = {
+    game: 'liars-dice', title: "Liar's Dice", min: 2, max: 6,
+    options() {
+      return `<p class="label">Dice each</p>${P.seg('o-dice', [[3, '3'], [4, '4'], [5, '5']], S.settings.dice)}
+        <p class="label" style="margin-top:18px">Ones are wild</p>${P.seg('o-wild', [['yes', 'Yes'], ['no', 'No']], S.settings.wild)}`;
+    },
+    readOptions() { return { dice: S.settings.dice, wild: S.settings.wild === 'yes' }; },
+    start(players, o) {
+      const F = { players: players.map(p => ({ id: p.id, name: p.name, n: o.dice, dice: [] })), nd: o.dice, wild: o.wild, round: 0, game: 1 };
+      liarRound(F, Math.floor(Math.random() * F.players.length));
+      return F;
+    },
+    view(F) {
+      const show = F.phase !== 'bid';
+      return { players: F.players.map(p => (show ? { id: p.id, name: p.name, n: p.n, dice: p.dice } : { id: p.id, name: p.name, n: p.n })),
+        wild: F.wild, round: F.round, turn: F.turn, bid: F.bid, bids: F.bids, phase: F.phase, result: F.result, game: F.game };
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach(p => { out[p.id] = { r: F.round, dice: p.dice }; });
+      return out;
+    },
+    act(F, from, a) {
+      const k = F.players.findIndex(p => p.id === from);
+      if (k < 0) return false;
+      if (a.t === 'again') {
+        if (F.phase !== 'final' || a.g !== F.game) return false;
+        F.players.forEach(p => { p.n = F.nd; });
+        F.round = 0;
+        F.game++;
+        liarRound(F, Math.floor(Math.random() * F.players.length));
+        return true;
+      }
+      if (a.r !== F.round) return false;
+      if (a.t === 'next') {
+        if (F.phase !== 'reveal') return false;
+        if (lAlive(F).length <= 1) { F.phase = 'final'; return true; }
+        const L = F.result.loser;
+        liarRound(F, F.players[L].n > 0 ? L : lNext(F, L));
+        return true;
+      }
+      if (F.phase !== 'bid' || k !== F.turn || a.m !== F.bids) return false;
+      if (a.t === 'bid') {
+        const q = Number(a.q), f = Number(a.f);
+        if (!lValid(F, q, f)) return false;
+        F.bid = { q, f, by: k };
+        F.bids++;
+        F.turn = lNext(F, k);
+        return true;
+      }
+      if (a.t === 'liar') {
+        if (!F.bid) return false;
+        const b = F.bid;
+        let count = 0;
+        F.players.forEach(p => p.dice.forEach(v => { if (v === b.f || (F.wild && v === 1 && b.f !== 1)) count++; }));
+        const stands = count >= b.q, loser = stands ? k : b.by;
+        F.players[loser].n--;
+        F.result = { bid: b, caller: k, count, stands, loser, out: F.players[loser].n === 0 };
+        F.phase = 'reveal';
+        return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const before = F.players.length;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      if (F.players.length === before) return;
+      if (F.players.length < 2) return 'open';
+      if (F.phase === 'final') return;
+      if (lAlive(F).length <= 1) { F.result = null; F.phase = 'final'; return; }
+      // Someone walked out mid round, so everyone rolls again.
+      liarRound(F, lAlive(F)[0]);
+    },
+    render(v) {
+      const F = v.pub, me = F.players.findIndex(p => p.id === v.me);
+      const mine = v.mine && v.mine.r === F.round ? v.mine.dice : null;
+      const name = i => (i === me ? 'You' : esc(F.players[i].name));
+      const table = '<ol class="table">' + F.players.map((p, i) => '<li class="' + (i === F.turn && F.phase === 'bid' ? 'now' : '') + (p.n ? '' : ' out') + '"><span>' + esc(p.name) + (i === me ? ' (you)' : '') + '</span><small>' + (p.n ? P.plural(p.n, 'die', 'dice') : 'Out') + '</small></li>').join('') + '</ol>';
+      const cup = mine && mine.length ? `<div class="reveal cupcard" id="ocup" tabindex="0" role="button" aria-label="Press and hold to lift your cup">
+          <div class="reveal-in">
+            <div class="reveal-face reveal-front">${CUP}<b>Hold to lift your cup</b><small>Let go to hide them again.</small></div>
+            <div class="reveal-face reveal-back"><div class="dice">${mine.map(x => dieHTML(x, F.wild && x === 1 ? 'wild' : '', 56)).join('')}</div>${F.wild ? '<small>Ones are wild</small>' : ''}</div>
+          </div>
+        </div>` : '';
+      if (F.phase === 'bid') {
+        const total = lTotal(F), my = F.turn === me && !v.pending;
+        const faces = F.wild ? [2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6];
+        let L = v.local.liar;
+        if (!L || L.m !== F.bids || L.r !== F.round) {
+          const f = F.bid ? F.bid.f : (F.wild ? 2 : 1);
+          L = v.local.liar = { r: F.round, m: F.bids, f, q: Math.min(total, lMin(F, f)) };
+        }
+        const ok = lValid(F, L.q, L.f);
+        const send = a => Online.sendAttr(Object.assign({ r: F.round, m: F.bids }, a));
+        const maker = my ? `<div class="maker">
+            <span class="label">Your bid</span>
+            <div class="faces" role="radiogroup" aria-label="Number on the dice">${faces.map(f => `<button type="button" class="face" data-ui="face" data-f="${f}" aria-pressed="${L.f === f}" aria-label="${FACES[f]}">${dieHTML(f, '', 40)}</button>`).join('')}</div>
+            <div class="qty"><button type="button" data-ui="qty" data-d="-1" aria-label="One fewer"${L.q <= 1 ? ' disabled' : ''}>-</button><output aria-live="polite">${L.q}</output><button type="button" data-ui="qty" data-d="1" aria-label="One more"${L.q >= total ? ' disabled' : ''}>+</button></div>
+            <div class="actions center"><button class="btn btn-main btn-big" type="button" ${ok ? send({ t: 'bid', q: L.q, f: L.f }) : 'disabled'}>Bid ${bidText({ q: L.q, f: L.f })}</button>${F.bid ? `<button class="btn btn-alt btn-big" type="button" ${send({ t: 'liar' })}>Liar!</button>` : ''}</div>
+            ${!ok && F.bid ? `<p class="hint">Bid more than ${bidText(F.bid)}: more dice, or the same amount of a higher number.</p>` : ''}
+          </div>` : '';
+        return `<section class="center">
+          <p class="eyebrow">Round ${F.round}. ${total} dice on the table</p>
+          <div class="bidcard">${F.bid ? `<small>${name(F.bid.by)} bid</small><b>${bidText(F.bid)}</b><p>${F.turn === me ? 'Raise it or call liar.' : esc(F.players[F.turn].name) + ' is deciding.'}</p>`
+            : `<small>No bid yet</small><b>${F.turn === me ? 'You' : esc(F.players[F.turn].name)}</b><p>${F.turn === me ? 'Open the bidding.' : 'opens the bidding.'}</p>`}</div>
+          ${maker}
+          ${cup}
+          ${table}
+        </section>`;
+      }
+      if (F.phase === 'reveal') {
+        const R = F.result, b = R.bid;
+        const hands = F.players.map((p, i) => p.dice && p.dice.length ? `<div class="hand"><b>${esc(p.name)}${i === me ? ' (you)' : ''}</b><div class="dice">${p.dice.map(x => dieHTML(x, x === b.f ? 'hit' : (F.wild && x === 1 && b.f !== 1 ? 'hit' : ''), 38)).join('')}</div></div>` : '').join('');
+        const loser = R.loser === me ? 'You lose' : esc(F.players[R.loser].name) + ' loses';
+        const last = F.players.filter(p => p.n > 0).length <= 1;
+        return `<section class="center">
+          <p class="eyebrow">${name(R.caller)} called liar on ${R.bid.by === me ? 'you' : esc(F.players[R.bid.by].name)}</p>
+          <h2 class="big count">${bidText({ q: R.count, f: b.f })}</h2>
+          <p class="verdict">${name(b.by)} bid ${bidText(b)}${F.wild && b.f !== 1 ? ', counting wild ones' : ''}. ${R.stands ? 'The bid was good.' : 'The bid was a lie.'} ${loser} a die${R.out ? (R.loser === me ? ' and you are out' : ' and is out') : ''}.</p>
+          <div class="hands">${hands}</div>
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'next', r: F.round })}>${last ? 'See who won' : 'Next round'}</button></div>
+          ${table}
+        </section>`;
+      }
+      const w = F.players.findIndex(p => p.n > 0);
+      return `<section class="center">
+        <p class="eyebrow">Last pirate standing</p>
+        <h2 class="big">${w === me ? 'You win' : esc((F.players[w] || { name: 'Nobody' }).name) + ' wins'}</h2>
+        ${w >= 0 ? `<p class="lead">With ${P.plural(F.players[w].n, 'die', 'dice')} left.</p>` : ''}
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div>
+      </section>`;
+    },
+    bind(v) {
+      const c = document.getElementById('ocup');
+      if (c) P.holdToReveal(c, () => sfx.tick(600));
+    },
+    click(name, el, v) {
+      const F = v.pub, L = v.local.liar;
+      if (!L) return;
+      const total = lTotal(F);
+      if (name === 'face') {
+        L.f = Number(el.getAttribute('data-f'));
+        if (!lValid(F, L.q, L.f)) L.q = Math.min(total, lMin(F, L.f));
+        sfx.tick(1400);
+      }
+      if (name === 'qty') L.q = Math.max(1, Math.min(total, L.q + Number(el.getAttribute('data-d'))));
+      v.redraw();
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.round !== B.round) sfx.noise({ filter: 'bandpass', freq: 900, dur: 0.5, gain: 0.25, q: 0.7 });
+      else if (F.bids > B.bids && F.bid) sfx.tick(900 + F.bid.q * 40);
+      if (F.phase === 'reveal' && B.phase !== 'reveal') { sfx.whoosh(); setTimeout(() => (F.result.stands ? sfx.buzz(0.5) : sfx.ding()), 300); P.vibrate([60, 40, 60]); }
+      if (F.phase === 'final' && B.phase !== 'final') {
+        const w = F.players.findIndex(p => p.n > 0);
+        if (F.players[w] && F.players[w].id === v.me) { sfx.win(); P.confetti({ colors: ['#e8b64c', '#f3e6c8', '#8a4b25', '#ffffff'] }); } else sfx.lose();
+      }
+    }
+  };
+  document.addEventListener('change', e => {
+    if (e.target.name === 'o-dice') { S.settings.dice = Number(e.target.value); persist(); }
+    if (e.target.name === 'o-wild') { S.settings.wild = e.target.value; persist(); }
+  });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

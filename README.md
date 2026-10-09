@@ -12,7 +12,7 @@ Some games also play online, with each player on their own phone. See [Online pl
 | Landlord | 2 to 6 | Buy streets, build houses and collect rent. The phone is the board, the bank and the dice, and the game saves as you go. |
 | Flock | 3 to 16 | Everyone answers the same question in secret. The most popular answer scores, and a lone answer earns the black sheep. Plays online too. |
 | Shade Hunt | 3 to 10 | One player sees a secret colour and gives a one-word clue. Everyone hunts for it on a grid of 240 shades. |
-| Liar's Dice | 2 to 6 | Peek at your own dice, then bid on what is under every cup. Raise the bid or call liar. |
+| Liar's Dice | 2 to 6 | Peek at your own dice, then bid on what is under every cup. Raise the bid or call liar. Plays online too. |
 | Farkle | 1 to 10 | Roll six dice, keep what scores and push your luck. Scoring rules live in `farkle/scoring.js`. |
 | Spy Grid | 4 or more | Two teams, 25 words and one secret key. Clue givers link their team's words with one word. Avoid the trap. |
 | Inside Job | 4 to 12 | Find the secret word with yes or no questions, then catch the player who knew it all along. Plays online too. |
@@ -23,10 +23,10 @@ Some games also play online, with each player on their own phone. See [Online pl
 | Punchline | 3 to 10 | Everyone finishes a funny prompt in secret, and a rotating judge picks a favourite without knowing who wrote it. |
 | Snake Pit | 3 to 6 | Hide gems and a snake in a secret pile, then bid on how many gems you can dig up without finding a snake. |
 | Yacht | 1 to 6 | The classic dice game. Roll five dice up to three times, then fill one of twelve boxes. Scoring lives in `yacht/rules.js`. |
-| Dots and Boxes | 2 to 4 | Take turns joining two dots. Close a box and it is yours, and you go again. |
+| Dots and Boxes | 2 to 4 | Take turns joining two dots. Close a box and it is yours, and you go again. Plays online too. |
 | Four in a Row | 2 | Take turns dropping discs. Line up four across, down or diagonally to win. Plays online too. |
-| Sea Battle | 2 | Hide your fleet, then take turns firing at each other's. The phone keeps each fleet secret. |
-| Mancala | 2 | The ancient game of sowing seeds, played with Kalah rules. |
+| Sea Battle | 2 | Hide your fleet, then take turns firing at each other's. The phone keeps each fleet secret. Plays online too. |
+| Mancala | 2 | The ancient game of sowing seeds, played with Kalah rules. Plays online too. |
 | Impostor | 3 to 12 | Everyone reads a secret word except the impostor. One-word clues, then a vote. Plays online too. |
 | Werewolf | 5 to 16 | The phone deals secret roles and reads the night out loud, so nobody has to sit out as narrator. Plays online too. |
 | Tune In | 2 to 12 | One player sees a hidden target on a dial and gives a clue. The rest turn the dial. |
@@ -77,7 +77,7 @@ It adds a version tag to every script and stylesheet link, so a phone never mixe
 
 ## Online play
 
-Four in a Row, Flock, Impostor, Most Likely To, Two of a Kind, Hot Takes, Odd One Out, Mind Meld, Werewolf, Where Are We?, Inside Job and Mole can also be played online. Each player uses their own phone, and the one-phone version of every game works exactly as before, with no account.
+Four in a Row, Flock, Impostor, Most Likely To, Two of a Kind, Hot Takes, Odd One Out, Mind Meld, Werewolf, Where Are We?, Inside Job, Mole, Liar's Dice, Sea Battle, Dots and Boxes and Mancala can also be played online. Each player uses their own phone, and the one-phone version of every game works exactly as before, with no account.
 
 - A player taps "Make an online game" on a game's setup screen and gets a five letter code. Friends open the link, or type the code on the Online page (`online/`).
 - Players start as guests with just a name. A guest can add an email later to keep their account, and their friends, on any phone. Sign-in uses a six digit code sent by email, so there are no passwords.

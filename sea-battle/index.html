@@ -62,6 +62,7 @@ body{background:radial-gradient(circle at 50% 20%,rgba(92,242,176,.12),transpare
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=2e43c4ce"></script>
 <script>
 (function () {
   'use strict';
@@ -158,6 +159,11 @@ body{background:radial-gradient(circle at 50% 20%,rgba(92,242,176,.12),transpare
     <div class="panel">
       <div class="sec"><span class="label">Two players</span><div id="players"></div></div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Man the ships</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Each player hides their fleet on their own phone, so nobody has to pass anything. Make a game, then send the code to a friend.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -262,7 +268,162 @@ body{background:radial-gradient(circle at 50% 20%,rgba(92,242,176,.12),transpare
     }
   });
 
-  render();
+  /* ---------- Online: each fleet stays on its owner's phone ---------- */
+  const seaSunk = (ships, shots, ship) => ship.cells.every(([a, b]) => shots[key(a, b)]);
+  function seaFresh(F) {
+    F.fleets = [randomFleet(), randomFleet()];
+    F.ready = [false, false];
+    F.shots = [{}, {}];
+    F.turn = F.first;
+    F.last = null;
+    F.winner = -1;
+    F.moves = 0;
+    F.phase = 'place';
+  }
+  // o: ships to draw (or null), shots landed on this grid, cells of sunk ships, pick and sel for aiming
+  function seaGrid(o) {
+    let h = '<div class="grid' + (o.mini ? ' mini' : '') + '">';
+    if (!o.mini) h += '<span></span>' + [...LET].map(l => '<span class="l">' + l + '</span>').join('');
+    for (let r = 0; r < N; r++) {
+      if (!o.mini) h += '<span class="l">' + (r + 1) + '</span>';
+      for (let c = 0; c < N; c++) {
+        const k = key(r, c), shot = o.shots ? o.shots[k] : null;
+        const ship = o.ships && o.ships.some(s => s.cells.some(([a, b]) => a === r && b === c));
+        let cls = o.sunk && o.sunk.includes(k) ? ' sunk' : ship ? ' ship' : '';
+        if (o.sel && o.sel[0] === r && o.sel[1] === c) cls += ' sel';
+        const mark = shot === 'hit' ? '<span class="hit"></span>' : shot === 'miss' ? '<span class="miss"></span>' : '';
+        const label = code(r, c) + (shot ? ', ' + shot : '') + (ship ? ', ship' : '');
+        if (o.pick) h += `<button type="button" class="cell${cls}" data-ui="aim" data-r="${r}" data-c="${c}"${shot ? ' disabled' : ''} aria-label="${label}">${mark}</button>`;
+        else h += `<span class="cell${cls}" ${o.mini ? 'aria-hidden="true"' : 'role="img" aria-label="' + label + '"'}>${mark}</span>`;
+      }
+    }
+    return h + '</div>';
+  }
+  const ONLINE = {
+    game: 'sea-battle', title: 'Sea Battle', min: 2, max: 2,
+    start(players, o, prev) {
+      const F = { players: players.slice(0, 2), first: Math.floor(Math.random() * 2), game: ((prev && prev.game) || 0) + 1 };
+      seaFresh(F);
+      return F;
+    },
+    view(F) {
+      const sunk = [0, 1].map(k => F.fleets[k].filter(s => seaSunk(F.fleets[k], F.shots[1 - k], s)));
+      const v = { players: F.players, game: F.game, phase: F.phase, ready: F.ready, shots: F.shots, turn: F.turn, last: F.last, winner: F.winner, moves: F.moves,
+        sunkCells: sunk.map(list => list.flatMap(s => s.cells.map(([a, b]) => key(a, b)))),
+        status: [0, 1].map(k => F.fleets[k].map(s => ({ name: s.name, size: s.size, down: sunk[k].includes(s) }))) };
+      if (F.phase === 'final') v.fleets = F.fleets;
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach((p, k) => { out[p.id] = { g: F.game, k, ships: F.fleets[k] }; });
+      return out;
+    },
+    act(F, from, a) {
+      const k = F.players.findIndex(p => p.id === from);
+      if (k < 0) return false;
+      if (a.t === 'again') {
+        if (F.phase !== 'final' || a.g !== F.game) return false;
+        F.first = 1 - F.first;
+        F.game++;
+        seaFresh(F);
+        return true;
+      }
+      if (a.g != null && a.g !== F.game) return false;
+      if (a.t === 'shuffle') {
+        if (F.phase !== 'place' || F.ready[k]) return false;
+        F.fleets[k] = randomFleet();
+        return true;
+      }
+      if (a.t === 'ready') {
+        if (F.phase !== 'place') return false;
+        F.ready[k] = true;
+        if (F.ready[0] && F.ready[1]) F.phase = 'play';
+        return true;
+      }
+      if (a.t !== 'fire' || F.phase !== 'play' || k !== F.turn || a.m !== F.moves) return false;
+      const r = Number(a.r), c = Number(a.c);
+      if (!(r >= 0 && r < N && c >= 0 && c < N) || F.shots[k][key(r, c)]) return false;
+      const foeShips = F.fleets[1 - k];
+      const ship = foeShips.find(s => s.cells.some(([x, y]) => x === r && y === c));
+      F.shots[k][key(r, c)] = ship ? 'hit' : 'miss';
+      F.moves++;
+      const sunk = ship && seaSunk(foeShips, F.shots[k], ship);
+      F.last = { by: k, at: code(r, c), hit: !!ship, sunk: sunk ? ship.name : '' };
+      if (ship && foeShips.every(s => seaSunk(foeShips, F.shots[k], s))) { F.winner = k; F.phase = 'final'; return true; }
+      F.turn = 1 - k;
+      return true;
+    },
+    leave(F, ids) { if (F.players.some(p => !ids.includes(p.id))) return 'open'; },
+    render(v) {
+      const F = v.pub, me = F.players.findIndex(p => p.id === v.me), them = me === 0 ? 1 : 0;
+      const m = v.mine && v.mine.g === F.game ? v.mine : null;
+      const fleetList = k => '<div class="fleet">' + F.status[k].map(s => `<span class="${s.down ? 'down' : ''}">${s.name} ${s.size}</span>`).join('') + '</div>';
+      const shotLine = () => {
+        const L = F.last;
+        if (!L) return '';
+        const who = L.by === me ? 'You' : esc(F.players[L.by].name);
+        return `<p class="result${L.hit ? ' hit' : ''}">${who} fired at ${L.at}. ${L.sunk ? (L.by === me ? 'You sank their ' : 'They sank your ') + L.sunk + '!' : L.hit ? 'Hit!' : 'Miss.'}</p>`;
+      };
+      if (F.phase === 'place') {
+        const ready = F.ready[me];
+        return `<section class="center">
+          <p class="eyebrow">Your fleet</p>
+          <h2 class="big">Place your ships</h2>
+          ${seaGrid({ ships: m ? m.ships : [] })}
+          <div class="fleet">${FLEET.map(([n, sz]) => `<span>${n} ${sz}</span>`).join('')}</div>
+          <div class="actions center">${ready ? '' : `<button class="btn btn-alt" type="button" ${Online.sendAttr({ t: 'shuffle', g: F.game })}>Shuffle ships</button>`}<button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'ready', g: F.game })}${ready ? ' disabled' : ''}>${ready ? 'Ready' : 'I am ready'}</button></div>
+          <p class="lead">${ready ? (F.ready[them] ? 'Both ready.' : 'Waiting for ' + esc(F.players[them].name) + ' to hide their fleet.') : (F.ready[them] ? esc(F.players[them].name) + ' is ready.' : 'Shuffle until you like the layout.')}</p>
+        </section>`;
+      }
+      if (F.phase === 'play') {
+        const mine = F.turn === me && !v.pending;
+        const sel = v.local.seaSel && v.local.seaSel.m === F.moves ? v.local.seaSel : null;
+        return `<section class="center">
+          <p class="eyebrow">${mine ? 'Your turn to fire' : esc(F.players[F.turn].name) + ' is aiming'}</p>
+          <h2 class="big">${esc(F.players[them].name)}'s waters</h2>
+          ${shotLine()}
+          ${seaGrid({ shots: F.shots[me], sunk: F.sunkCells[them], pick: mine, sel: sel ? [sel.r, sel.c] : null })}
+          ${mine ? `<div class="actions center"><button class="btn btn-main btn-big" type="button" ${sel ? Online.sendAttr({ t: 'fire', r: sel.r, c: sel.c, m: F.moves }) : 'disabled'}>${sel ? 'Fire at ' + code(sel.r, sel.c) : 'Pick a square'}</button></div>` : ''}
+          ${fleetList(them)}
+          <div class="split"><small>Your fleet</small>${seaGrid({ ships: m ? m.ships : [], shots: F.shots[them], sunk: F.sunkCells[me], mini: true })}</div>
+        </section>`;
+      }
+      const w = F.winner;
+      return `<section class="center">
+        <p class="eyebrow">The whole fleet is sunk</p>
+        <h2 class="big">${w === me ? 'You win' : esc(F.players[w].name) + ' wins'}</h2>
+        ${shotLine()}
+        <div class="split"><small>${esc(F.players[them].name)}'s fleet</small>${seaGrid({ ships: F.fleets[them], shots: F.shots[me], sunk: F.sunkCells[them] })}</div>
+        <div class="split"><small>Your fleet</small>${seaGrid({ ships: F.fleets[me], shots: F.shots[them], sunk: F.sunkCells[me] })}</div>
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div>
+      </section>`;
+    },
+    click(name, el, v) {
+      if (name !== 'aim') return;
+      v.local.seaSel = { m: v.pub.moves, r: Number(el.getAttribute('data-r')), c: Number(el.getAttribute('data-c')) };
+      sfx.tick(1400);
+      v.redraw();
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.moves > B.moves && F.last) {
+        if (F.last.sunk) sfx.boom();
+        else if (F.last.hit) sfx.buzz(0.4);
+        else sfx.noise({ filter: 'lowpass', freq: 600, to: 150, dur: 0.5, gain: 0.25 });
+        if (F.last.hit) P.vibrate(F.last.sunk ? [120, 60, 200] : 60);
+      }
+      if (F.phase === 'play' && B.phase === 'place') sfx.whoosh();
+      if (F.phase === 'final' && B.phase !== 'final') {
+        const me = F.players.findIndex(p => p.id === v.me);
+        if (F.winner === me) { sfx.win(); P.confetti({ colors: ['#5cf2b0', '#ff5a5f', '#e6fff4'] }); } else sfx.lose();
+      }
+    }
+  };
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

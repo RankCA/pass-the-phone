@@ -56,7 +56,11 @@
     werewolf: { title: 'Werewolf', min: 5, max: 16, blurb: 'Secret roles and night moves, no narrator needed.' },
     'where-are-we': { title: 'Where Are We?', min: 3, max: 12, blurb: 'Everyone knows the place except the spy.' },
     'inside-job': { title: 'Inside Job', min: 4, max: 12, blurb: 'Find the word, then catch who knew it all along.' },
-    mole: { title: 'Mole', min: 5, max: 10, blurb: 'Plan five jobs while the moles try to wreck them.' }
+    mole: { title: 'Mole', min: 5, max: 10, blurb: 'Plan five jobs while the moles try to wreck them.' },
+    'liars-dice': { title: "Liar's Dice", min: 2, max: 6, blurb: 'Bid on the dice under every cup, or call liar.' },
+    'sea-battle': { title: 'Sea Battle', min: 2, max: 2, blurb: 'Hide your fleet and sink theirs.' },
+    'dots-and-boxes': { title: 'Dots and Boxes', min: 2, max: 4, blurb: 'Join the dots and close the most boxes.' },
+    mancala: { title: 'Mancala', min: 2, max: 2, blurb: 'Sow seeds round the board and capture the most.' }
   };
 
   /* ---------- Connection ---------- */
