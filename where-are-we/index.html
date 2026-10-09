@@ -62,6 +62,8 @@ body{background:radial-gradient(circle at 86% 7%,#fff3c4 0 54px,rgba(255,243,196
 .result-card div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dashed var(--line);padding-bottom:6px}
 .result-card dt{font-weight:700;color:var(--muted)}
 .result-card dd{margin:0;font-weight:800;text-align:right;overflow-wrap:anywhere;min-width:0}
+.pick button[aria-pressed="true"]{background:var(--fg);color:#fff;box-shadow:none}
+.note{margin:14px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -72,6 +74,7 @@ body{background:radial-gradient(circle at 86% 7%,#fff3c4 0 54px,rgba(255,243,196
 </div>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=2a414f29"></script>
 <script src="places.js?v=93158a27"></script>
 <script>
 (function () {
@@ -104,6 +107,11 @@ body{background:radial-gradient(circle at 86% 7%,#fff3c4 0 54px,rgba(255,243,196
       <div class="sec"><span class="label">Players</span><div id="players"></div></div>
       <div class="sec"><span class="label">Round length</span>${P.seg('time', [[300, '5 min'], [420, '7 min'], [540, '9 min']], S.settings.time)}</div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Hand out postcards</button>${has ? '<button class="btn btn-alt" type="button" data-act="reset">Reset scores</button>' : ''}</div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone reads their postcard and votes on their own phone. Make a game, then send the code to your friends.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     ${has ? P.scoreList(Object.entries(S.scores)) : ''}
     <details class="howto">
@@ -279,7 +287,269 @@ body{background:radial-gradient(circle at 86% 7%,#fff3c4 0 54px,rgba(255,243,196
     if (e.target.name === 'time') { S.settings.time = Number(e.target.value); persist(); }
   });
 
-  render();
+  /* ---------- Online: everyone reads their postcard on their own phone ---------- */
+  function wawDeal(F) {
+    F.n++;
+    F.place = deck.one();
+    F.spy = P.pick(F.players).id;
+    const pool = P.shuffle(F.place.roles.slice());
+    F.roles = {};
+    F.players.filter(p => p.id !== F.spy).forEach((p, i) => { F.roles[p.id] = pool[i % pool.length]; });
+    F.starter = P.pick(F.players).id;
+    F.phase = 'read';
+    F.read = [];
+    F.ends = 0;
+    F.left = F.time * 1000;
+    F.votes = {};
+    F.accused = null;
+    F.mode = null;
+    F.pick = null;
+    F.winner = null;
+  }
+  function wawFinish(F, winner) {
+    F.winner = winner;
+    F.ends = 0;
+    F.players.forEach(p => {
+      if (winner === 'spy' && p.id === F.spy) F.scores[p.id] = (F.scores[p.id] || 0) + 2;
+      if (winner === 'town' && p.id !== F.spy) F.scores[p.id] = (F.scores[p.id] || 0) + 1;
+    });
+    F.phase = 'result';
+  }
+  function wawTally(F) {
+    const c = {};
+    Object.keys(F.votes).forEach(k => { const t = F.votes[k]; c[t] = (c[t] || 0) + 1; });
+    const top = Math.max(0, ...Object.values(c));
+    const lead = Object.keys(c).filter(id => c[id] === top);
+    F.accused = lead.length === 1 ? lead[0] : 'tie';
+    if (F.accused === F.spy) { F.mode = 'caught'; F.phase = 'guess'; }
+    else wawFinish(F, 'spy');
+  }
+  const wawStop = F => { if (F.ends) { F.left = Math.max(0, F.ends - Date.now()); F.ends = 0; } };
+  const ONLINE = {
+    game: 'where-are-we', title: 'Where Are We?', min: 3, max: 12,
+    options() { return `<p class="label">Round length</p>${P.seg('o-time', [[300, '5 min'], [420, '7 min'], [540, '9 min']], S.settings.time)}`; },
+    readOptions() { return { time: S.settings.time }; },
+    start(players, o) {
+      const F = { players, scores: {}, n: 0, game: 1, time: o.time };
+      wawDeal(F);
+      return F;
+    },
+    view(F) {
+      const v = { players: F.players, scores: F.scores, n: F.n, game: F.game, phase: F.phase, read: F.read, starter: F.starter, time: F.time,
+        ends: F.ends, left: F.left, voted: Object.keys(F.votes), accused: F.accused, mode: F.mode, pick: F.pick, winner: F.winner };
+      if (F.phase === 'guess' || F.phase === 'result') v.spy = F.spy;
+      if (F.phase === 'result') { v.place = F.place.name; v.roles = F.roles; }
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach(p => {
+        out[p.id] = p.id === F.spy ? { n: F.n, spy: true, vote: F.votes[p.id] || null }
+          : { n: F.n, spy: false, place: F.place.name, role: F.roles[p.id], vote: F.votes[p.id] || null };
+      });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(p => p.id === from) || a.n !== F.n) return false;
+      const host = from === ctx.host;
+      switch (a.t) {
+        case 'read':
+          if (F.phase !== 'read' || F.read.includes(from)) return false;
+          F.read.push(from);
+          if (F.players.every(p => F.read.includes(p.id))) { F.phase = 'play'; F.ends = Date.now() + F.left; }
+          return true;
+        case 'go':
+          if (!host || F.phase !== 'read') return false;
+          F.phase = 'play';
+          F.ends = Date.now() + F.left;
+          return true;
+        case 'pause':
+          if (!host || F.phase !== 'play' || !F.ends) return false;
+          wawStop(F);
+          return true;
+        case 'resume':
+          if (!host || F.phase !== 'play' || F.ends || !F.left) return false;
+          F.ends = Date.now() + F.left;
+          return true;
+        case 'votenow':
+          if (F.phase !== 'play') return false;
+          wawStop(F);
+          F.phase = 'vote';
+          return true;
+        case 'spyguess':
+          if (from !== F.spy || (F.phase !== 'play' && F.phase !== 'vote')) return false;
+          wawStop(F);
+          F.mode = 'reveal';
+          F.phase = 'guess';
+          return true;
+        case 'vote':
+          if (F.phase !== 'vote' || a.id === from || !F.players.some(p => p.id === a.id)) return false;
+          F.votes[from] = a.id;
+          if (F.players.every(p => F.votes[p.id])) wawTally(F);
+          return true;
+        case 'count':
+          if (!host || F.phase !== 'vote' || !Object.keys(F.votes).length) return false;
+          wawTally(F);
+          return true;
+        case 'pick':
+          if (F.phase !== 'guess' || from !== F.spy || !PLACES.some(x => x.name === a.place)) return false;
+          F.pick = a.place;
+          wawFinish(F, a.place === F.place.name ? 'spy' : 'town');
+          return true;
+        case 'next':
+          if (F.phase !== 'result') return false;
+          wawDeal(F);
+          return true;
+      }
+      return false;
+    },
+    tick(F, now) {
+      if (F.phase === 'play' && F.ends && now >= F.ends) { F.ends = 0; F.left = 0; F.phase = 'vote'; return true; }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      gone.forEach(id => { delete F.scores[id]; });
+      if (F.players.length < 3) return 'open';
+      if (F.phase === 'result') return;
+      // The spy walked out, so send everyone somewhere new.
+      if (gone.includes(F.spy)) { wawDeal(F); return; }
+      F.read = F.read.filter(id => !gone.includes(id));
+      Object.keys(F.votes).forEach(k => { if (gone.includes(k) || gone.includes(F.votes[k])) delete F.votes[k]; });
+      if (gone.includes(F.starter)) F.starter = F.players[0].id;
+      if (F.phase === 'read' && F.players.every(p => F.read.includes(p.id))) { F.phase = 'play'; F.ends = Date.now() + F.left; }
+      if (F.phase === 'vote' && F.players.every(p => F.votes[p.id])) wawTally(F);
+    },
+    render(v) {
+      const F = v.pub, me = v.me;
+      const m = v.mine && v.mine.n === F.n ? v.mine : null;
+      const nm = id => { const p = F.players.find(x => x.id === id); return p ? p.name : 'Someone'; };
+      const names = ids => esc(P.listNames(ids.map(nm)));
+      const send = a => Online.sendAttr(Object.assign({ n: F.n }, a));
+      const back = !m ? '<small>Your postcard</small><b>Arriving</b>'
+        : m.spy ? '<small>Your secret</small><span class="spy">You are the spy</span><p>Listen closely, blend in, and work out where everyone is.</p>'
+          : `<small>Greetings from</small><b>${esc(m.place)}</b><span class="role">You are the ${esc(m.role.toLowerCase())}</span><p>One player is a spy who does not know where you are.</p>`;
+      const card = hint => `<div class="reveal" id="ocard" tabindex="0" role="button" aria-label="Press and hold to read your postcard">
+        <div class="reveal-in">
+          <div class="reveal-face reveal-front airmail"><div class="stamp">${STAMP}</div><b>Postcard</b><small>${hint}</small></div>
+          <div class="reveal-face reveal-back airmail">${back}</div>
+        </div>
+      </div>`;
+      if (F.phase === 'read') {
+        const done = F.read.includes(me);
+        const waiting = F.players.filter(p => !F.read.includes(p.id)).map(p => p.id);
+        return `<section class="center">
+          <p class="eyebrow">For your eyes only</p>
+          ${card('Press and hold to read')}
+          ${done ? `<p class="lead">Waiting for ${names(waiting)} to read theirs.</p>`
+            : `<div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="read" id="oread"${v.local.wawPeek === F.n && m ? '' : ' disabled'}>I've read it</button></div>`}
+          ${v.host && waiting.length && waiting.length < F.players.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'go' })}>Start without them</button></div>` : ''}
+        </section>`;
+      }
+      if (F.phase === 'play') {
+        const list = v.local.wawList === F.n;
+        const armed = v.local.wawArm === F.n;
+        return `<section class="center">
+          <p class="eyebrow">Everyone has a postcard</p>
+          <h2 class="big">Ask away</h2>
+          <span class="starter">${F.starter === me ? 'You ask' : esc(nm(F.starter)) + ' asks'} the first question</span>
+          <div><div class="timer" id="otimer" role="timer">${F.ends ? '' : P.clock(F.left)}</div></div>
+          <div class="actions center">
+            ${v.host ? `<button class="btn btn-alt" type="button" ${send({ t: F.ends ? 'pause' : 'resume' })}>${F.ends ? 'Pause' : 'Resume'}</button>` : ''}
+            <button class="btn btn-alt" type="button" data-ui="list">${list ? 'Hide the places' : 'See all places'}</button>
+          </div>
+          ${list ? placeTags(false) : ''}
+          ${card('Hold to read it again')}
+          <div class="actions center">
+            ${m && m.spy ? `<button class="btn btn-alt" type="button" data-ui="spyguess">${armed ? 'Tap again to guess now' : 'I am the spy. Let me guess'}</button>` : ''}
+            <button class="btn btn-main btn-big" type="button" ${send({ t: 'votenow' })}>Vote now</button>
+          </div>
+        </section>`;
+      }
+      if (F.phase === 'vote') {
+        const mineVote = m && m.vote;
+        const waiting = F.players.filter(p => !F.voted.includes(p.id)).map(p => p.id);
+        return `<section class="center">
+          <p class="eyebrow">Time to vote</p>
+          <h2 class="big">Who is the spy?</h2>
+          <div class="pick">${F.players.filter(p => p.id !== me).map(p => `<button type="button" ${send({ t: 'vote', id: p.id })} aria-pressed="${mineVote === p.id}">${esc(p.name)}</button>`).join('')}</div>
+          <p class="note">${mineVote ? 'Vote saved. You can change it until everyone has voted.' : 'Tap who you think the spy is.'} ${waiting.length ? 'Still voting: ' + names(waiting) + '.' : ''}</p>
+          ${m && m.spy ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'spyguess' })}>I am the spy. Let me guess</button></div>` : ''}
+          ${v.host && F.voted.length && waiting.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'count' })}>Count the votes now</button></div>` : ''}
+        </section>`;
+      }
+      if (F.phase === 'guess') {
+        if (F.spy === me) {
+          return `<section class="center">
+            <p class="eyebrow">${F.mode === 'caught' ? 'You were caught' : 'You stepped forward'}</p>
+            <h2 class="big">Where are we?</h2>
+            <p class="lead">Pick the place. Get it right and you win${F.mode === 'caught' ? ' anyway' : ''}. Get it wrong and everyone else wins.</p>
+            <div class="places">${PLACES.map(x => `<button type="button" ${send({ t: 'pick', place: x.name })}${v.pending ? ' disabled' : ''}>${esc(x.name)}</button>`).join('')}</div>
+          </section>`;
+        }
+        return `<section class="center">
+          <p class="eyebrow">${F.mode === 'caught' ? 'Spy caught' : 'The spy steps forward'}</p>
+          <h2 class="big">${esc(nm(F.spy))} is the spy</h2>
+          <p class="lead">${F.mode === 'caught' ? 'You found the spy, but they get one guess at the place. If they get it right, the spy still wins.' : 'The spy stopped the game to guess the place. Right and they win, wrong and everyone else wins.'}</p>
+        </section>`;
+      }
+      const spyWins = F.winner === 'spy';
+      let how;
+      if (F.mode === 'reveal') how = F.pick === F.place ? 'The spy stopped the game and named the place.' : 'The spy stopped the game and guessed ' + F.pick + '. Wrong.';
+      else if (F.accused === 'tie' || F.accused == null) how = 'The vote was a tie, so the spy got away.';
+      else if (F.accused !== F.spy) how = 'You accused ' + nm(F.accused) + ', who was not the spy.';
+      else if (F.pick === F.place) how = 'The spy was caught, but named the place.';
+      else how = 'You caught the spy, who guessed ' + F.pick + '.';
+      return `<section class="center">
+        <p class="eyebrow">${spyWins ? 'The spy wins' : 'Everyone else wins'}</p>
+        <h2 class="big">We were at the ${esc(F.place.toLowerCase())}</h2>
+        <p class="lead">${esc(how)} ${spyWins ? esc(nm(F.spy)) + ' gets 2 points.' : 'Everyone except the spy gets 1 point.'}</p>
+        <div class="panel result-card"><dl>${F.players.map(p => `<div><dt>${esc(p.name)}${p.id === me ? ' (you)' : ''}</dt><dd>${p.id === F.spy ? 'The spy' : esc(F.roles[p.id] || '')}</dd></div>`).join('')}</dl></div>
+        ${P.scoreList(F.players.map(p => [p.name + (p.id === me ? ' (you)' : ''), F.scores[p.id] || 0]))}
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${send({ t: 'next' })}>Next trip</button></div>
+      </section>`;
+    },
+    bind(v) {
+      const F = v.pub, c = document.getElementById('ocard');
+      if (c) {
+        P.holdToReveal(c, () => {
+          if (v.local.wawPeek === F.n) return;
+          v.local.wawPeek = F.n;
+          const b = document.getElementById('oread');
+          if (b && v.mine && v.mine.n === F.n) b.disabled = false;
+        });
+      }
+      if (F.phase === 'play' && F.ends) Online.ticker(v.local, 'otimer', F.ends, { low: 30000, tick: true, onEnd: () => { sfx.buzz(1); P.vibrate([300, 100, 300]); } });
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'read') { el.disabled = true; v.send({ t: 'read', n: F.n }); sfx.pop(); }
+      if (name === 'list') { v.local.wawList = v.local.wawList === F.n ? null : F.n; v.redraw(); }
+      if (name === 'spyguess') {
+        if (v.local.wawArm === F.n) { v.local.wawArm = null; v.send({ t: 'spyguess', n: F.n }); return; }
+        v.local.wawArm = F.n;
+        v.redraw();
+        setTimeout(() => { if (v.local.wawArm === F.n) { v.local.wawArm = null; v.redraw(); } }, 3000);
+      }
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.n !== B.n || F.phase === B.phase) return;
+      if (F.phase === 'play') sfx.beep(true);
+      if (F.phase === 'vote' || F.phase === 'guess') sfx.whoosh();
+      if (F.phase === 'result') {
+        const won = (F.winner === 'spy') === (F.spy === v.me);
+        if (won) { sfx.win(); P.confetti({ colors: ['#ff5a5f', '#2c5fd4', '#ffd166', '#ffffff'] }); } else sfx.lose();
+      }
+    }
+  };
+  document.addEventListener('change', e => { if (e.target.name === 'o-time') { S.settings.time = Number(e.target.value); persist(); } });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

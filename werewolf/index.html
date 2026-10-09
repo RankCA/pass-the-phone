@@ -71,12 +71,17 @@ body.day .cast li .wolfname{color:#a32424}
 .alive-row{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:20px}
 .alive-row span{padding:4px 12px;border-radius:999px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);font-weight:700}
 .alive-row span.dead{background:transparent;color:var(--muted);text-decoration:line-through}
+.pick button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);box-shadow:none}
+.pack{list-style:none;margin:16px auto 0;padding:0;max-width:440px;display:grid;gap:6px;text-align:left}
+.pack li{display:flex;justify-content:space-between;gap:12px;padding:8px 14px;border-radius:12px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);font-weight:700}
+.checks{margin:14px auto 0;max-width:30em;font-size:17px;color:var(--muted)}
 </style>
 </head>
 <body>
 <div class="sky" aria-hidden="true"><svg id="sky" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMax slice"></svg></div>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=2a414f29"></script>
 <script>
 (function () {
   'use strict';
@@ -110,6 +115,7 @@ body.day .cast li .wolfname{color:#a32424}
   const nameOf = i => S.players[i];
   const roleOf = i => S.roles[i];
   const aliveIdx = () => S.players.map((_, i) => i).filter(i => S.alive[i]);
+  const asRole = r => (r === 'wolf' ? 'a werewolf' : r === 'villager' ? 'a villager' : 'the ' + ROLES[r].name.toLowerCase());
 
   /* ---------- Sky ---------- */
   (function drawSky() {
@@ -228,7 +234,7 @@ body.day .cast li .wolfname{color:#a32424}
     sfx.win();
     let line = 'Everyone, wake up. ';
     line += died != null ? 'Last night, ' + nameOf(died) + ' was attacked by the werewolves.' : 'Last night, nobody was hurt.';
-    if (died != null && S.settings.reveal) line += ' ' + nameOf(died) + ' was ' + (roleOf(died) === 'wolf' ? 'a werewolf.' : 'the ' + ROLES[roleOf(died)].name.toLowerCase() + '.');
+    if (died != null && S.settings.reveal) line += ' ' + nameOf(died) + ' was ' + asRole(roleOf(died)) + '.';
     if (S.settings.voice && P.canSpeak()) await P.speak(line, { rate: 0.92, pitch: 0.9 });
   }
 
@@ -252,6 +258,11 @@ body.day .cast li .wolfname{color:#a32424}
       </div>
       <div class="sec"><span class="label">Talk time each day</span>${P.seg('talk', [[0, 'No timer'], [120, '2 min'], [180, '3 min'], [300, '5 min']], st.talk)}</div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Deal the roles</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone gets their role and makes their night moves on their own phone, so nobody has to narrate. Make a game, then send the code.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -335,7 +346,7 @@ body.day .cast li .wolfname{color:#a32424}
     const d = S.died;
     let body;
     if (d == null) body = '<h2 class="big">Nobody was hurt</h2><p class="lead">The werewolves struck, but someone was protected. Or they missed.</p>';
-    else body = `<h2 class="big">${esc(nameOf(d))} was attacked</h2><p class="lead">${S.settings.reveal ? esc(nameOf(d)) + ' was ' + (roleOf(d) === 'wolf' ? 'a werewolf.' : 'the ' + ROLES[roleOf(d)].name.toLowerCase() + '.') : esc(nameOf(d)) + ' is out of the game.'} ${esc(nameOf(d))} can watch but must stay quiet.</p>`;
+    else body = `<h2 class="big">${esc(nameOf(d))} was attacked</h2><p class="lead">${S.settings.reveal ? esc(nameOf(d)) + ' was ' + asRole(roleOf(d)) + '.' : esc(nameOf(d)) + ' is out of the game.'} ${esc(nameOf(d))} can watch but must stay quiet.</p>`;
     return P.header() + `
     <section class="center">
       <p class="eyebrow">Morning ${S.night}</p>
@@ -370,7 +381,7 @@ body.day .cast li .wolfname{color:#a32424}
     const e = S.exiled;
     let body;
     if (e < 0) body = '<h2 class="big">Nobody was voted out</h2><p class="lead">The village could not agree.</p>';
-    else body = `<h2 class="big">${esc(nameOf(e))} is out</h2><p class="lead">${S.settings.reveal ? esc(nameOf(e)) + ' was ' + (roleOf(e) === 'wolf' ? 'a werewolf.' : 'the ' + ROLES[roleOf(e)].name.toLowerCase() + '.') : 'Their role stays secret until the end.'}</p>`;
+    else body = `<h2 class="big">${esc(nameOf(e))} is out</h2><p class="lead">${S.settings.reveal ? esc(nameOf(e)) + ' was ' + asRole(roleOf(e)) + '.' : 'Their role stays secret until the end.'}</p>`;
     return P.header() + `
     <section class="center">
       <p class="eyebrow">The village has spoken</p>
@@ -493,7 +504,349 @@ body.day .cast li .wolfname{color:#a32424}
     else if (['seer', 'doctor', 'reveal', 'voice'].includes(t.id)) { S.settings[t.id] = t.checked; persist(); }
   });
 
-  render();
+  /* ---------- Online: roles and night moves on everyone's own phone ---------- */
+  const DAYTIME = ['morning', 'day', 'vote', 'exile', 'end'];
+  function onlineWolves(n, w) {
+    const max = Math.max(1, Math.floor((n - 1) / 3));
+    if (w > 0) return Math.min(w, max);
+    return n <= 6 ? 1 : n <= 10 ? 2 : 3;
+  }
+  function wwDeal(F) {
+    const n = F.players.length, k = onlineWolves(n, F.set.wolves);
+    const roles = [];
+    for (let i = 0; i < k; i++) roles.push('wolf');
+    if (F.set.seer) roles.push('seer');
+    if (F.set.doctor) roles.push('doctor');
+    while (roles.length < n) roles.push('villager');
+    const dealt = P.shuffle(roles.slice(0, n));
+    F.roles = {};
+    F.alive = {};
+    F.players.forEach((p, i) => { F.roles[p.id] = dealt[i]; F.alive[p.id] = true; });
+    F.n++;
+    F.night = 0;
+    F.phase = 'read';
+    F.read = [];
+    F.acts = {};
+    F.checks = {};
+    F.votes = {};
+    F.died = null;
+    F.exiled = null;
+    F.winner = null;
+    F.ends = 0;
+  }
+  const wwAlive = F => F.players.filter(p => F.alive[p.id]).map(p => p.id);
+  function wwWinner(F) {
+    const alive = wwAlive(F), wolves = alive.filter(id => F.roles[id] === 'wolf').length;
+    if (wolves === 0) return 'village';
+    if (wolves >= alive.length - wolves) return 'wolves';
+    return null;
+  }
+  function wwNight(F) {
+    F.n++;
+    F.night++;
+    F.phase = 'night';
+    F.acts = {};
+    F.died = null;
+    F.exiled = null;
+    F.votes = {};
+    F.ends = 0;
+  }
+  const wwWolfIds = F => wwAlive(F).filter(id => F.roles[id] === 'wolf');
+  function wwPackAgrees(F) {
+    const picks = wwWolfIds(F).map(id => F.acts[id]);
+    return picks.length > 0 && picks.every(t => t && t === picks[0]);
+  }
+  function wwMorning(F) {
+    const picks = wwWolfIds(F).map(id => F.acts[id]).filter(Boolean);
+    const c = {};
+    picks.forEach(t => { c[t] = (c[t] || 0) + 1; });
+    const top = Math.max(0, ...Object.values(c));
+    const lead = Object.keys(c).filter(t => c[t] === top);
+    const target = lead.length ? P.pick(lead) : null;
+    const doc = wwAlive(F).find(id => F.roles[id] === 'doctor');
+    const save = doc ? F.acts[doc] : null;
+    F.died = target && target !== save ? target : null;
+    if (F.died) F.alive[F.died] = false;
+    F.n++;
+    F.winner = wwWinner(F);
+    F.phase = 'morning';
+  }
+  function wwNightDone(F) {
+    return wwAlive(F).every(id => F.acts[id]) && wwPackAgrees(F);
+  }
+  function wwTally(F) {
+    const c = {};
+    Object.keys(F.votes).forEach(k => { const t = F.votes[k]; c[t] = (c[t] || 0) + 1; });
+    const top = Math.max(0, ...Object.values(c));
+    const lead = Object.keys(c).filter(id => c[id] === top);
+    F.exiled = lead.length === 1 ? lead[0] : 'tie';
+    if (F.exiled !== 'tie') F.alive[F.exiled] = false;
+    F.n++;
+    F.winner = wwWinner(F);
+    F.phase = 'exile';
+  }
+  const ONLINE = {
+    game: 'werewolf', title: 'Werewolf', min: 5, max: 16,
+    options() {
+      const st = S.settings;
+      return `<p class="label">Werewolves</p>${P.seg('o-wolves', [[0, 'Auto'], [1, '1'], [2, '2'], [3, '3']], st.wolves)}<p class="hint">Auto picks 1 for up to 6 players, 2 for up to 10, then 3.</p>
+        <p class="label" style="margin-top:18px">Special roles</p>
+        <label class="check"><input type="checkbox" id="o-seer"${st.seer ? ' checked' : ''}> Seer: checks one player each night</label>
+        <label class="check" style="margin-top:10px"><input type="checkbox" id="o-doctor"${st.doctor ? ' checked' : ''}> Doctor: protects one player each night</label>
+        <p class="label" style="margin-top:18px">Rules</p>
+        <label class="check"><input type="checkbox" id="o-reveal"${st.reveal ? ' checked' : ''}> Show the role of anyone who is out</label>
+        <p class="label" style="margin-top:18px">Talk time each day</p>${P.seg('o-talk', [[0, 'No timer'], [120, '2 min'], [180, '3 min'], [300, '5 min']], st.talk)}`;
+    },
+    readOptions() { const st = S.settings; return { wolves: st.wolves, seer: st.seer, doctor: st.doctor, reveal: st.reveal, talk: st.talk }; },
+    start(players, o) {
+      const F = { players, set: o, game: 1, n: 0 };
+      wwDeal(F);
+      return F;
+    },
+    view(F) {
+      const v = { players: F.players, game: F.game, n: F.n, phase: F.phase, night: F.night, alive: F.alive, read: F.read,
+        acted: wwAlive(F).filter(id => F.acts[id]).length, voted: Object.keys(F.votes), died: F.died, exiled: F.exiled,
+        winner: F.winner, ends: F.ends, set: { reveal: F.set.reveal, talk: F.set.talk, seer: F.set.seer, doctor: F.set.doctor },
+        wolves: F.players.filter(p => F.roles[p.id] === 'wolf').length };
+      const shown = {};
+      if (F.set.reveal) F.players.forEach(p => { if (!F.alive[p.id]) shown[p.id] = F.roles[p.id]; });
+      v.outRoles = shown;
+      if (F.phase === 'end') v.roles = F.roles;
+      return v;
+    },
+    secrets(F) {
+      const out = {}, wolves = F.players.filter(p => F.roles[p.id] === 'wolf').map(p => p.id);
+      F.players.forEach(p => {
+        const r = F.roles[p.id];
+        const s = { n: F.n, role: r, alive: !!F.alive[p.id], pick: F.acts[p.id] || null, vote: F.votes[p.id] || null };
+        if (r === 'wolf') {
+          s.pack = wolves.filter(id => id !== p.id);
+          if (F.phase === 'night') { s.packPicks = {}; wolves.forEach(id => { if (F.alive[id]) s.packPicks[id] = F.acts[id] || null; }); }
+        }
+        if (r === 'seer') s.checks = F.checks[p.id] || [];
+        out[p.id] = s;
+      });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(p => p.id === from)) return false;
+      const host = from === ctx.host;
+      if (a.t === 'again') {
+        if (F.phase !== 'end' || a.g !== F.game) return false;
+        F.game++;
+        wwDeal(F);
+        return true;
+      }
+      if (a.n !== F.n) return false;
+      const alive = !!F.alive[from], role = F.roles[from];
+      switch (a.t) {
+        case 'read':
+          if (F.phase !== 'read' || F.read.includes(from)) return false;
+          F.read.push(from);
+          if (F.players.every(p => F.read.includes(p.id))) wwNight(F);
+          return true;
+        case 'go':
+          if (!host || F.phase !== 'read') return false;
+          wwNight(F);
+          return true;
+        case 'night': {
+          if (F.phase !== 'night' || !alive || !F.alive[a.id]) return false;
+          if (role === 'wolf' && F.roles[a.id] === 'wolf') return false;
+          if ((role === 'seer' || role === 'villager') && a.id === from) return false;
+          if (role === 'seer') {
+            if (F.acts[from]) return false;
+            (F.checks[from] = F.checks[from] || []).push([a.id, F.roles[a.id] === 'wolf', F.night]);
+          }
+          F.acts[from] = a.id;
+          if (wwNightDone(F)) wwMorning(F);
+          return true;
+        }
+        case 'dawn':
+          if (!host || F.phase !== 'night' || !wwAlive(F).some(id => F.acts[id])) return false;
+          wwMorning(F);
+          return true;
+        case 'talk':
+          if (F.phase !== 'morning' || F.winner) return false;
+          F.n++;
+          F.phase = 'day';
+          F.ends = F.set.talk ? Date.now() + F.set.talk * 1000 : 0;
+          return true;
+        case 'vote':
+          if (F.phase === 'day') { F.n++; F.phase = 'vote'; F.ends = 0; F.votes = {}; return true; }
+          return false;
+        case 'cast':
+          if (F.phase !== 'vote' || !alive || a.id === from || !F.alive[a.id]) return false;
+          F.votes[from] = a.id;
+          if (wwAlive(F).every(id => F.votes[id])) wwTally(F);
+          return true;
+        case 'count':
+          if (!host || F.phase !== 'vote' || !Object.keys(F.votes).length) return false;
+          wwTally(F);
+          return true;
+        case 'nextnight':
+          if (F.phase !== 'exile' || F.winner) return false;
+          wwNight(F);
+          return true;
+        case 'end':
+          if ((F.phase !== 'morning' && F.phase !== 'exile') || !F.winner) return false;
+          F.n++;
+          F.phase = 'end';
+          return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      if (F.players.length < 3) return 'open';
+      gone.forEach(id => { delete F.alive[id]; delete F.acts[id]; delete F.votes[id]; });
+      Object.keys(F.votes).forEach(k => { if (gone.includes(F.votes[k])) delete F.votes[k]; });
+      if (F.phase === 'end') return;
+      F.read = F.read.filter(id => !gone.includes(id));
+      if (F.phase === 'read' && F.players.every(p => F.read.includes(p.id))) { wwNight(F); return; }
+      const w = wwWinner(F);
+      if (w && F.phase !== 'read') { F.winner = w; F.n++; F.phase = 'end'; return; }
+      if (F.phase === 'night' && wwNightDone(F)) wwMorning(F);
+      if (F.phase === 'vote' && wwAlive(F).every(id => F.votes[id])) wwTally(F);
+    },
+    render(v) {
+      const F = v.pub, me = v.me;
+      // The role never changes, so keep showing it while a new save is on its way.
+      const m = v.mine || null, fresh = !!(m && m.n === F.n);
+      const nm = id => { const p = F.players.find(x => x.id === id); return p ? p.name : 'Someone'; };
+      const send = a => Online.sendAttr(Object.assign({ n: F.n }, a));
+      const outLine = id => (F.outRoles[id] ? esc(nm(id)) + ' was ' + asRole(F.outRoles[id]) + '.' : esc(nm(id)) + ' is out of the game.');
+      const aliveRowO = () => `<div class="alive-row">${F.players.map(p => `<span class="${F.alive[p.id] ? '' : 'dead'}">${esc(p.name)}${p.id === me ? ' (you)' : ''}</span>`).join('')}</div>`;
+      const meAlive = !!F.alive[me];
+      if (F.phase === 'read') {
+        const r = m && m.role, R = r ? ROLES[r] : null;
+        const done = F.read.includes(me);
+        const waiting = F.players.filter(p => !F.read.includes(p.id)).map(p => p.id);
+        const back = R ? `${ART[r]}<p class="role-name">${R.name}</p><p class="role-team">${R.team}</p><p class="role-text">${R.text}</p>
+          ${r === 'wolf' ? `<p class="role-team">${m.pack.length ? 'Your pack: ' + esc(P.listNames(m.pack.map(nm))) : 'You hunt alone.'}</p>` : ''}` : '<p class="role-name">Dealing</p>';
+        return `<section class="center">
+          <p class="eyebrow">For your eyes only</p>
+          <div class="reveal" id="ocard" tabindex="0" role="button" aria-label="Press and hold to see your role">
+            <div class="reveal-in">
+              <div class="reveal-face reveal-front">${MOON.replace('moonbig', 'role-art')}<b>Your role</b><small>Press and hold</small></div>
+              <div class="reveal-face reveal-back${r === 'wolf' ? ' wolf' : ''}">${back}</div>
+            </div>
+          </div>
+          ${done ? `<p class="lead">Waiting for ${esc(P.listNames(waiting.map(nm)))} to look.</p>`
+            : `<div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="read" id="oread"${v.local.wwPeek === F.n && R ? '' : ' disabled'}>I've seen my role</button></div>
+               <p class="lead">Let go to hide it again. The button unlocks after you look.</p>`}
+          ${v.host && waiting.length && waiting.length < F.players.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'go' })}>Start the night without them</button></div>` : ''}
+        </section>`;
+      }
+      if (F.phase === 'night') {
+        const total = F.players.filter(p => F.alive[p.id]).length;
+        const status = `<p class="whisper">${F.acted} of ${total} players have chosen.</p>`;
+        const hostEnd = v.host && F.acted ? `<div class="actions center"><button class="textbtn" type="button" ${send({ t: 'dawn' })}>End the night now</button></div>` : '';
+        if (!meAlive) return `<section class="center">${MOON}<p class="night-word">Night ${F.night}</p><p class="whisper">You are out of the game. Watch quietly, and do not give anything away.</p>${status}${hostEnd}</section>`;
+        const r = m && m.role;
+        const alive = F.players.filter(p => F.alive[p.id]);
+        const pickBtns = (list, extra) => `<div class="pick">${list.map(p => `<button type="button" ${send({ t: 'night', id: p.id })} aria-pressed="${fresh && m.pick === p.id}"${v.pending ? ' disabled' : ''}>${esc(p.name)}${extra ? extra(p) : ''}</button>`).join('')}</div>`;
+        let body;
+        if (r === 'wolf') {
+          const pack = m.packPicks || {};
+          const ids = Object.keys(pack);
+          const agree = ids.length && ids.every(id => pack[id] && pack[id] === pack[ids[0]]);
+          body = `<p class="eyebrow">Werewolves only</p><h2 class="big">Who do you attack?</h2>
+            ${pickBtns(alive.filter(p => p.id !== me && !m.pack.includes(p.id)))}
+            ${ids.length > 1 ? `<ul class="pack">${ids.map(id => `<li><span>${id === me ? 'You' : esc(nm(id))}</span><span>${pack[id] ? esc(nm(pack[id])) : 'Not yet'}</span></li>`).join('')}</ul>
+              <p class="whisper">${agree ? 'Your pack agrees.' : 'Your pack has to agree on one name.'}</p>` : ''}`;
+        } else if (r === 'seer') {
+          const checks = m.checks || [];
+          const tonight = checks.find(c => c[2] === F.night);
+          const past = checks.filter(c => c[2] !== F.night);
+          body = tonight
+            ? `<p class="eyebrow">Seer only</p><div class="result-card${tonight[1] ? ' bad' : ''}"><p><b>${esc(nm(tonight[0]))}</b> ${tonight[1] ? 'is a werewolf.' : 'is not a werewolf.'}</p></div>`
+            : `<p class="eyebrow">Seer only</p><h2 class="big">Who do you check?</h2>${pickBtns(alive.filter(p => p.id !== me))}`;
+          if (past.length) body += `<p class="checks">Earlier: ${esc(past.map(c => nm(c[0]) + (c[1] ? ' is a werewolf' : ' is not a werewolf')).join('. '))}.</p>`;
+        } else if (r === 'doctor') {
+          body = `<p class="eyebrow">Doctor only</p><h2 class="big">Who do you protect?</h2>${pickBtns(alive, p => (p.id === me ? ' (you)' : ''))}`;
+        } else {
+          body = `<p class="eyebrow">The village sleeps</p><h2 class="big">Who do you suspect?</h2>${pickBtns(alive.filter(p => p.id !== me))}
+            <p class="whisper">Everyone taps a name at night, so nobody can tell who has a special role. Your pick here does nothing.</p>`;
+        }
+        return `<section class="center">${body}${fresh && m.pick ? '<p class="whisper">Done. Wait for the night to end.</p>' : ''}${status}${hostEnd}</section>`;
+      }
+      if (F.phase === 'morning') {
+        const d = F.died;
+        const body = d == null ? '<h2 class="big">Nobody was hurt</h2><p class="lead">The werewolves struck, but someone was protected. Or they missed.</p>'
+          : `<h2 class="big">${d === me ? 'You were' : esc(nm(d)) + ' was'} attacked</h2><p class="lead">${outLine(d)} ${d === me ? 'You can watch, but stay quiet.' : esc(nm(d)) + ' can watch but must stay quiet.'}</p>`;
+        return `<section class="center"><p class="eyebrow">Morning ${F.night}</p>${body}${aliveRowO()}
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" ${send({ t: F.winner ? 'end' : 'talk' })}>${F.winner ? 'See who won' : 'Start talking'}</button></div></section>`;
+      }
+      if (F.phase === 'day') {
+        return `<section class="center"><p class="eyebrow">Day ${F.night}</p><h2 class="big">Who is a werewolf?</h2>
+          <p class="lead">Share what you know, accuse, defend yourself. Then vote someone out.</p>
+          ${F.ends ? '<div class="timer" id="otimer" role="timer"></div>' : ''}
+          ${aliveRowO()}
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" ${send({ t: 'vote' })}>Time to vote</button></div></section>`;
+      }
+      if (F.phase === 'vote') {
+        const waiting = F.players.filter(p => F.alive[p.id] && !F.voted.includes(p.id)).map(p => p.id);
+        const mineVote = fresh && m.vote;
+        return `<section class="center"><p class="eyebrow">The vote</p><h2 class="big">Who goes?</h2>
+          ${meAlive ? `<div class="pick">${F.players.filter(p => F.alive[p.id] && p.id !== me).map(p => `<button type="button" ${send({ t: 'cast', id: p.id })} aria-pressed="${mineVote === p.id}">${esc(p.name)}</button>`).join('')}</div>
+            <p class="lead">${mineVote ? 'Vote saved. You can change it until everyone has voted.' : 'Tap who you want to vote out.'}</p>` : '<p class="lead">You are out, so you do not vote.</p>'}
+          <p class="whisper">${waiting.length ? 'Still voting: ' + esc(P.listNames(waiting.map(nm))) + '.' : 'Counting the votes.'}</p>
+          ${v.host && F.voted.length && waiting.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'count' })}>Count the votes now</button></div>` : ''}</section>`;
+      }
+      if (F.phase === 'exile') {
+        const e = F.exiled;
+        const body = e === 'tie' ? '<h2 class="big">Nobody was voted out</h2><p class="lead">The village could not agree.</p>'
+          : `<h2 class="big">${e === me ? 'You are' : esc(nm(e)) + ' is'} out</h2><p class="lead">${F.set.reveal ? outLine(e) : 'Their role stays secret until the end.'}</p>`;
+        return `<section class="center"><p class="eyebrow">The village has spoken</p>${body}${aliveRowO()}
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" ${send({ t: F.winner ? 'end' : 'nextnight' })}>${F.winner ? 'See who won' : 'Night falls'}</button></div></section>`;
+      }
+      const wolvesWin = F.winner === 'wolves';
+      return `<section class="center"><p class="eyebrow">Game over</p>
+        <h2 class="big">${wolvesWin ? 'The werewolves win' : 'The village wins'}</h2>
+        <p class="lead">${wolvesWin ? 'The werewolves now match the village. Nobody is safe.' : 'Every werewolf has been found. The village sleeps soundly.'}</p>
+        <ul class="cast">${F.players.map(p => `<li class="${F.alive[p.id] ? '' : 'dead'}"><span>${esc(p.name)}${p.id === me ? ' (you)' : ''}</span><span class="${F.roles[p.id] === 'wolf' ? 'wolfname' : ''}">${ROLES[F.roles[p.id]].name}</span></li>`).join('')}</ul>
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div></section>`;
+    },
+    bind(v) {
+      const F = v.pub;
+      document.body.classList.toggle('day', DAYTIME.includes(F.phase));
+      const c = document.getElementById('ocard');
+      if (c) {
+        P.holdToReveal(c, () => {
+          if (v.local.wwPeek === F.n) return;
+          v.local.wwPeek = F.n;
+          const b = document.getElementById('oread');
+          if (b && v.mine && v.mine.role) b.disabled = false;
+        });
+      }
+      if (F.phase === 'day' && F.ends) Online.ticker(v.local, 'otimer', F.ends, { tick: true, onEnd: () => sfx.buzz(0.8) });
+    },
+    unbind() { document.body.classList.remove('day'); },
+    click(name, el, v) {
+      if (name === 'read') { el.disabled = true; v.send({ t: 'read', n: v.pub.n }); sfx.pop(); }
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game || B.phase === F.phase) return;
+      if (F.phase === 'night') chime();
+      if (F.phase === 'morning') sfx.win();
+      if (F.phase === 'exile') sfx.tone(110, { to: 55, dur: 0.6, gain: 0.3 });
+      if (F.phase === 'end') {
+        sfx.win();
+        P.confetti({ colors: F.winner === 'wolves' ? ['#e85a5a', '#2a1018', '#f0c75e'] : ['#f0c75e', '#f3ecd8', '#5b3fa0', '#a9cce6'] });
+      }
+    }
+  };
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'o-wolves' || t.name === 'o-talk') { S.settings[t.name.slice(2)] = Number(t.value); persist(); }
+    else if (['o-seer', 'o-doctor', 'o-reveal'].includes(t.id)) { S.settings[t.id.slice(2)] = t.checked; persist(); }
+  });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

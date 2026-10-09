@@ -70,11 +70,19 @@ body{background-color:#123d73;background-image:linear-gradient(rgba(255,255,255,
 .stamp.ok{color:var(--good)}
 .stamp.fail{color:var(--bad)}
 .moles{margin:12px 0 0;font-size:18px}
+.choice button[aria-pressed="true"]{box-shadow:0 0 0 4px var(--fg)}
+.choice button[aria-pressed="false"]{opacity:.8}
+.yesno{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:420px;margin:18px auto 0}
+.yesno button{min-height:70px;border:0;border-radius:18px;font:800 22px/1.1 var(--f-body);cursor:pointer;background:var(--panel);color:var(--fg);box-shadow:inset 0 0 0 2px var(--line)}
+.yesno button[aria-pressed="true"]{background:var(--fg);color:#0d2b52;box-shadow:none}
+.note{margin:14px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
+.votes-was{margin:14px auto 0;max-width:30em;font-size:16px}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=2a414f29"></script>
 <script>
 (function () {
   'use strict';
@@ -131,6 +139,11 @@ body{background-color:#123d73;background-image:linear-gradient(rgba(255,255,255,
     <div class="panel">
       <div class="sec"><span class="label">Players</span><div id="players"></div><p class="hint">5 to 10 players. With 5 or 6 there are 2 moles, with 7 to 9 there are 3, and with 10 there are 4.</p></div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Deal the roles</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone sees their role, votes and plays their job card on their own phone. Make a game, then send the code.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -288,7 +301,263 @@ body{background-color:#123d73;background-image:linear-gradient(rgba(255,255,255,
     }
   });
 
-  render();
+  /* ---------- Online: roles, votes and job cards on everyone's own phone ---------- */
+  const moleSize = F => SIZES[F.players.length][F.job];
+  const moleNeed = F => (F.job === 3 && F.players.length >= 7 ? 2 : 1);
+  const moleLeader = F => F.players[F.leaderAt % F.players.length].id;
+  const moleWins = (F, k) => F.results.filter(r => r === k).length;
+  function moleDeal(F) {
+    F.moles = P.shuffle(F.players.map(p => p.id)).slice(0, MOLES[F.players.length]);
+    F.leaderAt = Math.floor(Math.random() * F.players.length);
+    F.job = 0;
+    F.results = [];
+    F.rejects = 0;
+    F.crew = [];
+    F.votes = {};
+    F.cards = {};
+    F.lastVote = null;
+    F.last = null;
+    F.winner = null;
+    F.read = [];
+    F.n++;
+    F.phase = 'read';
+  }
+  function moleEnd(F) {
+    if (moleWins(F, 'ok') >= 3) F.winner = 'crew';
+    else if (moleWins(F, 'fail') >= 3 || F.rejects >= 5) F.winner = 'moles';
+    if (F.winner) { F.n++; F.phase = 'final'; return true; }
+    return false;
+  }
+  function molePlan(F) {
+    F.n++;
+    F.crew = [];
+    F.votes = {};
+    F.cards = {};
+    F.phase = 'plan';
+  }
+  function moleCount(F) {
+    const yes = F.players.filter(p => F.votes[p.id] === 'yes').map(p => p.id);
+    const ok = yes.length > F.players.length / 2;
+    F.lastVote = { job: F.job, crew: F.crew.slice(), yes, no: F.players.filter(p => !yes.includes(p.id)).map(p => p.id), ok };
+    if (ok) { F.rejects = 0; F.cards = {}; F.n++; F.phase = 'mission'; return; }
+    F.rejects++;
+    if (moleEnd(F)) return;
+    F.leaderAt++;
+    molePlan(F);
+  }
+  function moleFinish(F) {
+    const picks = F.crew.map(id => F.cards[id]);
+    const fails = picks.filter(c => c === 'fail').length, ok = fails < moleNeed(F);
+    F.last = { job: F.job, ok, fails, cards: P.shuffle(picks.slice()) };
+    F.results[F.job] = ok ? 'ok' : 'fail';
+    F.n++;
+    F.phase = 'outcome';
+  }
+  const ONLINE = {
+    game: 'mole', title: 'Mole', min: 5, max: 10,
+    start(players) {
+      const F = { players, game: 1, n: 0 };
+      moleDeal(F);
+      return F;
+    },
+    view(F) {
+      const v = { players: F.players, game: F.game, n: F.n, phase: F.phase, leader: moleLeader(F), job: F.job, results: F.results, rejects: F.rejects,
+        crew: F.crew, read: F.read, voted: Object.keys(F.votes), played: Object.keys(F.cards), lastVote: F.lastVote, last: F.last, winner: F.winner,
+        size: moleSize(F), need: moleNeed(F), sizes: SIZES[F.players.length] };
+      if (F.phase === 'final') v.moles = F.moles;
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach(p => {
+        const mole = F.moles.includes(p.id);
+        out[p.id] = { n: F.n, mole, mates: mole ? F.moles.filter(id => id !== p.id) : [], vote: F.votes[p.id] || null, card: F.cards[p.id] || null };
+      });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(p => p.id === from)) return false;
+      const host = from === ctx.host;
+      if (a.t === 'again') {
+        if (F.phase !== 'final' || a.g !== F.game) return false;
+        F.game++;
+        moleDeal(F);
+        return true;
+      }
+      if (a.n !== F.n) return false;
+      switch (a.t) {
+        case 'read':
+          if (F.phase !== 'read' || F.read.includes(from)) return false;
+          F.read.push(from);
+          if (F.players.every(p => F.read.includes(p.id))) molePlan(F);
+          return true;
+        case 'go':
+          if (!host || F.phase !== 'read') return false;
+          molePlan(F);
+          return true;
+        case 'propose': {
+          if (F.phase !== 'plan' || from !== moleLeader(F) || !Array.isArray(a.crew)) return false;
+          const crew = [...new Set(a.crew)].filter(id => F.players.some(p => p.id === id));
+          if (crew.length !== moleSize(F)) return false;
+          F.crew = crew;
+          F.votes = {};
+          F.n++;
+          F.phase = 'vote';
+          return true;
+        }
+        case 'vote':
+          if (F.phase !== 'vote' || (a.v !== 'yes' && a.v !== 'no')) return false;
+          F.votes[from] = a.v;
+          if (F.players.every(p => F.votes[p.id])) moleCount(F);
+          return true;
+        case 'count':
+          if (!host || F.phase !== 'vote' || !Object.keys(F.votes).length) return false;
+          moleCount(F);
+          return true;
+        case 'play':
+          if (F.phase !== 'mission' || !F.crew.includes(from) || (a.v !== 'ok' && a.v !== 'fail')) return false;
+          // Crew always pull it off. Only moles can mess a job up.
+          F.cards[from] = a.v === 'fail' && F.moles.includes(from) ? 'fail' : 'ok';
+          if (F.crew.every(id => F.cards[id])) moleFinish(F);
+          return true;
+        case 'carry':
+          if (F.phase !== 'outcome') return false;
+          if (moleEnd(F)) return true;
+          F.job++;
+          F.leaderAt++;
+          molePlan(F);
+          return true;
+      }
+      return false;
+    },
+    // The job sizes depend on how many play, so someone leaving ends the game.
+    leave(F, ids) { if (F.players.some(p => !ids.includes(p.id))) return 'open'; },
+    render(v) {
+      const F = v.pub, me = v.me, m = v.mine || null, fresh = !!(m && m.n === F.n);
+      const nm = id => { const p = F.players.find(x => x.id === id); return p ? p.name : 'Someone'; };
+      const names = ids => esc(P.listNames(ids.filter(id => id !== me).map(nm).concat(ids.includes(me) ? ['you'] : [])));
+      const send = a => Online.sendAttr(Object.assign({ n: F.n }, a));
+      const jobs = '<div class="jobs" aria-label="Jobs">' + F.sizes.map((sz, i) => {
+        const r = F.results[i];
+        return `<span class="job${r ? ' ' + r : i === F.job ? ' now' : ''}" aria-label="Job ${i + 1}: ${r === 'ok' ? 'done' : r === 'fail' ? 'failed' : sz + ' people'}">${r === 'ok' ? 'OK' : r === 'fail' ? 'X' : sz}</span>`;
+      }).join('') + '</div>' + (F.players.length >= 7 ? '<p class="hint center">Job 4 only fails with two mess ups.</p>' : '') +
+        `<div class="rejects" aria-label="${F.rejects} crews turned down">Turned down ${[1, 2, 3, 4, 5].map(k => `<i class="${F.rejects >= k ? 'on' : ''}"></i>`).join('')}</div>`;
+      const lastVote = () => {
+        const L = F.lastVote;
+        if (!L || L.job !== F.job) return '';
+        return `<p class="votes-was">${L.ok ? 'The crew was approved.' : 'The last crew was turned down.'} Yes: ${L.yes.length ? names(L.yes) : 'nobody'}. No: ${L.no.length ? names(L.no) : 'nobody'}.</p>`;
+      };
+      if (F.phase === 'read') {
+        const back = !m ? '<div class="reveal-face reveal-back"><b>Dealing</b></div>'
+          : m.mole ? `<div class="reveal-face reveal-back mole"><b>Mole</b><p>Wreck three jobs without getting caught.</p><p>The other ${m.mates.length === 1 ? 'mole is' : 'moles are'} <strong>${esc(P.listNames(m.mates.map(nm)))}</strong>.</p></div>`
+            : '<div class="reveal-face reveal-back"><b>Crew</b><p>Pull off three jobs. Keep the moles off your crews.</p></div>';
+        const done = F.read.includes(me);
+        const waiting = F.players.filter(p => !F.read.includes(p.id)).map(p => p.id);
+        return `<section class="center">
+          <p class="eyebrow">This is your role</p>
+          <div class="reveal rolecard" id="ocard" tabindex="0" role="button" aria-label="Press and hold to see your role">
+            <div class="reveal-in"><div class="reveal-face reveal-front"><b>Hold to read</b><small>Keep it to yourself.</small></div>${back}</div>
+          </div>
+          ${done ? `<p class="lead">Waiting for ${names(waiting)}.</p>`
+            : `<div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="read" id="oread"${v.local.molePeek === F.n && m ? '' : ' disabled'}>I've read it</button></div>`}
+          ${v.host && waiting.length && waiting.length < F.players.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'go' })}>Start without them</button></div>` : ''}
+        </section>`;
+      }
+      if (F.phase === 'plan') {
+        const lead = F.leader === me;
+        if (!lead) {
+          return `<section class="center"><p class="eyebrow">Job ${F.job + 1} of 5</p><h2 class="big">${esc(nm(F.leader))} leads</h2>${jobs}
+            <p class="lead">${esc(nm(F.leader))} is picking ${F.size} people for the job.${F.need === 2 ? ' This job only fails with two mess ups.' : ''}</p>${lastVote()}</section>`;
+        }
+        const sel = v.local.moleSel && v.local.moleSel.n === F.n ? v.local.moleSel.list : [];
+        const full = sel.length === F.size;
+        return `<section class="center"><p class="eyebrow">Job ${F.job + 1} of 5</p><h2 class="big">You lead</h2>${jobs}
+          <p class="lead">Pick ${F.size} people for the job. You can pick yourself.${F.need === 2 ? ' This job only fails with two mess ups.' : ''}</p>
+          <div class="crewpick">${F.players.map(p => `<button type="button" data-ui="pick" data-id="${esc(p.id)}" aria-pressed="${sel.includes(p.id)}">${esc(p.name)}${p.id === me ? ' (you)' : ''}</button>`).join('')}</div>
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="propose"${full && !v.pending ? '' : ' disabled'}>${full ? 'Put it to a vote' : 'Pick ' + (F.size - sel.length) + ' more'}</button></div>
+          ${lastVote()}</section>`;
+      }
+      if (F.phase === 'vote') {
+        const mine = fresh ? m.vote : null;
+        const waiting = F.players.filter(p => !F.voted.includes(p.id)).map(p => p.id);
+        return `<section class="center"><p class="eyebrow">Job ${F.job + 1}. ${esc(nm(F.leader))} proposes</p><h2 class="big">${names(F.crew)}</h2>
+          <p class="lead">Do you send this crew on the job? Votes show up once everyone has voted.</p>
+          <div class="yesno"><button type="button" ${send({ t: 'vote', v: 'yes' })} aria-pressed="${mine === 'yes'}">Yes</button><button type="button" ${send({ t: 'vote', v: 'no' })} aria-pressed="${mine === 'no'}">No</button></div>
+          <p class="note">${waiting.length ? 'Still voting: ' + names(waiting) + '.' : 'Counting the votes.'}</p>
+          ${v.host && F.voted.length && waiting.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'count' })}>Count the votes now</button></div>` : ''}
+          ${jobs}</section>`;
+      }
+      if (F.phase === 'mission') {
+        const onCrew = F.crew.includes(me), card = fresh ? m.card : null;
+        const waiting = F.crew.filter(id => !F.played.includes(id));
+        const body = onCrew
+          ? `<h2 class="big">What do you do?</h2>
+             <div class="choice"><button class="ok" type="button" ${send({ t: 'play', v: 'ok' })}${card ? ` aria-pressed="${card === 'ok'}"` : ''}>Pull it off</button>${m && m.mole ? `<button class="fail" type="button" ${send({ t: 'play', v: 'fail' })}${card ? ` aria-pressed="${card === 'fail'}"` : ''}>Mess it up</button>` : ''}</div>
+             <p class="hint">${m && m.mole ? 'Only you can see this choice.' : 'Crew always pull it off.'}${card ? ' Saved. You can change it until the whole crew is done.' : ''}</p>`
+          : `<h2 class="big">The crew is on the job</h2><p class="lead">${names(F.crew)} are deciding in secret.</p>`;
+        return `<section class="center"><p class="eyebrow">Job ${F.job + 1}</p>${body}
+          <p class="note">${waiting.length ? 'Waiting for ' + names(waiting) + '.' : 'Opening the envelopes.'}</p>${lastVote()}</section>`;
+      }
+      if (F.phase === 'outcome') {
+        const L = F.last;
+        return `<section class="center"><p class="eyebrow">Job ${L.job + 1}</p>
+          <span class="stamp ${L.ok ? 'ok' : 'fail'}">${L.ok ? 'Done' : 'Failed'}</span>
+          <p class="lead">${L.fails === 0 ? 'Everyone pulled it off.' : L.fails === 1 ? 'One person messed it up.' : L.fails + ' people messed it up.'}${!L.ok ? '' : L.fails ? ' It still worked, because this job needed two mess ups.' : ''}</p>
+          <div class="tally">${L.cards.map(c => `<span class="${c}">${c === 'ok' ? 'Pulled off' : 'Messed up'}</span>`).join('')}</div>
+          ${jobs}
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" ${send({ t: 'carry' })}>Carry on</button></div></section>`;
+      }
+      const crewWin = F.winner === 'crew';
+      return `<section class="center">
+        <p class="eyebrow">${crewWin ? 'Three jobs done' : F.rejects >= 5 ? 'Five crews turned down' : 'Three jobs wrecked'}</p>
+        <h2 class="big">${crewWin ? 'The crew wins' : 'The moles win'}</h2>
+        <p class="moles">The moles were <strong>${names(F.moles)}</strong>.</p>
+        ${jobs}
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div>
+      </section>`;
+    },
+    bind(v) {
+      const F = v.pub, c = document.getElementById('ocard');
+      if (!c) return;
+      P.holdToReveal(c, () => {
+        if (v.local.molePeek === F.n) return;
+        v.local.molePeek = F.n;
+        const b = document.getElementById('oread');
+        if (b && v.mine) b.disabled = false;
+      });
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'read') { el.disabled = true; v.send({ t: 'read', n: F.n }); sfx.pop(); return; }
+      if (name === 'pick') {
+        let sel = v.local.moleSel;
+        if (!sel || sel.n !== F.n) sel = v.local.moleSel = { n: F.n, list: [] };
+        const id = el.getAttribute('data-id'), at = sel.list.indexOf(id);
+        if (at >= 0) sel.list.splice(at, 1);
+        else if (sel.list.length < F.size) sel.list.push(id);
+        sfx.tick(1300);
+        v.redraw();
+      }
+      if (name === 'propose') {
+        const sel = v.local.moleSel;
+        if (sel && sel.n === F.n && sel.list.length === F.size) { v.send({ t: 'propose', n: F.n, crew: sel.list.slice() }); sfx.pop(); }
+      }
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game || B.phase === F.phase) return;
+      if (F.phase === 'plan' && B.phase === 'vote') sfx.buzz(0.4);
+      if (F.phase === 'mission') sfx.pop();
+      if (F.phase === 'outcome') { if (F.last.ok) sfx.ding(); else { sfx.buzz(0.7); P.vibrate([150, 60, 150]); } }
+      if (F.phase === 'final') {
+        const won = (F.winner === 'crew') !== F.moles.includes(v.me);
+        if (won) { sfx.win(); P.confetti({ colors: ['#3ddc84', '#f4f8ff', '#ffd23f'] }); } else sfx.lose();
+      }
+    }
+  };
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

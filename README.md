@@ -15,8 +15,8 @@ Some games also play online, with each player on their own phone. See [Online pl
 | Liar's Dice | 2 to 6 | Peek at your own dice, then bid on what is under every cup. Raise the bid or call liar. |
 | Farkle | 1 to 10 | Roll six dice, keep what scores and push your luck. Scoring rules live in `farkle/scoring.js`. |
 | Spy Grid | 4 or more | Two teams, 25 words and one secret key. Clue givers link their team's words with one word. Avoid the trap. |
-| Inside Job | 4 to 12 | Find the secret word with yes or no questions, then catch the player who knew it all along. |
-| Mole | 5 to 10 | A crew plans five jobs while hidden moles try to wreck them. Votes and sabotage happen in secret on the phone. |
+| Inside Job | 4 to 12 | Find the secret word with yes or no questions, then catch the player who knew it all along. Plays online too. |
+| Mole | 5 to 10 | A crew plans five jobs while hidden moles try to wreck them. Votes and sabotage happen in secret on the phone. Plays online too. |
 | Close Call | 3 to 8 | Everyone guesses a number in secret, then bets on whose guess is closest without going over. |
 | Two of a Kind | 3 to 12 | Fill in the blank with one word. Match exactly one other player for 3 points, or more players for 1. Plays online too. |
 | Quick Sketch | 4 or more | Teams take turns drawing the secret word on the phone while their team races the clock to guess it. |
@@ -28,7 +28,7 @@ Some games also play online, with each player on their own phone. See [Online pl
 | Sea Battle | 2 | Hide your fleet, then take turns firing at each other's. The phone keeps each fleet secret. |
 | Mancala | 2 | The ancient game of sowing seeds, played with Kalah rules. |
 | Impostor | 3 to 12 | Everyone reads a secret word except the impostor. One-word clues, then a vote. Plays online too. |
-| Werewolf | 5 to 16 | The phone deals secret roles and reads the night out loud, so nobody has to sit out as narrator. |
+| Werewolf | 5 to 16 | The phone deals secret roles and reads the night out loud, so nobody has to sit out as narrator. Plays online too. |
 | Tune In | 2 to 12 | One player sees a hidden target on a dial and gives a clue. The rest turn the dial. |
 | Short Fuse | 2 to 12 | Say a word that fits the prompt, then hand off the bomb before it blows. |
 | Brain Freeze | 1 to 12 | Name three things in five seconds while a ring drains away. |
@@ -39,7 +39,7 @@ Some games also play online, with each player on their own phone. See [Online pl
 | Copycats | 3 to 10 | Everyone writes a one-word clue for the guesser. Matching clues cancel out. |
 | Most Likely To | 3 to 12 | Point on three or pass the phone for a secret vote. Ends with a yearbook of titles. Plays online too. |
 | Hot Takes | 3 to 12 | Everyone secretly agrees or disagrees. The player in the hot seat guesses how many agreed. Plays online too. |
-| Where Are We? | 3 to 12 | Everyone knows the secret place and their role there, except the spy. |
+| Where Are We? | 3 to 12 | Everyone knows the secret place and their role there, except the spy. Plays online too. |
 | Odd One Out | 3 to 12 | Everyone answers the same question at once, except one player who got a different one. Plays online too. |
 | Art Fraud | 4 to 10 | Everyone adds one line to a drawing of the secret word. One artist is faking it. |
 | Two Truths | 3 to 10 | Everyone writes two truths and a lie. The phone shuffles them and the room hunts for the lies. |
@@ -77,7 +77,7 @@ It adds a version tag to every script and stylesheet link, so a phone never mixe
 
 ## Online play
 
-Four in a Row, Flock, Impostor, Most Likely To, Two of a Kind, Hot Takes, Odd One Out and Mind Meld can also be played online. Each player uses their own phone, and the one-phone version of every game works exactly as before, with no account.
+Four in a Row, Flock, Impostor, Most Likely To, Two of a Kind, Hot Takes, Odd One Out, Mind Meld, Werewolf, Where Are We?, Inside Job and Mole can also be played online. Each player uses their own phone, and the one-phone version of every game works exactly as before, with no account.
 
 - A player taps "Make an online game" on a game's setup screen and gets a five letter code. Friends open the link, or type the code on the Online page (`online/`).
 - Players start as guests with just a name. A guest can add an email later to keep their account, and their friends, on any phone. Sign-in uses a six digit code sent by email, so there are no passwords.

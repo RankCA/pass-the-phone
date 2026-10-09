@@ -52,6 +52,8 @@ body{background:radial-gradient(ellipse 70% 45% at 50% -5%,rgba(255,214,120,.16)
 .tally{list-style:none;margin:16px auto 0;padding:0;display:grid;gap:6px;max-width:440px;text-align:left}
 .tally li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--panel);font-weight:700}
 .tally li.top{box-shadow:inset 0 0 0 2px var(--accent)}
+.pick button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);box-shadow:none}
+.note{margin:14px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
 .tally li span{flex:1;min-width:0;overflow-wrap:anywhere}
 .tally li b{font-family:var(--f-display);font-size:26px;font-weight:400}
 .tally small{font-size:14px;color:var(--muted)}
@@ -60,6 +62,7 @@ body{background:radial-gradient(ellipse 70% 45% at 50% -5%,rgba(255,214,120,.16)
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=2a414f29"></script>
 <script src="words.js?v=2f1a8bd5"></script>
 <script>
 (function () {
@@ -130,6 +133,11 @@ body{background:radial-gradient(ellipse 70% 45% at 50% -5%,rgba(255,214,120,.16)
       <div class="sec"><span class="label">Time to find the word</span>${P.seg('time', [[180, '3 min'], [240, '4 min'], [300, '5 min']], S.settings.time)}</div>
       <div class="sec"><span class="label">Time to find the insider</span>${P.seg('talk', [[60, '1 min'], [90, '90 sec'], [120, '2 min']], S.settings.talk)}</div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Deal the roles</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone reads their card and votes on their own phone. Ask your questions out loud or on a call. Make a game, then send the code.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -298,7 +306,278 @@ body{background:radial-gradient(ellipse 70% 45% at 50% -5%,rgba(255,214,120,.16)
     if (e.target.name === 'time' || e.target.name === 'talk') { S.settings[e.target.name] = Number(e.target.value); persist(); }
   });
 
-  render();
+  /* ---------- Online: cards and votes on everyone's own phone ---------- */
+  const ijMaster = F => F.players[F.masterAt % F.players.length].id;
+  function ijDeal(F) {
+    F.n++;
+    F.round++;
+    F.word = deck.one([F.word]);
+    const master = ijMaster(F);
+    F.insider = P.pick(F.players.filter(p => p.id !== master)).id;
+    F.phase = 'read';
+    F.read = [];
+    F.ends = 0;
+    F.left = F.time * 1000;
+    F.finder = null;
+    F.votes = {};
+    F.accused = null;
+    F.outcome = null;
+    F.gains = {};
+  }
+  function ijSettle(F) {
+    F.gains = {};
+    const master = ijMaster(F);
+    if (F.outcome === 'caught') F.players.forEach(p => { if (p.id !== F.insider) F.gains[p.id] = 1; });
+    else if (F.outcome === 'escaped') F.gains[F.insider] = 2;
+    Object.keys(F.gains).forEach(id => { F.scores[id] = (F.scores[id] || 0) + F.gains[id]; });
+    F.ends = 0;
+    F.n++;
+    F.phase = 'result';
+    return master;
+  }
+  function ijTally(F) {
+    const c = {};
+    Object.keys(F.votes).forEach(k => { const t = F.votes[k]; c[t] = (c[t] || 0) + 1; });
+    const top = Math.max(0, ...Object.values(c));
+    const lead = Object.keys(c).filter(id => c[id] === top);
+    F.accused = lead.length === 1 ? lead[0] : 'tie';
+    F.outcome = F.accused === F.insider ? 'caught' : 'escaped';
+    ijSettle(F);
+  }
+  const ijVoters = F => F.players.filter(p => p.id !== ijMaster(F)).map(p => p.id);
+  const ONLINE = {
+    game: 'inside-job', title: 'Inside Job', min: 4, max: 12,
+    options() {
+      return `<p class="label">Time to find the word</p>${P.seg('o-time', [[180, '3 min'], [240, '4 min'], [300, '5 min']], S.settings.time)}
+        <p class="label" style="margin-top:18px">Time to find the insider</p>${P.seg('o-talk', [[60, '1 min'], [90, '90 sec'], [120, '2 min']], S.settings.talk)}`;
+    },
+    readOptions() { return { time: S.settings.time, talk: S.settings.talk }; },
+    start(players, o) {
+      const F = { players, scores: {}, game: 1, n: 0, round: 0, masterAt: Math.floor(Math.random() * players.length), time: o.time, talk: o.talk, word: '' };
+      ijDeal(F);
+      return F;
+    },
+    view(F) {
+      const v = { players: F.players, scores: F.scores, game: F.game, n: F.n, round: F.round, master: ijMaster(F), phase: F.phase, read: F.read,
+        ends: F.ends, left: F.left, finder: F.finder, voted: Object.keys(F.votes), accused: F.accused, outcome: F.outcome, gains: F.gains };
+      if (F.phase !== 'read' && F.phase !== 'ask') v.word = F.word;
+      if (F.phase === 'result') v.insider = F.insider;
+      return v;
+    },
+    secrets(F) {
+      const out = {}, master = ijMaster(F);
+      F.players.forEach(p => {
+        const role = p.id === master ? 'master' : p.id === F.insider ? 'insider' : 'guesser';
+        out[p.id] = { n: F.n, role, word: role === 'guesser' ? null : F.word, vote: F.votes[p.id] || null };
+      });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(p => p.id === from) || a.n !== F.n) return false;
+      const host = from === ctx.host, master = ijMaster(F), runs = from === master || host;
+      switch (a.t) {
+        case 'read':
+          if (F.phase !== 'read' || F.read.includes(from)) return false;
+          F.read.push(from);
+          if (F.players.every(p => F.read.includes(p.id))) { F.phase = 'ask'; F.ends = Date.now() + F.left; }
+          return true;
+        case 'go':
+          if (!host || F.phase !== 'read') return false;
+          F.phase = 'ask';
+          F.ends = Date.now() + F.left;
+          return true;
+        case 'pause':
+          if (!runs || (F.phase !== 'ask' && F.phase !== 'talk') || !F.ends) return false;
+          F.left = Math.max(0, F.ends - Date.now());
+          F.ends = 0;
+          return true;
+        case 'resume':
+          if (!runs || (F.phase !== 'ask' && F.phase !== 'talk') || F.ends || !F.left) return false;
+          F.ends = Date.now() + F.left;
+          return true;
+        case 'found':
+          if (from !== master || F.phase !== 'ask' || a.id === master || !F.players.some(p => p.id === a.id)) return false;
+          F.finder = a.id;
+          F.n++;
+          F.phase = 'talk';
+          F.left = F.talk * 1000;
+          F.ends = Date.now() + F.left;
+          return true;
+        case 'votenow':
+          if (F.phase !== 'talk') return false;
+          F.n++;
+          F.phase = 'vote';
+          F.ends = 0;
+          return true;
+        case 'vote':
+          if (F.phase !== 'vote' || from === master || a.id === from || a.id === master || !F.players.some(p => p.id === a.id)) return false;
+          F.votes[from] = a.id;
+          if (ijVoters(F).every(id => F.votes[id])) ijTally(F);
+          return true;
+        case 'count':
+          if (!host || F.phase !== 'vote' || !Object.keys(F.votes).length) return false;
+          ijTally(F);
+          return true;
+        case 'next':
+          if (F.phase !== 'result') return false;
+          F.masterAt++;
+          ijDeal(F);
+          return true;
+      }
+      return false;
+    },
+    tick(F, now) {
+      if (!F.ends || now < F.ends) return false;
+      if (F.phase === 'ask') { F.outcome = 'timeout'; ijSettle(F); return true; }
+      if (F.phase === 'talk') { F.n++; F.ends = 0; F.phase = 'vote'; return true; }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      const master = ijMaster(F);
+      F.players = F.players.filter(p => ids.includes(p.id));
+      gone.forEach(id => { delete F.scores[id]; });
+      if (F.players.length < 4) return 'open';
+      if (F.phase === 'result') return;
+      // The quizmaster or the insider walked out, so deal a fresh round.
+      if (gone.includes(master) || gone.includes(F.insider)) { F.masterAt = F.masterAt % F.players.length; ijDeal(F); return; }
+      F.masterAt = F.players.findIndex(p => p.id === master);
+      F.read = F.read.filter(id => !gone.includes(id));
+      Object.keys(F.votes).forEach(k => { if (gone.includes(k) || gone.includes(F.votes[k])) delete F.votes[k]; });
+      if (F.phase === 'read' && F.players.every(p => F.read.includes(p.id))) { F.phase = 'ask'; F.ends = Date.now() + F.left; }
+      if (F.phase === 'vote' && ijVoters(F).every(id => F.votes[id])) ijTally(F);
+    },
+    render(v) {
+      const F = v.pub, me = v.me, m = v.mine || null, fresh = !!(m && m.n === F.n);
+      const nm = id => { const p = F.players.find(x => x.id === id); return p ? p.name : 'Someone'; };
+      const send = a => Online.sendAttr(Object.assign({ n: F.n }, a));
+      const masterName = F.master === me ? 'you' : esc(nm(F.master));
+      const clock = `<div><span class="clock" id="otimer">${F.ends ? '' : P.clock(F.left)}</span></div>`;
+      const runs = F.master === me || v.host;
+      const pauseBtn = runs ? `<button class="btn btn-alt" type="button" ${send({ t: F.ends ? 'pause' : 'resume' })}>${F.ends ? 'Pause' : 'Carry on'}</button>` : '';
+      const role = m && m.role;
+      const back = !role ? '<small>Your card</small><b>Dealing</b>'
+        : role === 'master' ? `<small>You are the host</small><span class="word">${esc(m.word)}</span><p>Answer questions with yes, no or not sure. Nothing else.</p>`
+          : role === 'insider' ? `<small>You are the insider</small><span class="word">${esc(m.word)}</span><p>Steer the questions towards it without getting caught.</p>`
+            : '<small>You are a guesser</small><b>Find the word</b><p>Ask the host yes or no questions. Then catch the insider.</p>';
+      const card = hint => `<div class="reveal rolecard" id="ocard" tabindex="0" role="button" aria-label="Press and hold to see your card">
+          <div class="reveal-in">
+            <div class="reveal-face reveal-front"><b>${hint}</b><small>Keep it to yourself.</small></div>
+            <div class="reveal-face reveal-back">${back}</div>
+          </div>
+        </div>`;
+      if (F.phase === 'read') {
+        const done = F.read.includes(me);
+        const waiting = F.players.filter(p => !F.read.includes(p.id)).map(p => p.id);
+        return `<section class="center">
+          <p class="eyebrow">Round ${F.round}. This is your card</p>
+          <span class="host">Host this round: ${masterName}</span>
+          ${card('Hold to read')}
+          ${done ? `<p class="lead">Waiting for ${esc(P.listNames(waiting.map(nm)))}.</p>`
+            : `<div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="read" id="oread"${v.local.ijPeek === F.n && role ? '' : ' disabled'}>I've read it</button></div>`}
+          ${v.host && waiting.length && waiting.length < F.players.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'go' })}>Start without them</button></div>` : ''}
+        </section>`;
+      }
+      if (F.phase === 'ask') {
+        if (F.master === me) {
+          const choosing = v.local.ijFound === F.n;
+          return `<section class="center">
+            <p class="eyebrow">Round ${F.round}. You are the host</p>
+            <p class="lead">The secret word is <b>${esc(m && m.word)}</b>. Answer only yes, no or not sure.</p>
+            ${clock}
+            ${choosing ? `<h2 class="big">Who said it?</h2><div class="pick">${F.players.filter(p => p.id !== me).map(p => `<button type="button" ${send({ t: 'found', id: p.id })}>${esc(p.name)}</button>`).join('')}</div>
+              <div class="actions center"><button class="btn btn-alt" type="button" data-ui="unfound">Back to the questions</button></div>`
+              : `<div class="actions center">${pauseBtn}<button class="btn btn-main btn-big" type="button" data-ui="found">Someone said it</button></div>`}
+          </section>`;
+        }
+        return `<section class="center">
+          <p class="eyebrow">Round ${F.round}. Find the word</p>
+          <span class="host">Host: ${masterName}</span>
+          ${clock}
+          <p class="lead">Ask ${masterName} yes or no questions. Shout it out when you think you know the word.</p>
+          ${v.host ? `<div class="actions center">${pauseBtn}</div>` : ''}
+          ${card('Hold to check your card')}
+        </section>`;
+      }
+      if (F.phase === 'talk') {
+        return `<section class="center">
+          <p class="eyebrow">${F.finder === me ? 'You' : esc(nm(F.finder))} found ${esc(F.word)}</p>
+          <h2 class="big">Find the insider</h2>
+          ${clock}
+          <p class="lead">Who knew too much? Was it ${F.finder === me ? 'you' : esc(nm(F.finder))}, or someone who kept nudging the questions?</p>
+          <div class="actions center">${pauseBtn}<button class="btn btn-main btn-big" type="button" ${send({ t: 'votenow' })}>Vote now</button></div>
+        </section>`;
+      }
+      if (F.phase === 'vote') {
+        const waiting = F.players.filter(p => p.id !== F.master && !F.voted.includes(p.id)).map(p => p.id);
+        const mineVote = fresh && m.vote;
+        const body = F.master === me ? '<p class="lead">You are the host this round, so you do not vote.</p>'
+          : `<div class="pick">${F.players.filter(p => p.id !== me && p.id !== F.master).map(p => `<button type="button" ${send({ t: 'vote', id: p.id })} aria-pressed="${mineVote === p.id}">${esc(p.name)}</button>`).join('')}</div>
+            <p class="note">${mineVote ? 'Vote saved. You can change it until everyone has voted.' : 'Tap who you think the insider is.'}</p>`;
+        return `<section class="center">
+          <p class="eyebrow">The vote</p>
+          <h2 class="big">Who is the insider?</h2>
+          ${body}
+          <p class="note">${waiting.length ? 'Still voting: ' + esc(P.listNames(waiting.map(nm))) + '.' : 'Counting the votes.'}</p>
+          ${v.host && F.voted.length && waiting.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'count' })}>Count the votes now</button></div>` : ''}
+        </section>`;
+      }
+      const caught = F.outcome === 'caught';
+      const head = F.outcome === 'timeout' ? 'Out of time' : caught ? 'Insider caught' : 'Insider got away';
+      const ins = F.insider === me ? 'you' : nm(F.insider);
+      const line = F.outcome === 'timeout' ? 'Nobody found ' + F.word + ', so nobody wins this round.'
+        : caught ? 'Most of you pointed at ' + ins + ', and they were the insider.'
+          : (F.accused && F.accused !== 'tie' ? 'Most of you pointed at ' + nm(F.accused) + ', but the insider was ' + ins + '.' : 'The vote was tied, so ' + ins + ' slipped away.');
+      const rows = F.players.map(p => [p, F.scores[p.id] || 0]).sort((a, b) => b[1] - a[1]);
+      const top = rows[0] ? rows[0][1] : 0;
+      const next = F.players[(F.players.findIndex(p => p.id === F.master) + 1) % F.players.length];
+      return `<section class="center">
+        <p class="eyebrow">The insider was ${esc(ins)}</p>
+        <h2 class="verdict">${head}</h2>
+        <p class="lead">${esc(line)}</p>
+        <ol class="tally">${rows.map(([p, n]) => `<li class="${top > 0 && n === top ? 'top' : ''}"><span>${esc(p.name)}${p.id === me ? ' (you)' : ''}</span>${F.gains[p.id] ? `<small>+${F.gains[p.id]}</small>` : ''}<b>${n}</b></li>`).join('')}</ol>
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${send({ t: 'next' })}>Next round</button></div>
+        <p class="hint">${next.id === me ? 'You host' : esc(next.name) + ' hosts'} next.</p>
+      </section>`;
+    },
+    bind(v) {
+      const F = v.pub, c = document.getElementById('ocard');
+      if (c) {
+        P.holdToReveal(c, () => {
+          if (v.local.ijPeek === F.n) return;
+          v.local.ijPeek = F.n;
+          const b = document.getElementById('oread');
+          if (b && v.mine && v.mine.role) b.disabled = false;
+        });
+      }
+      if ((F.phase === 'ask' || F.phase === 'talk') && F.ends) Online.ticker(v.local, 'otimer', F.ends, { tick: true });
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'read') { el.disabled = true; v.send({ t: 'read', n: F.n }); sfx.pop(); }
+      if (name === 'found') { v.local.ijFound = F.n; v.redraw(); }
+      if (name === 'unfound') { v.local.ijFound = null; v.redraw(); }
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game || B.phase === F.phase) return;
+      if (F.phase === 'ask') sfx.beep(true);
+      if (F.phase === 'talk') sfx.ding();
+      if (F.phase === 'vote') sfx.beep(true);
+      if (F.phase === 'result') {
+        if (F.outcome === 'timeout') { sfx.buzz(0.8); P.vibrate([200, 80, 200]); }
+        else if ((F.outcome === 'caught') !== (F.insider === v.me)) { sfx.win(); P.confetti({ colors: ['#f5b301', '#f2efe8', '#c4c0b6'] }); }
+        else sfx.lose();
+      }
+    }
+  };
+  document.addEventListener('change', e => {
+    if (e.target.name === 'o-time' || e.target.name === 'o-talk') { S.settings[e.target.name.slice(2)] = Number(e.target.value); persist(); }
+  });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

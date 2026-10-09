@@ -18,6 +18,7 @@
      options(), readOptions()  host: settings shown in the waiting room (optional)
      render(v)                 everyone: HTML for the game from v.pub and v.mine
      bind(v), fx(v, prev)      everyone: after-render hooks and sounds (optional)
+     unbind()                  everyone: undo page changes when the game screen goes (optional)
      click(name, el, v)        everyone: buttons marked data-ui="name" (optional)
    Buttons marked data-send='{"t":"drop","c":3}' send that action to the host.
    Fields marked data-keep keep their text when the screen redraws, and
@@ -51,7 +52,11 @@
     'two-of-a-kind': { title: 'Two of a Kind', min: 3, max: 12, blurb: 'Fill the blank and match exactly one other player.' },
     'hot-takes': { title: 'Hot Takes', min: 3, max: 12, blurb: 'Guess how many people agreed with the take.' },
     'odd-one-out': { title: 'Odd One Out', min: 3, max: 12, blurb: 'One player got a different question.' },
-    'mind-meld': { title: 'Mind Meld', min: 2, max: 6, blurb: 'Link your words until you all say the same one.' }
+    'mind-meld': { title: 'Mind Meld', min: 2, max: 6, blurb: 'Link your words until you all say the same one.' },
+    werewolf: { title: 'Werewolf', min: 5, max: 16, blurb: 'Secret roles and night moves, no narrator needed.' },
+    'where-are-we': { title: 'Where Are We?', min: 3, max: 12, blurb: 'Everyone knows the place except the spy.' },
+    'inside-job': { title: 'Inside Job', min: 4, max: 12, blurb: 'Find the word, then catch who knew it all along.' },
+    mole: { title: 'Mole', min: 5, max: 10, blurb: 'Plan five jobs while the moles try to wreck them.' }
   };
 
   /* ---------- Connection ---------- */
@@ -621,7 +626,11 @@
         if (f) { f.focus({ preventScroll: true }); f.select(); }
       }
     }
-    if (kind !== R.lastKind) { window.scrollTo(0, 0); R.lastKind = kind; }
+    if (kind !== R.lastKind) {
+      if (R.lastKind === 'game' && spec.unbind) { try { spec.unbind(); } catch (e) { console.error(e); } }
+      window.scrollTo(0, 0);
+      R.lastKind = kind;
+    }
     if (kind === 'game' && spec.fx) {
       const key = JSON.stringify([v.pub, v.mine]);
       if (key !== R.prevKey) {
@@ -914,6 +923,33 @@
     }
   }
 
+  /* ---------- Helpers for game pages ---------- */
+  // Counts down to `ends` (a Date.now() time) in the element with this id.
+  // `local` is the v.local object, so one game page runs one countdown at a time.
+  // o.tick plays a tick in the last ten seconds, o.onEnd runs once at zero.
+  function ticker(local, id, ends, o) {
+    clearInterval(local.olTick);
+    const el = document.getElementById(id);
+    if (!el || !ends) return;
+    const opt = o || {};
+    const step = () => {
+      if (!el.isConnected) { clearInterval(local.olTick); return; }
+      const left = Math.max(0, ends - Date.now());
+      el.textContent = left > 0 ? P.clock(left) : (opt.done || "Time's up");
+      el.classList.toggle('low', left > 0 && left <= (opt.low || 10000));
+      el.classList.toggle('done', left <= 0);
+      const sec = Math.ceil(left / 1000);
+      if (sec !== local.olSec) {
+        local.olSec = sec;
+        if (opt.tick && sec > 0 && sec <= 10) P.sfx.tick();
+        if (sec <= 0 && opt.onEnd && local.olEnded !== ends) { local.olEnded = ends; if (local.olSeen === ends) opt.onEnd(); }
+      }
+      if (left > 0) local.olSeen = ends;
+    };
+    step();
+    local.olTick = setInterval(step, 250);
+  }
+
   /* ---------- Small helpers for the online page and the hub ---------- */
   function watchInvites(uid, onInvite) {
     return client().then(sb => {
@@ -927,7 +963,7 @@
   window.Online = {
     GAMES, ROOT, AS, wanted, room, client, hasSession, getSession, rpc,
     guest, sendCode, checkCode, addEmail, signOut, problem, problemKey,
-    gameUrl, watchInvites, spaced, sendAttr,
+    gameUrl, watchInvites, spaced, sendAttr, ticker,
     redraw: () => paint()
   };
 })();
