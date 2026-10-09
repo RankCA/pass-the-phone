@@ -46,6 +46,8 @@ body{background:radial-gradient(ellipse 60% 42% at 50% 0%,rgba(255,213,74,.16),t
 .card:disabled{cursor:default}
 .card small{display:block;margin-top:6px;font-size:15px;font-weight:900;color:#7a1c2b}
 .card.won{background:#ffe9a3;box-shadow:inset 0 0 0 4px #c4142f}
+div.card{cursor:default}
+.note{margin:14px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
 .board{list-style:none;margin:18px auto 0;padding:0;display:grid;gap:6px;max-width:440px;text-align:left}
 .board li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--panel);font-weight:700}
 .board li.top{box-shadow:inset 0 0 0 2px var(--accent)}
@@ -57,6 +59,7 @@ body{background:radial-gradient(ellipse 60% 42% at 50% 0%,rgba(255,213,74,.16),t
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=a70bfe61"></script>
 <script src="prompts.js?v=48f37349"></script>
 <script>
 (function () {
@@ -103,6 +106,11 @@ body{background:radial-gradient(ellipse 60% 42% at 50% 0%,rgba(255,213,74,.16),t
       <div class="sec"><span class="label">Players</span><div id="players"></div></div>
       <div class="sec"><span class="label">First to</span>${P.seg('goal', [[3, '3 points'], [5, '5 points'], [7, '7 points']], S.settings.goal)}</div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Open the show</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone writes their ending on their own phone, and the judge picks on theirs. Make a game, then send the code.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -233,7 +241,180 @@ body{background:radial-gradient(ellipse 60% 42% at 50% 0%,rgba(255,213,74,.16),t
   document.addEventListener('input', e => { if (e.target.id === 'ans') { const btn = document.getElementById('lockBtn'); if (btn) btn.disabled = !e.target.value.trim(); } });
   document.addEventListener('change', e => { if (e.target.name === 'goal') { S.settings.goal = Number(e.target.value); persist(); } });
 
-  render();
+  /* ---------- Online: everyone writes on their own phone ---------- */
+  const punchJudge = F => F.players[F.judgeAt % F.players.length].id;
+  const punchClean = t => String(t == null ? '' : t).replace(/\s+/g, ' ').trim().slice(0, 90);
+  function punchRound(F) {
+    F.n++;
+    F.round++;
+    F.p = deck.one([F.p]);
+    F.answers = {};
+    F.cards = [];
+    F.picked = -1;
+    F.phase = 'write';
+  }
+  function punchCards(F) {
+    F.cards = P.shuffle(Object.keys(F.answers).map(id => ({ by: id, text: F.answers[id] })));
+    F.phase = 'judge';
+  }
+  const punchWriters = F => F.players.filter(p => p.id !== punchJudge(F)).map(p => p.id);
+  const ONLINE = {
+    game: 'punchline', title: 'Punchline', min: 3, max: 10,
+    options() { return `<p class="label">First to</p>${P.seg('o-goal', [[3, '3 points'], [5, '5 points'], [7, '7 points']], S.settings.goal)}`; },
+    readOptions() { return { goal: S.settings.goal }; },
+    start(players, o) {
+      const F = { players, goal: o.goal, scores: {}, judgeAt: Math.floor(Math.random() * players.length), round: 0, n: 0, p: '', game: 1, winner: [] };
+      punchRound(F);
+      return F;
+    },
+    view(F) {
+      const v = { players: F.players, goal: F.goal, scores: F.scores, judge: punchJudge(F), round: F.round, n: F.n, p: F.p, phase: F.phase, picked: F.picked, game: F.game, winner: F.winner,
+        written: Object.keys(F.answers) };
+      if (F.phase !== 'write') v.cards = F.cards.map(c => (F.phase === 'judge' ? { text: c.text } : c));
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach(p => { out[p.id] = { n: F.n, text: F.answers[p.id] || '' }; });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(p => p.id === from)) return false;
+      const host = from === ctx.host, judge = punchJudge(F);
+      if (a.t === 'again') {
+        if (F.phase !== 'final' || a.g !== F.game) return false;
+        F.scores = {};
+        F.round = 0;
+        F.judgeAt++;
+        F.winner = [];
+        F.game++;
+        punchRound(F);
+        return true;
+      }
+      if (a.n !== F.n) return false;
+      switch (a.t) {
+        case 'write': {
+          const t = punchClean(a.text);
+          if (F.phase !== 'write' || from === judge || !t) return false;
+          F.answers[from] = t;
+          if (punchWriters(F).every(id => F.answers[id])) punchCards(F);
+          return true;
+        }
+        case 'show':
+          if (!host || F.phase !== 'write' || Object.keys(F.answers).length < 2) return false;
+          punchCards(F);
+          return true;
+        case 'skip':
+          if (!(host || from === judge) || F.phase !== 'write') return false;
+          F.round--;
+          punchRound(F);
+          return true;
+        case 'pick': {
+          const i = Number(a.i);
+          if (F.phase !== 'judge' || from !== judge || !(i >= 0 && i < F.cards.length)) return false;
+          F.picked = i;
+          const w = F.cards[i].by;
+          F.scores[w] = (F.scores[w] || 0) + 1;
+          if (F.scores[w] >= F.goal) { F.winner = [w]; F.phase = 'final'; }
+          else F.phase = 'reveal';
+          return true;
+        }
+        case 'next':
+          if (F.phase !== 'reveal') return false;
+          F.judgeAt++;
+          punchRound(F);
+          return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      const judge = punchJudge(F);
+      F.players = F.players.filter(p => ids.includes(p.id));
+      gone.forEach(id => { delete F.answers[id]; delete F.scores[id]; });
+      if (F.players.length < 3) return 'open';
+      if (F.phase === 'final') return;
+      F.judgeAt = F.judgeAt % F.players.length;
+      // The judge walked out, so start a fresh round with the next judge.
+      if (gone.includes(judge)) { punchRound(F); return; }
+      if (F.phase === 'judge' || F.phase === 'reveal') { F.cards = F.cards.filter(c => !gone.includes(c.by)); if (F.phase === 'reveal') return; if (!F.cards.length) punchRound(F); return; }
+      if (F.phase === 'write' && punchWriters(F).every(id => F.answers[id])) punchCards(F);
+    },
+    render(v) {
+      const F = v.pub, me = v.me, judge = F.judge;
+      const nm = id => { const p = F.players.find(x => x.id === id); return p ? p.name : 'Someone'; };
+      const prompt = `<div class="prompt">${esc(F.p)}<span class="blank" aria-hidden="true"></span></div>`;
+      const send = a => Online.sendAttr(Object.assign({ n: F.n }, a));
+      const board = () => {
+        const rows = F.players.map(p => [p, F.scores[p.id] || 0]).sort((a, b) => b[1] - a[1]);
+        const top = rows[0] ? rows[0][1] : 0;
+        return '<ol class="board">' + rows.map(([p, n]) => `<li class="${top > 0 && n === top ? 'top' : ''}"><span>${esc(p.name)}${p.id === me ? ' (you)' : ''}</span><b>${n}</b></li>`).join('') + '</ol>';
+      };
+      const judgeChip = `<span class="judge">Judge: ${judge === me ? 'you' : esc(nm(judge))}</span>`;
+      if (F.phase === 'write') {
+        const waiting = F.players.filter(p => p.id !== judge && !F.written.includes(p.id)).map(p => p.id);
+        const mine = v.mine && v.mine.n === F.n ? v.mine.text : '';
+        const editing = v.local.punchEdit === F.n;
+        let body;
+        if (judge === me) body = '<p class="lead">You are the judge this round. Read the prompt out loud while everyone writes an ending.</p>';
+        else if (mine && !editing) body = `<div class="cards"><div class="card">${esc(mine)}<small>Your ending</small></div></div><div class="actions center"><button class="btn btn-alt" type="button" data-ui="edit">Change it</button></div>`;
+        else body = `<div class="field"><label for="opunch-${F.n}">Your ending</label><textarea id="opunch-${F.n}" data-keep maxlength="90" autocomplete="off" placeholder="Make the judge laugh">${esc(mine)}</textarea></div>
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="lock"${v.pending ? ' disabled' : ''}>Lock it in</button></div>`;
+        return `<section class="center"><p class="eyebrow">Round ${F.round}</p>${judgeChip}${prompt}${body}
+          <p class="note">${waiting.length ? 'Still writing: ' + esc(P.listNames(waiting.map(nm))) + '.' : 'Every ending is in.'}</p>
+          ${v.host || judge === me ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'skip' })}>Another prompt</button>${v.host && F.written.length >= 2 && waiting.length ? `<button class="btn btn-alt" type="button" ${send({ t: 'show' })}>Judge them now</button>` : ''}</div>` : ''}
+          ${board()}</section>`;
+      }
+      if (F.phase === 'judge') {
+        const sel = v.local.punchSel && v.local.punchSel.n === F.n ? v.local.punchSel.i : -1;
+        const cards = F.cards.map((c, i) => (judge === me
+          ? `<button type="button" class="card" data-ui="sel" data-i="${i}" aria-pressed="${sel === i}">${esc(c.text)}</button>`
+          : `<div class="card">${esc(c.text)}</div>`)).join('');
+        return `<section class="center"><p class="eyebrow">${judge === me ? 'Read them out loud' : esc(nm(judge)) + ' is judging'}</p>${prompt}
+          <div class="cards">${cards}</div>
+          ${judge === me ? `<div class="actions center"><button class="btn btn-main btn-big" type="button" ${sel >= 0 ? send({ t: 'pick', i: sel }) : 'disabled'}>${sel >= 0 ? 'This one wins' : 'Tap your favourite'}</button></div>`
+            : '<p class="note">Nobody knows who wrote what. The judge picks a favourite.</p>'}</section>`;
+      }
+      const w = F.cards[F.picked] ? F.cards[F.picked].by : null;
+      const cardsShown = `<div class="cards">${F.cards.map((c, i) => `<div class="card${i === F.picked ? ' won' : ''}">${esc(c.text)}<small>${c.by === me ? 'You' : esc(nm(c.by))}</small></div>`).join('')}</div>`;
+      if (F.phase === 'reveal') {
+        const next = F.players[(F.players.findIndex(p => p.id === judge) + 1) % F.players.length];
+        return `<section class="center"><p class="eyebrow">${judge === me ? 'You' : esc(nm(judge))} picked</p>
+          <h2 class="big">${w === me ? 'You score' : esc(nm(w)) + ' scores'}</h2>${prompt}${cardsShown}${board()}
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" ${send({ t: 'next' })}>Next round</button></div>
+          <p class="hint">${next.id === me ? 'You judge' : esc(next.name) + ' judges'} next.</p></section>`;
+      }
+      return `<section class="center"><p class="eyebrow">That's the show</p>
+        <h2 class="big">${F.winner.includes(me) ? 'You win' : esc(P.listNames(F.winner.map(nm))) + ' wins'}</h2>${prompt}${cardsShown}${board()}
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div></section>`;
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'lock') {
+        const f = document.getElementById('opunch-' + F.n);
+        const t = punchClean(f ? f.value : '');
+        if (!t) { if (f) f.focus(); return; }
+        v.local.punchEdit = null;
+        v.send({ t: 'write', n: F.n, text: t });
+        sfx.pop();
+      }
+      if (name === 'edit') { v.local.punchEdit = F.n; v.redraw(); }
+      if (name === 'sel') { v.local.punchSel = { n: F.n, i: Number(el.getAttribute('data-i')) }; sfx.tick(1300); v.redraw(); }
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.phase === 'write' && B.phase === 'write' && F.n === B.n && F.written.length > B.written.length) sfx.pop();
+      if (F.phase === 'judge' && B.phase !== 'judge') sfx.whoosh();
+      if (F.phase === 'reveal' && B.phase !== 'reveal') sfx.ding();
+      if (F.phase === 'final' && B.phase !== 'final') { sfx.win(); P.confetti({ colors: ['#ffd54a', '#fff4e6', '#c4142f'] }); }
+    }
+  };
+  document.addEventListener('change', e => { if (e.target.name === 'o-goal') { S.settings.goal = Number(e.target.value); persist(); } });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

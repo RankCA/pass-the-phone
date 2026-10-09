@@ -105,6 +105,9 @@ button{font:inherit;color:inherit}
 .stamp{position:absolute;right:-8px;top:-10px;padding:0 8px;border-radius:6px;background:var(--red);color:#fff;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;transform:rotate(8deg)}
 .verdict{margin-top:22px;font-weight:800;font-size:clamp(54px,15vw,100px);line-height:1;color:var(--cream);-webkit-text-stroke:.06em var(--ink);paint-order:stroke fill;text-shadow:0 5px 0 var(--tang-deep)}
 .verdict.bad{color:var(--ink);-webkit-text-stroke:0;text-shadow:none}
+.online{margin-top:20px;padding:16px 18px;border-radius:26px;background:rgba(255,246,234,.55)}
+.online p{margin:0;font-weight:600}
+.waiting{margin:14px auto 0;max-width:30em;font-weight:700}
 .howto{margin-top:26px}
 .howto summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-weight:800;font-size:21px}
 .howto ol{margin:4px 0 0;padding-left:1.3em;display:grid;gap:6px;font-weight:600}
@@ -117,6 +120,7 @@ button{font:inherit;color:inherit}
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=a70bfe61"></script>
 <script src="words.js?v=4f2a28ca"></script>
 <script>
 (function () {
@@ -197,6 +201,11 @@ button{font:inherit;color:inherit}
         <div class="seg" role="radiogroup">${[[8, '8 cards'], [13, '13 cards']].map(([v, t]) => `<label><input type="radio" name="cards" id="cards-${v}" value="${v}"${S.settings.cards === v ? ' checked' : ''}><span>${t}</span></label>`).join('')}</div>
       </div>
       <div class="actions"><button class="btn btn-ink btn-big" type="button" data-act="start">Start</button></div>
+    </div>
+    <div class="online">
+      <span class="label">Play online</span>
+      <p>Everyone writes their clue on their own phone at the same time, and the guesser never sees the copycats. Make a game, then send the code.</p>
+      <div class="actions"><a class="btn btn-line" href="?lobby=new">Make an online game</a><a class="btn btn-line" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -436,7 +445,281 @@ button{font:inherit;color:inherit}
     if (e.target.name === 'cards') { S.settings.cards = Number(e.target.value); persist(); }
   });
 
-  render();
+  /* ---------- Online: clues on everyone's own phone ---------- */
+  function catCard(F) {
+    F.n++;
+    if (F.pile <= 0) { F.phase = 'final'; return; }
+    const g = F.gIdx % F.players.length;
+    F.guesser = F.players[g].id;
+    F.givers = F.players.filter(p => p.id !== F.guesser).map(p => p.id);
+    F.pile--;
+    F.word = deck.one([F.word]);
+    F.clues = {};
+    F.err = {};
+    F.list = [];
+    F.guess = '';
+    F.result = null;
+    F.penalty = null;
+    F.phase = 'clue';
+  }
+  function catClueProblem(F, v) {
+    if (!v) return 'Type a clue first.';
+    if (/\s/.test(v)) return 'One word only. No spaces.';
+    if (tooClose(v, F.word)) return 'Too close to the secret word. Try another.';
+    return '';
+  }
+  function catCheck(F) {
+    F.list = P.shuffle(F.givers.filter(id => F.clues[id]).map(id => ({ text: F.clues[id], by: id, out: false, auto: false })));
+    markCopycats(F.list);
+    F.phase = 'check';
+  }
+  const ONLINE = {
+    game: 'copycats', title: 'Copycats', min: 3, max: 10, header,
+    ui: { main: 'btn btn-ink btn-big', alt: 'btn btn-line', inAlt: 'btn btn-line', panel: 'box', eyebrow: 'eyebrow', big: 'big', lead: 'lead', label: 'label', textbtn: 'textbtn' },
+    options() {
+      return `<span class="label">Cards in the pile</span>
+        <div class="seg" role="radiogroup">${[[8, '8 cards'], [13, '13 cards']].map(([v, t]) => `<label><input type="radio" name="o-cards" id="o-cards-${v}" value="${v}"${S.settings.cards === v ? ' checked' : ''}><span>${t}</span></label>`).join('')}</div>`;
+    },
+    readOptions() { return { cards: S.settings.cards }; },
+    start(players, o) {
+      const F = { players, total: o.cards, pile: o.cards, score: 0, gIdx: Math.floor(Math.random() * players.length), game: 1, n: 0, word: '' };
+      catCard(F);
+      return F;
+    },
+    view(F) {
+      const v = { players: F.players, total: F.total, pile: F.pile, score: F.score, n: F.n, game: F.game, phase: F.phase, guesser: F.guesser, givers: F.givers,
+        written: Object.keys(F.clues) };
+      if (F.phase === 'guess') v.kept = F.list.filter(c => !c.out).map(c => ({ text: c.text }));
+      if (F.phase === 'result') Object.assign(v, { list: F.list, word: F.word, guess: F.guess, result: F.result, penalty: F.penalty });
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach(p => {
+        if (p.id === F.guesser) { out[p.id] = { n: F.n, guesser: true }; return; }
+        out[p.id] = { n: F.n, word: F.word, clue: F.clues[p.id] || '', err: F.err[p.id] && F.err[p.id].n === F.n ? F.err[p.id].text : '',
+          list: F.phase === 'check' ? F.list : null };
+      });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(p => p.id === from)) return false;
+      const host = from === ctx.host, giver = F.givers && F.givers.includes(from);
+      if (a.t === 'again') {
+        if (F.phase !== 'final' || a.g !== F.game) return false;
+        F.pile = F.total;
+        F.score = 0;
+        F.gIdx++;
+        F.game++;
+        catCard(F);
+        return true;
+      }
+      if (a.n !== F.n) return false;
+      switch (a.t) {
+        case 'clue': {
+          const v = String(a.text == null ? '' : a.text).trim().slice(0, 24);
+          if (F.phase !== 'clue' || !giver) return false;
+          const why = catClueProblem(F, v);
+          if (why) { F.err[from] = { n: F.n, text: why }; return true; }
+          delete F.err[from];
+          F.clues[from] = v;
+          if (F.givers.every(id => F.clues[id])) catCheck(F);
+          return true;
+        }
+        case 'swap':
+          if (F.phase !== 'clue' || !(giver || host) || Object.keys(F.clues).length) return false;
+          F.word = deck.one([F.word]);
+          F.n++;
+          return true;
+        case 'go':
+          if (!host || F.phase !== 'clue' || !Object.keys(F.clues).length) return false;
+          catCheck(F);
+          return true;
+        case 'toggle': {
+          const c = F.list[Number(a.i)];
+          if (F.phase !== 'check' || !giver || !c) return false;
+          c.out = !c.out;
+          c.auto = false;
+          return true;
+        }
+        case 'checked':
+          if (F.phase !== 'check' || !giver) return false;
+          F.phase = 'guess';
+          return true;
+        case 'guess': {
+          const g = String(a.g == null ? '' : a.g).trim().slice(0, 40);
+          if (F.phase !== 'guess' || from !== F.guesser || !g) return false;
+          F.guess = g;
+          if (sameWord(g, F.word)) { F.result = 'right'; F.score++; }
+          else {
+            F.result = 'wrong';
+            if (F.pile > 0) { F.pile--; F.penalty = 'pile'; }
+            else if (F.score > 0) { F.score--; F.penalty = 'score'; }
+          }
+          F.phase = 'result';
+          return true;
+        }
+        case 'pass':
+          if (F.phase !== 'guess' || from !== F.guesser) return false;
+          F.result = 'pass';
+          F.phase = 'result';
+          return true;
+        case 'override':
+          if (F.phase !== 'result' || F.result !== 'wrong') return false;
+          if (F.penalty === 'pile') F.pile++;
+          else if (F.penalty === 'score') F.score++;
+          F.penalty = null;
+          F.result = 'right';
+          F.score++;
+          return true;
+        case 'next':
+          if (F.phase !== 'result') return false;
+          F.gIdx++;
+          catCard(F);
+          return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      if (F.players.length < 3) return 'open';
+      if (F.phase === 'final' || F.phase === 'result') return;
+      // The guesser walked out, so put the card back and deal the next one.
+      if (gone.includes(F.guesser)) { F.pile++; catCard(F); return; }
+      F.givers = F.givers.filter(id => !gone.includes(id));
+      gone.forEach(id => { delete F.clues[id]; });
+      F.list = F.list.filter(c => !gone.includes(c.by));
+      if (F.phase === 'clue' && F.givers.every(id => F.clues[id])) catCheck(F);
+    },
+    render(v) {
+      const F = v.pub, me = v.me;
+      const m = v.mine && v.mine.n === F.n ? v.mine : null;
+      const nm = id => (id === me ? 'you' : ((F.players.find(x => x.id === id) || {}).name || 'Someone'));
+      const Nm = id => (id === me ? 'You' : esc(nm(id)));
+      const send = a => Online.sendAttr(Object.assign({ n: F.n }, a));
+      const status = `<div class="status"><span>Score ${F.score}</span><span>${P.plural(F.pile, 'card')} left</span></div>`;
+      const note = (c, i, opts) => {
+        const tag = opts && opts.button ? 'button' : 'div';
+        const attrs = tag === 'button' ? ` type="button" ${send({ t: 'toggle', i })} aria-pressed="${c.out}" aria-label="${esc(c.text)} by ${esc(nm(c.by))}. ${c.out ? 'Thrown out' : 'Kept'}. Tap to change."` : '';
+        return `<${tag} class="${tag === 'button' ? 'note-btn' : 'note'}${c.out ? ' out' : ''}" style="--n:${NOTES[i % NOTES.length]};--r:${((i * 41) % 9) - 4}deg"${attrs}>
+          <span class="w">${esc(c.text)}</span>${opts && opts.by ? `<small>${Nm(c.by)}</small>` : ''}${c.out ? `<span class="stamp">${c.auto ? 'Copycat' : 'Out'}</span>` : ''}</${tag}>`;
+      };
+      if (F.phase === 'clue') {
+        const waiting = F.givers.filter(id => !F.written.includes(id));
+        if (F.guesser === me) {
+          return `<section class="center"><p class="eyebrow">You are guessing</p><h2 class="big light">Eyes on your own screen</h2>
+            <p class="lead">Everyone else is writing a one-word clue for you. ${waiting.length ? 'Waiting for ' + esc(P.listNames(waiting.map(nm))) + '.' : ''}</p>${status}</section>`;
+        }
+        const mine = m && m.clue, editing = v.local.catEdit === F.n;
+        return `<section class="center">
+          <p class="eyebrow">Your clue for ${esc(nm(F.guesser))}</p>
+          <div class="secret"><small>The secret word</small><b>${esc(m ? m.word : '')}</b></div>
+          ${mine && !editing ? `<p class="lead">Your clue is <b>${esc(mine)}</b>.</p><div class="actions center"><button class="btn btn-line" type="button" data-ui="edit">Change it</button></div>`
+            : `<div class="field"><label for="oclue-${F.n}">One word only</label><input id="oclue-${F.n}" data-keep data-enter="clue" type="text" maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="Type your clue"></div>
+               <p class="err" role="alert">${esc((v.local.catErr && v.local.catErr.n === F.n ? v.local.catErr.text : '') || (m && m.err) || '')}</p>
+               <div class="actions center"><button class="btn btn-ink btn-big" type="button" data-ui="clue"${v.pending ? ' disabled' : ''}>Hide it</button></div>`}
+          <p class="waiting">${waiting.length ? 'Still writing: ' + esc(P.listNames(waiting.map(nm))) + '.' : 'Every clue is in.'}</p>
+          ${!F.written.length ? `<div class="actions center"><button class="textbtn" type="button" ${send({ t: 'swap' })}>Nobody knows this word? Get a new one</button></div>` : ''}
+          ${v.host && F.written.length && waiting.length ? `<div class="actions center"><button class="btn btn-line" type="button" ${send({ t: 'go' })}>Check the clues now</button></div>` : ''}
+          ${status}
+        </section>`;
+      }
+      if (F.phase === 'check') {
+        if (F.guesser === me) {
+          return `<section class="center"><p class="eyebrow">You are guessing</p><h2 class="big light">The others are checking the clues</h2>
+            <p class="lead">Matching clues get thrown out before you see them.</p>${status}</section>`;
+        }
+        const list = (m && m.list) || [];
+        const outN = list.filter(c => c.out).length;
+        return `<section class="center">
+          <p class="eyebrow">Clue givers only</p>
+          <h2 class="big light">Check the clues</h2>
+          <p class="lead">${outN ? 'Matching clues are thrown out.' : 'No copycats this time.'} Tap a clue to throw it out or bring it back, for example if two clues mean the same thing.</p>
+          <div class="notes">${list.map((c, i) => note(c, i, { button: true, by: true })).join('')}</div>
+          <div class="actions center"><button class="btn btn-ink btn-big" type="button" ${send({ t: 'checked' })}>Give it to ${esc(nm(F.guesser))}</button></div>
+        </section>`;
+      }
+      if (F.phase === 'guess') {
+        const kept = F.kept || [];
+        if (F.guesser !== me) {
+          return `<section class="center"><p class="eyebrow">${esc(nm(F.guesser))} is guessing</p>
+            ${kept.length ? `<div class="notes">${kept.map((c, i) => note(c, i)).join('')}</div>` : '<h2 class="big light">Every clue was a copycat</h2>'}
+            <p class="lead">${esc(nm(F.guesser))} gets one guess.</p>${status}</section>`;
+        }
+        return `<section class="center">
+          <p class="eyebrow">What is the word?</p>
+          ${kept.length ? `<div class="notes">${kept.map((c, i) => note(c, i)).join('')}</div>` : '<h2 class="big light">Every clue was a copycat</h2><p class="lead">No clues survived. You can still take a wild guess, or pass.</p>'}
+          <div class="field"><label for="oguess-${F.n}">Your guess</label><input id="oguess-${F.n}" data-keep data-enter="guess" type="text" maxlength="40" autocomplete="off" enterkeyhint="go" placeholder="Type one guess"></div>
+          <div class="actions center">
+            <button class="btn btn-line" type="button" ${send({ t: 'pass' })}>Pass</button>
+            <button class="btn btn-ink btn-big" type="button" data-ui="guess"${v.pending ? ' disabled' : ''}>Guess</button>
+          </div>
+        </section>`;
+      }
+      if (F.phase === 'result') {
+        const r = F.result, gName = Nm(F.guesser);
+        let verdict, line;
+        if (r === 'right') { verdict = 'Got it'; line = `${gName} guessed ${esc(F.word)}. You keep the card.`; }
+        else if (r === 'pass') { verdict = 'Passed'; line = `The word was ${esc(F.word)}. That card is gone.`; }
+        else { verdict = 'Not quite'; line = `${gName} said ${esc(F.guess)}. The word was ${esc(F.word)}. ${F.penalty === 'score' ? 'You also lose one card you already won.' : 'You lose this card and the next one.'}`; }
+        return `<section class="center">
+          <div class="verdict${r === 'right' ? '' : ' bad'}">${verdict}</div>
+          <p class="lead">${line}</p>
+          <div class="notes">${F.list.map((c, i) => note(c, i, { by: true })).join('')}</div>
+          ${status}
+          <div class="actions center">
+            ${r === 'wrong' ? `<button class="btn btn-line" type="button" ${send({ t: 'override' })}>That was right. Count it</button>` : ''}
+            <button class="btn btn-ink btn-big" type="button" ${send({ t: 'next' })}>${F.pile > 0 ? 'Next card' : 'See your score'}</button>
+          </div>
+        </section>`;
+      }
+      const total = F.total, pct = F.score / total;
+      const verdict = F.score === total ? 'Perfect score' : pct >= 0.85 ? 'Basically telepathic' : pct >= 0.7 ? 'Great teamwork' : pct >= 0.5 ? 'Not bad at all' : pct >= 0.3 ? 'Room to improve' : 'Too many copycats';
+      return `<section class="center">
+        <p class="eyebrow">Game over</p>
+        <div class="verdict">${F.score} / ${total}</div>
+        <h2 class="big">${verdict}</h2>
+        <div class="actions center"><button class="btn btn-ink btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div>
+      </section>`;
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'edit') { v.local.catEdit = F.n; v.redraw(); return; }
+      if (name === 'clue') {
+        const f = document.getElementById('oclue-' + F.n), t = (f ? f.value : '').trim();
+        const why = v.mine && v.mine.word ? catClueProblem({ word: v.mine.word }, t) : (!t ? 'Type a clue first.' : '');
+        if (why) { v.local.catErr = { n: F.n, text: why }; sfx.buzz(0.25); v.redraw(); return; }
+        v.local.catErr = null;
+        v.local.catEdit = null;
+        v.send({ t: 'clue', n: F.n, text: t });
+        sfx.whoosh();
+      }
+      if (name === 'guess') {
+        const f = document.getElementById('oguess-' + F.n), g = (f ? f.value : '').trim();
+        if (!g) { if (f) f.focus(); return; }
+        v.send({ t: 'guess', n: F.n, g });
+      }
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.phase === 'check' && B.phase !== 'check' && v.mine && v.mine.list && v.mine.list.some(c => c.out)) setTimeout(() => sfx.tone(220, { type: 'sawtooth', to: 110, dur: 0.35, gain: 0.08, lowpass: 900 }), 150);
+      if (F.phase === 'result' && B.phase !== 'result') {
+        if (F.result === 'right') { sfx.ding(); P.confetti({ colors: ['#fff36b', '#ffc2dc', '#a8e9ff', '#c4f7a1', '#fff6ea'], count: 90 }); }
+        else if (F.result === 'wrong') sfx.buzz(0.6); else sfx.whoosh();
+      }
+      if (F.phase === 'final' && B.phase !== 'final') {
+        if (F.score > (S.best[F.total] || 0)) { S.best[F.total] = F.score; persist(); }
+        if (F.score / F.total >= 0.7) { sfx.win(); P.confetti({ colors: ['#fff36b', '#ffc2dc', '#a8e9ff', '#c4f7a1', '#22140a'] }); }
+      }
+    }
+  };
+  document.addEventListener('change', e => { if (e.target.name === 'o-cards') { S.settings.cards = Number(e.target.value); persist(); } });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

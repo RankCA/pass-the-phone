@@ -46,11 +46,13 @@ body{background:radial-gradient(circle at 15% 10%,rgba(255,207,107,.1),transpare
 .story .who{font-weight:800;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#4b3f9e;overflow-wrap:anywhere}
 .story .txt{font-family:var(--f-display);font-size:clamp(19px,4.6vw,24px);line-height:1.35;overflow-wrap:anywhere}
 .counter{display:block;margin-top:6px;text-align:right;font-size:14px;color:var(--muted)}
+.note{margin:14px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=a70bfe61"></script>
 <script src="openers.js?v=b86d1f3c"></script>
 <script>
 (function () {
@@ -80,6 +82,11 @@ body{background:radial-gradient(circle at 15% 10%,rgba(255,207,107,.1),transpare
       <div class="sec"><span class="label">How long</span>${P.seg('laps', [[1, 'Once around'], [2, 'Twice around']], S.settings.laps)}</div>
       <div class="sec"><span class="label">First line</span>${P.seg('start', [['random', 'Give us one'], ['own', 'We write it']], S.settings.start)}</div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Open the book</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Each storyteller writes on their own phone and only sees the line before theirs. Make a game, then send the code.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -199,7 +206,140 @@ body{background:radial-gradient(circle at 15% 10%,rgba(255,207,107,.1),transpare
     else if (t.name === 'start') { S.settings.start = t.value; persist(); }
   });
 
-  render();
+  /* ---------- Online: each storyteller on their own phone ---------- */
+  function chainNew(F) {
+    const n = F.players.length, off = F.story % n;
+    const lap = Array.from({ length: n }, (_, k) => F.players[(off + k) % n].id);
+    F.order = F.laps === 2 ? lap.concat(lap) : lap;
+    F.pos = 0;
+    F.shown = 0;
+    F.lines = F.start === 'random' ? [{ text: deck.one(), by: null }] : [];
+    F.story++;
+    F.n++;
+    F.phase = 'write';
+  }
+  const ONLINE = {
+    game: 'story-chain', title: 'Story Chain', min: 2, max: 12,
+    options() {
+      return `<p class="label">How long</p>${P.seg('o-laps', [[1, 'Once around'], [2, 'Twice around']], S.settings.laps)}
+        <p class="label" style="margin-top:18px">First line</p>${P.seg('o-start', [['random', 'Give us one'], ['own', 'We write it']], S.settings.start)}`;
+    },
+    readOptions() { return { laps: S.settings.laps, start: S.settings.start }; },
+    start(players, o) {
+      const F = { players, laps: o.laps, start: o.start, story: 0, n: 0, game: 1 };
+      chainNew(F);
+      return F;
+    },
+    view(F) {
+      const v = { players: F.players, n: F.n, game: F.game, phase: F.phase, pos: F.pos, total: F.order.length + (F.start === 'random' ? 1 : 0),
+        writer: F.phase === 'write' ? F.order[F.pos] : null, count: F.lines.length, shown: F.shown };
+      if (F.phase === 'reveal') v.lines = F.lines;
+      return v;
+    },
+    secrets(F) {
+      const out = {}, writer = F.phase === 'write' ? F.order[F.pos] : null, last = F.lines[F.lines.length - 1];
+      F.players.forEach(p => { out[p.id] = { n: F.n, pos: F.pos, last: p.id === writer ? (last ? last.text : null) : undefined }; });
+      return out;
+    },
+    act(F, from, a) {
+      if (!F.players.some(p => p.id === from) || a.n !== F.n) return false;
+      if (a.t === 'add') {
+        const text = String(a.text == null ? '' : a.text).replace(/\s+/g, ' ').trim().slice(0, 220);
+        if (F.phase !== 'write' || from !== F.order[F.pos] || a.pos !== F.pos || !text) return false;
+        F.lines.push({ text, by: from });
+        F.pos++;
+        if (F.pos >= F.order.length) { F.phase = 'reveal'; F.shown = 0; }
+        return true;
+      }
+      if (F.phase !== 'reveal') return false;
+      if (a.t === 'more') { if (a.k !== F.shown || F.shown >= F.lines.length) return false; F.shown++; return true; }
+      if (a.t === 'all') { F.shown = F.lines.length; return true; }
+      if (a.t === 'again') { if (F.shown < F.lines.length) return false; F.game++; chainNew(F); return true; }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      if (F.players.length < 2) return 'open';
+      if (F.phase !== 'write') return;
+      // Skip the turns that belonged to whoever left.
+      const done = F.order.slice(0, F.pos), todo = F.order.slice(F.pos).filter(id => !gone.includes(id));
+      F.order = done.concat(todo);
+      if (F.pos >= F.order.length) { F.phase = 'reveal'; F.shown = 0; }
+    },
+    render(v) {
+      const F = v.pub, me = v.me;
+      const nm = id => (id === me ? 'You' : ((F.players.find(x => x.id === id) || {}).name || 'Someone'));
+      const send = a => Online.sendAttr(Object.assign({ n: F.n }, a));
+      if (F.phase === 'write') {
+        const lineNo = F.count + 1;
+        if (F.writer !== me) {
+          return `<section class="center">
+            <p class="eyebrow">Line ${lineNo} of ${F.total}</p>
+            <h2 class="big">${esc(nm(F.writer))} is writing</h2>
+            <p class="lead">The story stays hidden until the end. You will only see the line right before yours.</p>
+          </section>`;
+        }
+        const m = v.mine && v.mine.n === F.n && v.mine.pos === F.pos ? v.mine : null;
+        const last = m ? m.last : null, opening = m && last == null;
+        return `<section class="center">
+          <p class="eyebrow">Line ${lineNo} of ${F.total}. Your turn</p>
+          ${!m ? '<p class="lead">Getting your line ready.</p>' : opening ? '<h2 class="big">Write the first line</h2><p class="lead">Start the story any way you like.</p>'
+            : `<div class="book"><small>The story so far ends with</small><p class="line">${esc(last)}</p></div>`}
+          <div class="field"><label for="oline-${F.pos}">${opening ? 'Opening line' : 'What happens next?'}</label><textarea id="oline-${F.pos}" data-keep maxlength="220" placeholder="Write one sentence"></textarea></div>
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="add"${m && !v.pending ? '' : ' disabled'}>Add it and pass</button></div>
+        </section>`;
+      }
+      const done = F.shown >= F.count;
+      return `<section class="center">
+        <p class="eyebrow">${done ? 'The end' : 'Gather round'}</p>
+        <h2 class="big">${done ? 'Your story' : 'Read it out loud'}</h2>
+        <div class="book"><ol class="story">${F.lines.slice(0, F.shown).map(l => `<li><span class="who">${esc(l.by ? nm(l.by) : 'Opener')}</span><span class="txt">${esc(l.text)}</span></li>`).join('')}</ol>${F.shown ? '' : '<p class="line">Tap the button to reveal the first line.</p>'}</div>
+        ${done ? `<div class="actions center">
+            ${P.canSpeak() ? '<button class="btn btn-alt" type="button" data-ui="read">Read it to us</button>' : ''}
+            <button class="btn btn-alt" type="button" data-ui="copy">Copy the story</button>
+            <button class="btn btn-main btn-big" type="button" ${send({ t: 'again' })}>New story</button>
+          </div><p class="hint" id="ocopy" aria-live="polite"></p>`
+          : `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'all' })}>Show it all</button><button class="btn btn-main btn-big" type="button" ${send({ t: 'more', k: F.shown })}>${F.shown ? 'Next line' : 'First line'}</button></div>`}
+      </section>`;
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'add') {
+        const f = document.getElementById('oline-' + F.pos);
+        const text = (f ? f.value : '').replace(/\s+/g, ' ').trim();
+        if (!text) { if (f) f.focus(); return; }
+        v.send({ t: 'add', n: F.n, pos: F.pos, text });
+        sfx.whoosh();
+      }
+      if (name === 'read') P.speak((F.lines || []).map(l => l.text).join(' '), { rate: 0.95 });
+      if (name === 'copy') {
+        const note = document.getElementById('ocopy');
+        const text = (F.lines || []).map(l => l.text).join('\n');
+        const ok = () => { if (note) note.textContent = 'Copied.'; };
+        const fail = () => { if (note) note.textContent = 'Copy did not work here. Select the story and copy it.'; };
+        try { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, fail); else fail(); } catch (x) { fail(); }
+      }
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.phase === 'write' && F.writer === v.me && B.writer !== v.me) { sfx.ding(); P.vibrate(60); }
+      if (F.phase === 'reveal' && B.phase === 'reveal' && F.shown > B.shown) {
+        sfx.pop();
+        if (F.shown >= F.count) { sfx.win(); P.confetti({ colors: ['#ffcf6b', '#f6f3ff', '#ff78be', '#8fe3ff'], count: 90 }); }
+      }
+    }
+  };
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'o-laps') { S.settings.laps = Number(t.value); persist(); }
+    else if (t.name === 'o-start') { S.settings.start = t.value; persist(); }
+  });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

@@ -51,6 +51,10 @@ body{background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px
 .statements li.true{opacity:.8}
 .stamp{display:inline-block;margin-left:8px;padding:0 8px;border:3px solid var(--accent);border-radius:4px;color:var(--accent);font-family:var(--f-display);font-weight:800;font-size:15px;transform:rotate(-4deg)}
 .chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:16px}
+.statements button{display:flex;gap:14px;align-items:flex-start;width:100%;padding:16px;border:0;border-radius:10px;background:#fff;color:var(--fg);font:inherit;text-align:left;cursor:pointer;box-shadow:0 0 0 2px var(--fg),6px 6px 0 rgba(22,36,26,.15)}
+.statements button[aria-pressed="true"]{box-shadow:0 0 0 4px var(--accent),6px 6px 0 rgba(224,53,43,.2)}
+.statements li.pickable{padding:0;box-shadow:none;background:none}
+.note{margin:14px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
 .chip{min-height:46px;padding:6px 16px;border:0;border-radius:999px;background:#fff;color:var(--fg);box-shadow:0 0 0 2px var(--fg);font:700 17px var(--f-body);cursor:pointer}
 .chip[aria-pressed="true"]{background:var(--truth);color:#fff;box-shadow:none}
 </style>
@@ -58,6 +62,7 @@ body{background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=a70bfe61"></script>
 <script>
 (function () {
   'use strict';
@@ -78,6 +83,11 @@ body{background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px
     <div class="panel">
       <div class="sec"><span class="label">Players</span><div id="players"></div></div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Start the test</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone writes on their own phone and votes for the lie in secret. Make a game, then send the code to your friends.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -219,7 +229,217 @@ body{background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px
     if (k < 2) document.getElementById(order[k + 1]).focus(); else save();
   });
 
-  render();
+  /* ---------- Online: statements and votes on everyone's own phone ---------- */
+  const truthClean = t => String(t == null ? '' : t).replace(/\s+/g, ' ').trim().slice(0, 90);
+  function truthWrite(F) {
+    F.n++;
+    F.phase = 'write';
+    F.sets = {};
+    F.order = [];
+    F.at = 0;
+    F.votes = {};
+    F.revealed = false;
+  }
+  const truthSpot = F => F.order[F.at];
+  function truthSpotStart(F) {
+    F.n++;
+    F.votes = {};
+    F.revealed = false;
+    F.phase = 'spot';
+  }
+  function truthReveal(F) {
+    const spot = truthSpot(F), set = F.sets[spot], lie = set.findIndex(x => x.lie);
+    const voters = F.players.filter(p => p.id !== spot).map(p => p.id);
+    const found = voters.filter(id => F.votes[id] === lie);
+    found.forEach(id => { F.scores[id] = (F.scores[id] || 0) + 1; });
+    F.scores[spot] = (F.scores[spot] || 0) + (voters.length - found.length);
+    F.revealed = true;
+  }
+  const ONLINE = {
+    game: 'two-truths', title: 'Two Truths', min: 3, max: 10,
+    start(players) {
+      const F = { players, scores: {}, n: 0, game: 1 };
+      truthWrite(F);
+      return F;
+    },
+    view(F) {
+      const v = { players: F.players, scores: F.scores, n: F.n, game: F.game, phase: F.phase, written: Object.keys(F.sets) };
+      if (F.phase === 'spot') {
+        const spot = truthSpot(F), set = F.sets[spot];
+        Object.assign(v, { spot, at: F.at, total: F.order.length, items: set.map(x => x.text), voted: Object.keys(F.votes), revealed: F.revealed });
+        if (F.revealed) { v.lie = set.findIndex(x => x.lie); v.votes = F.votes; }
+      }
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach(p => { out[p.id] = { n: F.n, set: F.sets[p.id] || null, vote: F.votes[p.id] == null ? null : F.votes[p.id] }; });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(p => p.id === from)) return false;
+      const host = from === ctx.host;
+      if (a.t === 'again') {
+        if (F.phase !== 'final' || a.g !== F.game) return false;
+        F.scores = {};
+        F.game++;
+        truthWrite(F);
+        return true;
+      }
+      if (a.n !== F.n) return false;
+      switch (a.t) {
+        case 'write': {
+          const v = [a.t1, a.t2, a.lie].map(truthClean);
+          if (F.phase !== 'write' || v.some(x => !x)) return false;
+          F.sets[from] = P.shuffle([{ text: v[0], lie: false }, { text: v[1], lie: false }, { text: v[2], lie: true }]);
+          if (F.players.every(p => F.sets[p.id])) { F.order = P.shuffle(F.players.map(p => p.id)); F.at = 0; truthSpotStart(F); }
+          return true;
+        }
+        case 'go':
+          if (!host || F.phase !== 'write' || Object.keys(F.sets).length < 2) return false;
+          F.order = P.shuffle(Object.keys(F.sets));
+          F.at = 0;
+          truthSpotStart(F);
+          return true;
+        case 'vote': {
+          const k = Number(a.k), spot = truthSpot(F);
+          if (F.phase !== 'spot' || F.revealed || from === spot || !(k >= 0 && k <= 2)) return false;
+          F.votes[from] = k;
+          if (F.players.filter(p => p.id !== spot).every(p => F.votes[p.id] != null)) truthReveal(F);
+          return true;
+        }
+        case 'reveal':
+          if (F.phase !== 'spot' || F.revealed || !(host || from === truthSpot(F))) return false;
+          truthReveal(F);
+          return true;
+        case 'next':
+          if (F.phase !== 'spot' || !F.revealed) return false;
+          F.at++;
+          if (F.at >= F.order.length) { F.n++; F.phase = 'final'; return true; }
+          truthSpotStart(F);
+          return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      gone.forEach(id => { delete F.votes[id]; delete F.scores[id]; });
+      if (F.players.length < 3) return 'open';
+      if (F.phase === 'write') {
+        gone.forEach(id => { delete F.sets[id]; });
+        if (F.players.every(p => F.sets[p.id])) { F.order = P.shuffle(F.players.map(p => p.id)); F.at = 0; truthSpotStart(F); }
+        return;
+      }
+      if (F.phase !== 'spot') return;
+      const spot = truthSpot(F);
+      const before = F.order.slice(0, F.at).filter(id => !gone.includes(id)).length;
+      F.order = F.order.filter(id => !gone.includes(id));
+      gone.forEach(id => { delete F.sets[id]; });
+      if (gone.includes(spot)) {
+        F.at = before;
+        if (F.at >= F.order.length) { F.n++; F.phase = 'final'; return; }
+        truthSpotStart(F);
+        return;
+      }
+      F.at = F.order.indexOf(spot);
+      if (!F.revealed && F.players.filter(p => p.id !== spot).every(p => F.votes[p.id] != null)) truthReveal(F);
+    },
+    render(v) {
+      const F = v.pub, me = v.me;
+      const m = v.mine && v.mine.n === F.n ? v.mine : null;
+      const nm = id => (id === me ? 'you' : ((F.players.find(x => x.id === id) || {}).name || 'Someone'));
+      const names = ids => esc(P.listNames(ids.map(nm)));
+      const send = a => Online.sendAttr(Object.assign({ n: F.n }, a));
+      const scores = () => P.scoreList(F.players.map(p => [p.name + (p.id === me ? ' (you)' : ''), F.scores[p.id] || 0]));
+      if (F.phase === 'write') {
+        const mineSet = v.mine && v.mine.set;
+        const editing = v.local.truthEdit === F.n;
+        const waiting = F.players.filter(p => !F.written.includes(p.id)).map(p => p.id);
+        const body = mineSet && !editing
+          ? `<p class="lead">Your three statements are in. They will show up in a random order.</p><div class="actions center"><button class="btn btn-alt" type="button" data-ui="edit">Change them</button></div>`
+          : `<div class="field"><label for="ot1-${F.n}">True thing</label><input id="ot1-${F.n}" data-keep type="text" maxlength="90" autocomplete="off" placeholder="I have been to Spain"></div>
+             <div class="field"><label for="ot2-${F.n}">Another true thing</label><input id="ot2-${F.n}" data-keep type="text" maxlength="90" autocomplete="off" placeholder="I can juggle"></div>
+             <div class="field"><label for="olie-${F.n}" class="lie">A believable lie</label><input id="olie-${F.n}" data-keep data-enter="save" type="text" maxlength="90" autocomplete="off" placeholder="I once met a famous chef"></div>
+             <p class="err" role="alert">${esc(v.local.truthErr === F.n ? 'Fill in all three first.' : '')}</p>
+             <div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="save"${v.pending ? ' disabled' : ''}>Lock them in</button></div>`;
+        return `<section class="center">
+          <p class="eyebrow">About you</p>
+          <h2 class="big">Two truths and a lie</h2>
+          ${body}
+          <p class="note">${waiting.length ? 'Still writing: ' + names(waiting) + '.' : 'Everyone is ready.'}</p>
+          ${v.host && F.written.length >= 2 && waiting.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'go' })}>Start without them</button></div>` : ''}
+        </section>`;
+      }
+      if (F.phase === 'spot') {
+        const spot = F.spot, mineSpot = spot === me, vote = m ? m.vote : null;
+        const ownLie = mineSpot && m && m.set ? m.set.findIndex(x => x.lie) : -1;
+        const items = F.items.map((t, k) => {
+          const cls = F.revealed ? (k === F.lie ? 'lie' : 'true') : '';
+          const stamp = F.revealed && k === F.lie ? '<span class="stamp">Lie</span>' : (!F.revealed && k === ownLie ? '<span class="stamp">Your lie</span>' : '');
+          if (!F.revealed && !mineSpot) return `<li class="pickable"><button type="button" ${send({ t: 'vote', k })} aria-pressed="${vote === k}"><span class="n">${k + 1}</span><p>${esc(t)}</p></button></li>`;
+          return `<li class="${cls}"><span class="n">${k + 1}</span><p>${esc(t)}${stamp}</p></li>`;
+        }).join('');
+        const voters = F.players.filter(p => p.id !== spot).map(p => p.id);
+        const waiting = voters.filter(id => !F.voted.includes(id));
+        let foot;
+        if (!F.revealed) {
+          foot = mineSpot ? `<p class="lead">Read them out loud and answer questions. Everyone else votes for the lie.</p>`
+            : `<p class="lead">Ask ${esc(nm(spot))} questions, then tap the one you think is the lie.</p>`;
+          foot += `<p class="note">${vote != null ? 'Vote saved. You can change it until everyone has voted. ' : ''}${waiting.length ? 'Still voting: ' + names(waiting) + '.' : ''}</p>`;
+          if (v.host || mineSpot) foot += F.voted.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'reveal' })}>Reveal the lie now</button></div>` : '';
+        } else {
+          const found = voters.filter(id => F.votes[id] === F.lie), fooled = voters.length - found.length;
+          const last = F.at >= F.total - 1;
+          foot = `<p class="lead">${found.length ? names(found).replace(/^./, c => c.toUpperCase()) + ' found it.' : 'Nobody found it.'} ${mineSpot ? 'You' : esc(nm(spot))} fooled ${P.plural(fooled, 'player')}.</p>
+            ${scores()}
+            <div class="actions center"><button class="btn btn-main btn-big" type="button" ${send({ t: 'next' })}>${last ? 'Final scores' : 'Next in the spotlight'}</button></div>`;
+        }
+        return `<section class="center">
+          <p class="eyebrow">In the spotlight ${F.at + 1} of ${F.total}</p>
+          <h2 class="big">${mineSpot ? 'You' : esc(nm(spot))}</h2>
+          <ol class="statements">${items}</ol>
+          ${foot}
+        </section>`;
+      }
+      const rows = F.players.map(p => [p, F.scores[p.id] || 0]).sort((a, b) => b[1] - a[1]);
+      const top = rows.length ? rows[0][1] : 0, winners = rows.filter(r => r[1] === top).map(r => r[0].id);
+      return `<section class="center">
+        <p class="eyebrow">Test complete</p>
+        <h2 class="big">${winners.length === 1 && winners[0] === me ? 'You are the best liar and lie detector' : names(winners).replace(/^./, c => c.toUpperCase()) + (winners.length > 1 ? ' are the best liars and lie detectors' : ' is the best liar and lie detector')}</h2>
+        ${scores()}
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>New statements</button></div>
+      </section>`;
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'edit') { v.local.truthEdit = F.n; v.redraw(); return; }
+      if (name !== 'save') return;
+      const val = id => { const f = document.getElementById(id + '-' + F.n); return truthClean(f ? f.value : ''); };
+      const t1 = val('ot1'), t2 = val('ot2'), lie = val('olie');
+      if (!t1 || !t2 || !lie) { v.local.truthErr = F.n; v.redraw(); return; }
+      v.local.truthErr = null;
+      v.local.truthEdit = null;
+      v.send({ t: 'write', n: F.n, t1, t2, lie });
+      sfx.whoosh();
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.phase === 'spot' && (B.phase !== 'spot' || F.n !== B.n)) sfx.whoosh();
+      if (F.phase === 'spot' && F.revealed && !B.revealed) {
+        sfx.tone(140, { type: 'sawtooth', to: 900, dur: 0.5, gain: 0.08, lowpass: 2000 });
+        const voters = F.players.filter(p => p.id !== F.spot).map(p => p.id);
+        const fooled = voters.filter(id => F.votes[id] !== F.lie).length;
+        setTimeout(() => (fooled > 0 ? sfx.buzz(0.4) : sfx.ding()), 450);
+      }
+      if (F.phase === 'final' && B.phase !== 'final') { sfx.win(); P.confetti({ colors: ['#e0352b', '#2e8b57', '#16241a', '#ffffff'] }); }
+    }
+  };
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

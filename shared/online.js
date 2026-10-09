@@ -60,7 +60,12 @@
     'liars-dice': { title: "Liar's Dice", min: 2, max: 6, blurb: 'Bid on the dice under every cup, or call liar.' },
     'sea-battle': { title: 'Sea Battle', min: 2, max: 2, blurb: 'Hide your fleet and sink theirs.' },
     'dots-and-boxes': { title: 'Dots and Boxes', min: 2, max: 4, blurb: 'Join the dots and close the most boxes.' },
-    mancala: { title: 'Mancala', min: 2, max: 2, blurb: 'Sow seeds round the board and capture the most.' }
+    mancala: { title: 'Mancala', min: 2, max: 2, blurb: 'Sow seeds round the board and capture the most.' },
+    punchline: { title: 'Punchline', min: 3, max: 10, blurb: 'Finish the prompt. The judge picks a favourite.' },
+    'fake-facts': { title: 'Fake Facts', min: 3, max: 8, blurb: 'Write a fake answer and spot the real one.' },
+    'two-truths': { title: 'Two Truths', min: 3, max: 10, blurb: 'Two true things and a lie. Find every lie.' },
+    'story-chain': { title: 'Story Chain', min: 2, max: 12, blurb: 'Write a story one line at a time.' },
+    copycats: { title: 'Copycats', min: 3, max: 10, blurb: 'One-word clues for the guesser. Matching clues cancel out.' }
   };
 
   /* ---------- Connection ---------- */

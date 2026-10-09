@@ -20,7 +20,7 @@ Some games also play online, with each player on their own phone. See [Online pl
 | Close Call | 3 to 8 | Everyone guesses a number in secret, then bets on whose guess is closest without going over. |
 | Two of a Kind | 3 to 12 | Fill in the blank with one word. Match exactly one other player for 3 points, or more players for 1. Plays online too. |
 | Quick Sketch | 4 or more | Teams take turns drawing the secret word on the phone while their team races the clock to guess it. |
-| Punchline | 3 to 10 | Everyone finishes a funny prompt in secret, and a rotating judge picks a favourite without knowing who wrote it. |
+| Punchline | 3 to 10 | Everyone finishes a funny prompt in secret, and a rotating judge picks a favourite without knowing who wrote it. Plays online too. |
 | Snake Pit | 3 to 6 | Hide gems and a snake in a secret pile, then bid on how many gems you can dig up without finding a snake. |
 | Yacht | 1 to 6 | The classic dice game. Roll five dice up to three times, then fill one of twelve boxes. Scoring lives in `yacht/rules.js`. |
 | Dots and Boxes | 2 to 4 | Take turns joining two dots. Close a box and it is yours, and you go again. Plays online too. |
@@ -36,15 +36,15 @@ Some games also play online, with each player on their own phone. See [Online pl
 | Don't Say It | 4 or more | Describe the word for your team without saying any of the five banned words. |
 | Doodle Chain | 3 to 12 | Draw the prompt, guess the drawing, draw the guess. Then watch the whole chain. |
 | Fishbowl | 4 or more | Fill a bowl with names, then describe them, use one word, and act them out. |
-| Copycats | 3 to 10 | Everyone writes a one-word clue for the guesser. Matching clues cancel out. |
+| Copycats | 3 to 10 | Everyone writes a one-word clue for the guesser. Matching clues cancel out. Plays online too. |
 | Most Likely To | 3 to 12 | Point on three or pass the phone for a secret vote. Ends with a yearbook of titles. Plays online too. |
 | Hot Takes | 3 to 12 | Everyone secretly agrees or disagrees. The player in the hot seat guesses how many agreed. Plays online too. |
 | Where Are We? | 3 to 12 | Everyone knows the secret place and their role there, except the spy. Plays online too. |
 | Odd One Out | 3 to 12 | Everyone answers the same question at once, except one player who got a different one. Plays online too. |
 | Art Fraud | 4 to 10 | Everyone adds one line to a drawing of the secret word. One artist is faking it. |
-| Two Truths | 3 to 10 | Everyone writes two truths and a lie. The phone shuffles them and the room hunts for the lies. |
-| Fake Facts | 3 to 8 | Write a fake answer to a strange true fact, then try to spot the real one. |
-| Story Chain | 2 to 12 | Write a story one sentence at a time, seeing only the line before yours. |
+| Two Truths | 3 to 10 | Everyone writes two truths and a lie. The phone shuffles them and the room hunts for the lies. Plays online too. |
+| Fake Facts | 3 to 8 | Write a fake answer to a strange true fact, then try to spot the real one. Plays online too. |
+| Story Chain | 2 to 12 | Write a story one sentence at a time, seeing only the line before yours. Plays online too. |
 | Letter Rush | 1 to 12 | Roll a letter and fill every category before time runs out. Needs paper. |
 | Mind Meld | 2 to 6 | Everyone types a word, then hunts for the word that links them until you all match. Plays online too. |
 | Tap Duel | 2 | Two players, one phone flat between you. Quick draw, tug of war, color clash and snap. |
@@ -77,7 +77,7 @@ It adds a version tag to every script and stylesheet link, so a phone never mixe
 
 ## Online play
 
-Four in a Row, Flock, Impostor, Most Likely To, Two of a Kind, Hot Takes, Odd One Out, Mind Meld, Werewolf, Where Are We?, Inside Job, Mole, Liar's Dice, Sea Battle, Dots and Boxes and Mancala can also be played online. Each player uses their own phone, and the one-phone version of every game works exactly as before, with no account.
+Four in a Row, Flock, Impostor, Most Likely To, Two of a Kind, Hot Takes, Odd One Out, Mind Meld, Werewolf, Where Are We?, Inside Job, Mole, Liar's Dice, Sea Battle, Dots and Boxes, Mancala, Punchline, Fake Facts, Two Truths, Story Chain and Copycats can also be played online. Each player uses their own phone, and the one-phone version of every game works exactly as before, with no account.
 
 - A player taps "Make an online game" on a game's setup screen and gets a five letter code. Friends open the link, or type the code on the Online page (`online/`).
 - Players start as guests with just a name. A guest can add an email later to keep their account, and their friends, on any phone. Sign-in uses a six digit code sent by email, so there are no passwords.

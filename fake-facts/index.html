@@ -50,6 +50,8 @@ body{background-color:#ece7dc;background-image:radial-gradient(rgba(22,20,18,.06
 .opts button:hover{box-shadow:inset 0 0 0 2px var(--fg)}
 .opts button:disabled{opacity:.6;cursor:default}
 .opts .n{flex:none;font-family:var(--f-display);font-weight:400;color:var(--accent);min-width:1.4em}
+.opts button[aria-pressed="true"]{box-shadow:inset 0 0 0 3px var(--accent)}
+.note{margin:14px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
 .clips{display:grid;gap:12px;max-width:620px;margin:20px auto 0;text-align:left}
 .clip{padding:14px 16px;background:var(--panel);box-shadow:inset 0 0 0 1px var(--line);animation:pin .35s ease}
 @keyframes pin{from{opacity:0;transform:translateY(8px) rotate(-1deg)}}
@@ -63,6 +65,7 @@ body{background-color:#ece7dc;background-image:radial-gradient(rgba(22,20,18,.06
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=a70bfe61"></script>
 <script src="facts.js?v=284df574"></script>
 <script>
 (function () {
@@ -92,6 +95,11 @@ body{background-color:#ece7dc;background-image:radial-gradient(rgba(22,20,18,.06
       <div class="sec"><span class="label">Players</span><div id="players"></div></div>
       <div class="sec"><span class="label">Facts per game</span>${P.seg('count', [[4, '4'], [6, '6'], [8, '8']], S.settings.count)}</div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Stop the presses</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone writes their fake and votes on their own phone. Make a game, then send the code to your friends.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -286,7 +294,224 @@ body{background-color:#ece7dc;background-image:radial-gradient(rgba(22,20,18,.06
     if (e.target.name === 'count') { S.settings.count = Number(e.target.value); persist(); }
   });
 
-  render();
+  /* ---------- Online: fakes and votes on everyone's own phone ---------- */
+  const fakeClean = t => String(t == null ? '' : t).replace(/\s+/g, ' ').trim().slice(0, 40);
+  function fakeFact(F) {
+    F.n++;
+    F.phase = 'write';
+    F.fakes = {};
+    F.err = {};
+    F.options = [];
+    F.votes = {};
+    F.reveal = 0;
+  }
+  function fakeOptions(F) {
+    const groups = [];
+    F.players.forEach(p => {
+      const t = F.fakes[p.id];
+      if (!t) return;
+      const same = groups.find(g => P.normAnswer(g.text) === P.normAnswer(t));
+      if (same) same.by.push(p.id); else groups.push({ text: t, by: [p.id] });
+    });
+    const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+    const real = F.facts[F.idx].a;
+    F.options = groups.map(g => ({ text: cap(g.text), by: g.by, truth: false })).concat([{ text: cap(real), by: [], truth: true }]);
+    F.options.sort((a, b) => a.text.toLowerCase().localeCompare(b.text.toLowerCase()));
+    F.phase = 'vote';
+  }
+  function fakeScore(F) {
+    Object.keys(F.votes).forEach(id => {
+      const o = F.options[F.votes[id]];
+      if (!o) return;
+      if (o.truth) F.scores[id] = (F.scores[id] || 0) + 2;
+      else o.by.forEach(a => { F.scores[a] = (F.scores[a] || 0) + 1; });
+    });
+    F.reveal = 0;
+    F.phase = 'reveal';
+  }
+  const fakeOrder = F => F.options.map((o, k) => k).filter(k => !F.options[k].truth).concat(F.options.map((o, k) => k).filter(k => F.options[k].truth));
+  const ONLINE = {
+    game: 'fake-facts', title: 'Fake Facts', min: 3, max: 8,
+    options() { return `<p class="label">Facts per game</p>${P.seg('o-count', [[4, '4'], [6, '6'], [8, '8']], S.settings.count)}`; },
+    readOptions() { return { count: S.settings.count }; },
+    start(players, o) {
+      const F = { players, scores: {}, facts: deck.draw(o.count), idx: 0, n: 0, game: 1 };
+      fakeFact(F);
+      return F;
+    },
+    view(F) {
+      const f = F.facts[F.idx];
+      const v = { players: F.players, scores: F.scores, q: f.q, idx: F.idx, count: F.facts.length, n: F.n, game: F.game, phase: F.phase,
+        written: Object.keys(F.fakes), voted: Object.keys(F.votes), reveal: F.reveal };
+      if (F.phase === 'vote') v.options = F.options.map(o => ({ text: o.text }));
+      if (F.phase === 'reveal' || F.phase === 'final') { v.options = F.options; v.votes = F.votes; v.order = fakeOrder(F); v.answer = f.a; }
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach(p => {
+        out[p.id] = { n: F.n, fake: F.fakes[p.id] || '', err: F.err[p.id] === F.n,
+          mine: F.options.map((o, k) => (o.by.includes(p.id) ? k : -1)).filter(k => k >= 0), vote: F.votes[p.id] == null ? null : F.votes[p.id] };
+      });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(p => p.id === from)) return false;
+      const host = from === ctx.host;
+      if (a.t === 'again') {
+        if (F.phase !== 'final' || a.g !== F.game) return false;
+        F.facts = deck.draw(F.facts.length);
+        F.idx = 0;
+        F.scores = {};
+        F.game++;
+        fakeFact(F);
+        return true;
+      }
+      if (a.n !== F.n) return false;
+      switch (a.t) {
+        case 'fake': {
+          const t = fakeClean(a.text);
+          if (F.phase !== 'write' || !t) return false;
+          // Writing the real answer gives it away, so turn it down and say why.
+          if (P.sameAnswer(t, F.facts[F.idx].a)) { F.err[from] = F.n; return true; }
+          delete F.err[from];
+          F.fakes[from] = t;
+          if (F.players.every(p => F.fakes[p.id])) fakeOptions(F);
+          return true;
+        }
+        case 'show':
+          if (!host || F.phase !== 'write' || Object.keys(F.fakes).length < 2) return false;
+          fakeOptions(F);
+          return true;
+        case 'skip':
+          if (!host || F.phase !== 'write') return false;
+          F.facts[F.idx] = deck.one(F.facts) || F.facts[F.idx];
+          fakeFact(F);
+          return true;
+        case 'vote': {
+          const k = Number(a.k), o = F.options[k];
+          if (F.phase !== 'vote' || !o || o.by.includes(from)) return false;
+          F.votes[from] = k;
+          if (F.players.every(p => F.votes[p.id] != null)) fakeScore(F);
+          return true;
+        }
+        case 'count':
+          if (!host || F.phase !== 'vote' || !Object.keys(F.votes).length) return false;
+          fakeScore(F);
+          return true;
+        case 'more':
+          if (F.phase !== 'reveal' || a.k !== F.reveal || F.reveal >= F.options.length) return false;
+          F.reveal++;
+          return true;
+        case 'all':
+          if (F.phase !== 'reveal') return false;
+          F.reveal = F.options.length;
+          return true;
+        case 'next':
+          if (F.phase !== 'reveal' || F.reveal < F.options.length) return false;
+          if (F.idx >= F.facts.length - 1) { F.n++; F.phase = 'final'; return true; }
+          F.idx++;
+          fakeFact(F);
+          return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      gone.forEach(id => { delete F.fakes[id]; delete F.votes[id]; delete F.scores[id]; });
+      if (F.players.length < 3) return 'open';
+      if (F.phase === 'write' && F.players.every(p => F.fakes[p.id])) fakeOptions(F);
+      if (F.phase === 'vote' && F.players.every(p => F.votes[p.id] != null)) fakeScore(F);
+    },
+    render(v) {
+      const F = v.pub, me = v.me;
+      const m = v.mine && v.mine.n === F.n ? v.mine : null;
+      const nm = id => (id === me ? 'you' : ((F.players.find(x => x.id === id) || {}).name || 'Someone'));
+      const names = ids => esc(P.listNames(ids.map(nm)));
+      const send = a => Online.sendAttr(Object.assign({ n: F.n }, a));
+      const story = (kicker, fill) => `<div class="story"><small>${kicker}</small><h2>${esc(F.q).replace('___', fill ? `<span class="blank">${esc(fill)}</span>` : '<span class="blank">&nbsp;</span>')}</h2></div>`;
+      const scores = () => P.scoreList(F.players.map(p => [p.name + (p.id === me ? ' (you)' : ''), F.scores[p.id] || 0]));
+      if (F.phase === 'write') {
+        const waiting = F.players.filter(p => !F.written.includes(p.id)).map(p => p.id);
+        const editing = v.local.fakeEdit === F.n;
+        const done = m && m.fake && !editing;
+        return `<section class="center">
+          <p class="eyebrow">Fact ${F.idx + 1} of ${F.count}</p>
+          ${story('Fill in the blank', done ? m.fake : '')}
+          ${done ? `<p class="lead">Your fake is in. Change it any time before everyone is done.</p><div class="actions center"><button class="btn btn-alt" type="button" data-ui="edit">Change it</button></div>`
+            : `<div class="field"><label for="ofake-${F.n}">Your fake answer</label><input id="ofake-${F.n}" data-keep data-enter="fake" type="text" maxlength="40" autocomplete="off" enterkeyhint="done" placeholder="Make it believable"></div>
+               <p class="err" role="alert">${m && m.err ? 'That is the real answer! Keep it secret and write a fake one.' : ''}</p>
+               <div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="fake"${v.pending ? ' disabled' : ''}>Lock it in</button></div>`}
+          <p class="note">${waiting.length ? 'Still writing: ' + names(waiting) + '.' : 'Every fake is in.'}</p>
+          ${v.host ? `<div class="actions center"><button class="textbtn" type="button" ${send({ t: 'skip' })}>Somebody already knows this one</button>${F.written.length >= 2 && waiting.length ? `<button class="textbtn" type="button" ${send({ t: 'show' })}>Vote now</button>` : ''}</div>` : ''}
+        </section>`;
+      }
+      if (F.phase === 'vote') {
+        const mine = m ? m.mine : [], vote = m ? m.vote : null;
+        const waiting = F.players.filter(p => !F.voted.includes(p.id)).map(p => p.id);
+        return `<section class="center">
+          <p class="eyebrow">Which one is true?</p>
+          ${story('Fill in the blank')}
+          <ol class="opts">${F.options.map((o, k) => `<li style="padding:0;border:0"><button type="button" ${mine.includes(k) ? 'disabled' : send({ t: 'vote', k })} aria-pressed="${vote === k}"><span class="n">${k + 1}</span><span>${esc(o.text)}${mine.includes(k) ? ' (yours)' : ''}</span></button></li>`).join('')}</ol>
+          <p class="note">${vote != null ? 'Vote saved. You can change it until everyone has voted.' : 'Tap the one you believe.'} ${waiting.length ? 'Still voting: ' + names(waiting) + '.' : ''}</p>
+          ${v.host && F.voted.length && waiting.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'count' })}>Count the votes now</button></div>` : ''}
+        </section>`;
+      }
+      const shownCount = F.phase === 'final' ? F.options.length : F.reveal, done = shownCount >= F.options.length;
+      const clip = k => {
+        const o = F.options[k], fooled = Object.keys(F.votes).filter(id => F.votes[id] === k);
+        if (o.truth) return `<div class="clip truth"><b>${esc(o.text)}</b><p>${fooled.length ? 'Found by ' + names(fooled) + '. Two points each.' : 'Nobody found the truth.'}</p></div>`;
+        return `<div class="clip"><b>${esc(o.text)}</b><p>Written by ${names(o.by)}. ${fooled.length ? 'Fooled ' + names(fooled) + '.' : 'Fooled nobody.'}</p></div>`;
+      };
+      if (F.phase === 'reveal') {
+        return `<section class="center">
+          <p class="eyebrow">The truth comes out</p>
+          ${story(done ? 'The real answer' : 'Fill in the blank', done ? F.answer : '')}
+          <div class="clips">${F.order.slice(0, shownCount).map(clip).join('')}</div>
+          ${done ? scores() + `<div class="actions center"><button class="btn btn-main btn-big" type="button" ${send({ t: 'next' })}>${F.idx >= F.count - 1 ? 'Final scores' : 'Next fact'}</button></div>`
+            : `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'all' })}>Show them all</button><button class="btn btn-main btn-big" type="button" ${send({ t: 'more', k: F.reveal })}>${F.reveal === F.options.length - 1 ? 'Reveal the truth' : 'Next answer'}</button></div>`}
+        </section>`;
+      }
+      const rows = F.players.map(p => [p, F.scores[p.id] || 0]).sort((a, b) => b[1] - a[1]);
+      const top = rows.length ? rows[0][1] : 0, winners = rows.filter(r => r[1] === top).map(r => r[0].id);
+      return `<section class="center">
+        <p class="eyebrow">Final edition</p>
+        <h2 class="big">${winners.length === 1 && winners[0] === me ? 'You make the front page' : (t => t.charAt(0).toUpperCase() + t.slice(1))(names(winners)) + (winners.length > 1 ? ' share the front page' : ' makes the front page')}</h2>
+        ${scores()}
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div>
+      </section>`;
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'fake') {
+        const f = document.getElementById('ofake-' + F.n);
+        const t = fakeClean(f ? f.value : '');
+        if (!t) { if (f) f.focus(); return; }
+        v.local.fakeEdit = null;
+        v.send({ t: 'fake', n: F.n, text: t });
+        sfx.whoosh();
+      }
+      if (name === 'edit') { v.local.fakeEdit = F.n; v.redraw(); }
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.phase === 'vote' && B.phase !== 'vote') sfx.whoosh();
+      if (F.phase === 'reveal' && B.phase === 'reveal' && F.reveal > B.reveal) {
+        const o = F.options[F.order[F.reveal - 1]];
+        if (o && o.truth) sfx.win(); else sfx.tone(300, { type: 'square', dur: 0.12, gain: 0.08 });
+      }
+      if (F.phase === 'final' && B.phase !== 'final') { sfx.win(); P.confetti({ colors: ['#d8261b', '#161412', '#ece7dc', '#ffffff'] }); }
+      const m = v.mine, pm = prev && prev.mine;
+      if (m && m.err && !(pm && pm.err && pm.n === m.n)) sfx.buzz(0.3);
+    }
+  };
+  document.addEventListener('change', e => { if (e.target.name === 'o-count') { S.settings.count = Number(e.target.value); persist(); } });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>
