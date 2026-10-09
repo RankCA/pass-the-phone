@@ -62,6 +62,7 @@ body{background:linear-gradient(180deg,#bfe2ff 0%,#e3f3ff 60%,#ffffff 100%);back
 <div class="snow" aria-hidden="true" id="snow"></div>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=f82a3556"></script>
 <script src="words.js?v=391ae2c3"></script>
 <script>
 (function () {
@@ -138,6 +139,11 @@ body{background:linear-gradient(180deg,#bfe2ff 0%,#e3f3ff 60%,#ffffff 100%);back
       <div class="sec"${st.mode === 'phone' ? '' : ' hidden'}><span class="label">Category</span>${P.seg('cat', [['any', 'Surprise me']].concat(CATS.map(c => [c, c])), st.cat)}</div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Build a snowman</button></div>
       ${S.record.won + S.record.lost ? `<p class="hint">On this phone: ${P.plural(S.record.won, 'snowman', 'snowmen')} saved, ${S.record.lost} melted.</p>` : ''}
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone sees the snowman on their own phone and anyone can tap a letter. In "A player" mode, the word setter types it on theirs. Make a game, then send the code.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>`;
   }
   function viewSet() {
@@ -238,7 +244,176 @@ body{background:linear-gradient(180deg,#bfe2ff 0%,#e3f3ff 60%,#ffffff 100%);back
     else if (t.name === 'cat') { S.settings.cat = t.value; persist(); }
   });
 
-  render();
+  /* ---------- Online: guess together, each on your own phone ---------- */
+  const snowLetters = w => [...new Set(w.toUpperCase().replace(/[^A-Z]/g, '').split(''))];
+  function snowRound(F) {
+    F.n++;
+    F.guessed = [];
+    if (F.mode === 'player') {
+      F.setter = F.players[F.setterAt % F.players.length].id;
+      F.word = '';
+      F.hint = '';
+      F.phase = 'set';
+      return;
+    }
+    F.setter = null;
+    const cats = F.cat === 'any' || !DATA[F.cat] ? CATS : [F.cat];
+    const items = [];
+    cats.forEach(c => DATA[c].forEach(w => items.push({ c, w })));
+    const pick = P.deck('snowman', items, x => x.w).one();
+    F.word = pick.w;
+    F.hint = pick.c;
+    F.phase = 'play';
+  }
+  const ONLINE = {
+    game: 'snowman', title: 'Snowman', min: 2, max: 12,
+    options() {
+      const st = S.settings;
+      return `<span class="label">Who picks the word?</span>
+        <div class="modes">${P.opt('o-mode', 'phone', 'The phone', 'Everyone guesses together.', st.mode)}${P.opt('o-mode', 'player', 'A player', 'One player types a secret word on their phone. The others guess.', st.mode)}</div>
+        ${st.mode === 'phone' ? `<div class="sec"><span class="label">Category</span>${P.seg('o-cat', [['any', 'Surprise me']].concat(CATS.map(c => [c, c])), st.cat)}</div>` : ''}`;
+    },
+    readOptions() { return { mode: S.settings.mode, cat: S.settings.cat }; },
+    start(players, o) {
+      const F = { players, mode: o.mode, cat: o.cat, setterAt: Math.floor(Math.random() * players.length), record: { won: 0, lost: 0 }, n: 0, game: 1 };
+      snowRound(F);
+      return F;
+    },
+    view(F) {
+      const known = F.word ? snowLetters(F.word) : [];
+      const v = { players: F.players, mode: F.mode, setter: F.setter, hint: F.hint, guessed: F.guessed, phase: F.phase, n: F.n, game: F.game, record: F.record,
+        miss: F.guessed.filter(l => !known.includes(l)).length };
+      // Only the shape of the word, plus the letters already found.
+      v.shape = F.word ? F.word.split('').map(ch => (ch === ' ' ? ' ' : /[A-Za-z]/.test(ch) ? (F.guessed.includes(ch.toUpperCase()) || F.phase === 'end' ? ch.toUpperCase() : '_') : ch)) : [];
+      v.hits = F.guessed.filter(l => known.includes(l));
+      if (F.phase === 'end') { v.word = F.word; v.won = known.every(l => F.guessed.includes(l)); }
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      if (F.setter) out[F.setter] = { n: F.n, word: F.word };
+      return out;
+    },
+    act(F, from, a) {
+      if (!F.players.some(p => p.id === from)) return false;
+      if (a.t === 'again') {
+        if (F.phase !== 'end' || a.g !== F.game) return false;
+        F.setterAt++;
+        F.game++;
+        snowRound(F);
+        return true;
+      }
+      if (a.n !== F.n) return false;
+      if (a.t === 'setword') {
+        const w = String(a.word == null ? '' : a.word).replace(/\s+/g, ' ').trim();
+        if (F.phase !== 'set' || from !== F.setter || !/^[A-Za-z ]{2,24}$/.test(w) || !/[A-Za-z]/.test(w)) return false;
+        F.word = w;
+        F.hint = String(a.hint == null ? '' : a.hint).trim().slice(0, 24);
+        F.phase = 'play';
+        return true;
+      }
+      if (a.t === 'guess') {
+        const l = String(a.l || '').toUpperCase();
+        if (F.phase !== 'play' || from === F.setter || !/^[A-Z]$/.test(l) || F.guessed.includes(l)) return false;
+        F.guessed.push(l);
+        const known = snowLetters(F.word);
+        const solved = known.every(x => F.guessed.includes(x)), lost = F.guessed.filter(x => !known.includes(x)).length >= MAX;
+        if (solved || lost) { F.record[solved ? 'won' : 'lost']++; F.phase = 'end'; }
+        return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      if (F.players.length < 2) return 'open';
+      // The word setter walked out, so the next player sets a new word.
+      if (F.setter && gone.includes(F.setter) && F.phase !== 'end') { F.setterAt = F.setterAt % F.players.length; snowRound(F); }
+    },
+    render(v) {
+      const F = v.pub, me = v.me;
+      const nm = id => (id === me ? 'You' : esc(((F.players.find(x => x.id === id) || {}).name) || 'Someone'));
+      const send = a => Online.sendAttr(Object.assign({ n: F.n }, a));
+      const word = `<div class="word" aria-label="${F.phase === 'end' ? esc(F.word) : 'Secret word'}">${F.shape.map(ch => (ch === ' ' ? '<i class="gap"></i>' : ch === '_' ? '<span></span>' : /[A-Z]/.test(ch) ? `<span class="${F.phase === 'end' && !F.guessed.includes(ch) ? 'miss' : ''}">${ch}</span>` : `<span>${esc(ch)}</span>`)).join('')}</div>`;
+      if (F.phase === 'set') {
+        if (F.setter !== me) return `<section class="center"><p class="eyebrow">New word</p>${manSVG(0)}<h2 class="big">${nm(F.setter)} is picking a word</h2><p class="lead">Get ready to guess.</p></section>`;
+        const err = v.local.snowErr === F.n;
+        return `<section class="center">
+          <p class="eyebrow">You pick the word</p>
+          <h2 class="big">Type a secret word</h2>
+          <p class="lead">Letters and spaces only. A short phrase works too.</p>
+          <div class="field"><label for="osecret-${F.n}">Secret word</label><input id="osecret-${F.n}" data-keep data-enter="set" type="password" maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Nobody peek"></div>
+          <div class="field"><label for="ohint-${F.n}">Hint for the guessers, if you want</label><input id="ohint-${F.n}" data-keep data-enter="set" type="text" maxlength="24" autocomplete="off" placeholder="For example: an animal"></div>
+          <p class="err" role="alert">${err ? 'Use letters and spaces only, at least 2 letters.' : ''}</p>
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="set">Start the guessing</button></div>
+        </section>`;
+      }
+      if (F.phase === 'play') {
+        const setter = F.setter === me;
+        const keys = setter ? '' : `<div class="keys">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l => {
+          const used = F.guessed.includes(l), hit = F.hits.includes(l);
+          return `<button type="button" ${used || v.pending ? 'disabled' : send({ t: 'guess', l })} class="${used ? (hit ? 'hit' : 'miss') : ''}" aria-label="${l}${used ? (hit ? ', in the word' : ', not in the word') : ''}">${l}</button>`;
+        }).join('')}</div>`;
+        const mine = setter && v.mine && v.mine.n === F.n ? v.mine.word : '';
+        return `<section class="center">
+          ${F.hint ? `<span class="cat">${esc(F.hint)}</span>` : ''}
+          ${manSVG(F.miss)}
+          <p class="left">${MAX - F.miss > 0 ? P.plural(MAX - F.miss, 'wrong guess', 'wrong guesses') + ' left' : ''}</p>
+          ${word}
+          ${setter ? `<p class="lead">${mine ? `Your word is <b>${esc(mine)}</b>. ` : ''}The others are guessing. Keep a straight face.</p>` : '<p class="hint">Anyone can tap a letter. Talk it over first.</p>'}
+          ${keys}
+        </section>`;
+      }
+      return `<section class="center">
+        <p class="eyebrow">${F.won ? 'Saved' : 'Melted'}</p>
+        ${manSVG(F.won ? F.miss : MAX, !F.won)}
+        <h2 class="big">${F.won ? 'You saved the snowman' : 'The snowman melted'}</h2>
+        ${word}
+        <p class="hint">This game: ${P.plural(F.record.won, 'snowman', 'snowmen')} saved, ${F.record.lost} melted.</p>
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Another word</button></div>
+      </section>`;
+    },
+    bind(v) { onlineKeys = v.pub.phase === 'play' && v.pub.setter !== v.me ? v : null; },
+    unbind() { onlineKeys = null; },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name !== 'set') return;
+      const w = document.getElementById('osecret-' + F.n), h = document.getElementById('ohint-' + F.n);
+      const word = (w ? w.value : '').replace(/\s+/g, ' ').trim();
+      if (!/^[A-Za-z ]{2,24}$/.test(word) || !/[A-Za-z]/.test(word)) { v.local.snowErr = F.n; v.redraw(); return; }
+      v.local.snowErr = null;
+      v.send({ t: 'setword', n: F.n, word, hint: h ? h.value : '' });
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.guessed.length > B.guessed.length) {
+        const l = F.guessed[F.guessed.length - 1];
+        if (F.hits.includes(l)) sfx.ding(); else { sfx.tone(260, { type: 'triangle', to: 140, dur: 0.35, gain: 0.14 }); P.vibrate(40); }
+      }
+      if (F.phase === 'end' && B.phase !== 'end') {
+        S.record[F.won ? 'won' : 'lost']++;
+        persist();
+        if (F.won) { sfx.win(); P.confetti({ colors: ['#ffffff', '#ff7a3d', '#e63946', '#16324f', '#a9d4f5'] }); } else sfx.lose();
+      }
+    }
+  };
+  // Typing a letter guesses it, like on one phone.
+  let onlineKeys = null;
+  document.addEventListener('keydown', e => {
+    if (!onlineKeys || !/^[a-zA-Z]$/.test(e.key) || e.metaKey || e.ctrlKey || (e.target && /INPUT|TEXTAREA/.test(e.target.tagName))) return;
+    const l = e.key.toUpperCase(), F = onlineKeys.pub;
+    if (!F.guessed.includes(l)) onlineKeys.send({ t: 'guess', n: F.n, l });
+  });
+  document.addEventListener('change', e => {
+    const t = e.target;
+    if (t.name === 'o-mode') { S.settings.mode = t.value; persist(); Online.redraw(); }
+    else if (t.name === 'o-cat') { S.settings.cat = t.value; persist(); }
+  });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

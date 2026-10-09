@@ -65,7 +65,11 @@
     'fake-facts': { title: 'Fake Facts', min: 3, max: 8, blurb: 'Write a fake answer and spot the real one.' },
     'two-truths': { title: 'Two Truths', min: 3, max: 10, blurb: 'Two true things and a lie. Find every lie.' },
     'story-chain': { title: 'Story Chain', min: 2, max: 12, blurb: 'Write a story one line at a time.' },
-    copycats: { title: 'Copycats', min: 3, max: 10, blurb: 'One-word clues for the guesser. Matching clues cancel out.' }
+    copycats: { title: 'Copycats', min: 3, max: 10, blurb: 'One-word clues for the guesser. Matching clues cancel out.' },
+    'spy-grid': { title: 'Spy Grid', min: 4, max: 16, blurb: 'Two teams race to find their words from one-word clues.' },
+    'shade-hunt': { title: 'Shade Hunt', min: 3, max: 10, blurb: 'Find the secret colour from a one-word clue.' },
+    snowman: { title: 'Snowman', min: 2, max: 12, blurb: 'Guess the word one letter at a time.' },
+    'close-call': { title: 'Close Call', min: 3, max: 8, blurb: 'Guess a number, then bet on the closest guess.' }
   };
 
   /* ---------- Connection ---------- */

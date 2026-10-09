@@ -62,11 +62,13 @@ body{background:radial-gradient(circle at 10% 0%,rgba(245,183,0,.18),transparent
 .gains li span{flex:1;min-width:0;overflow-wrap:anywhere}
 .gains li small{font-size:15px;color:var(--muted)}
 .gains li b{font-family:var(--f-display);font-weight:400;font-size:22px;font-variant-numeric:tabular-nums}
+.note{margin:14px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=f82a3556"></script>
 <script src="questions.js?v=7c3b433f"></script>
 <script>
 (function () {
@@ -145,6 +147,11 @@ body{background:radial-gradient(circle at 10% 0%,rgba(245,183,0,.18),transparent
       <div class="sec"><span class="label">Players</span><div id="players"></div></div>
       <div class="sec"><span class="label">Questions</span>${P.seg('count', [[5, '5'], [7, '7'], [10, '10']], S.settings.count)}</div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Place your bets</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">Everyone types a guess on their own phone at the same time, then bets their chips in secret. Make a game, then send the code.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -280,7 +287,223 @@ body{background:radial-gradient(circle at 10% 0%,rgba(245,183,0,.18),transparent
   document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'num') { e.preventDefault(); lock(); } });
   document.addEventListener('change', e => { if (e.target.name === 'count') { S.settings.count = Number(e.target.value); persist(); } });
 
-  render();
+  /* ---------- Online: guess and bet at the same time, each on your own phone ---------- */
+  function ccQuestion(F, skip) {
+    if (!skip) F.qn++;
+    F.q = deck.one(F.q ? [F.q] : []);
+    F.n++;
+    F.guesses = {};
+    F.slots = [];
+    F.bets = {};
+    F.result = null;
+    F.phase = 'guess';
+  }
+  function ccSlots(F) {
+    const values = [...new Set(F.players.filter(p => F.guesses[p.id] != null).map(p => F.guesses[p.id]))].sort((a, b) => a - b);
+    const k = values.length;
+    F.slots = [{ low: true, value: null, ids: [], odds: 6 }].concat(values.map((val, i) => {
+      const d = Math.abs(i - (k - 1) / 2);
+      return { low: false, value: val, ids: F.players.filter(p => F.guesses[p.id] === val).map(p => p.id), odds: Math.min(5, 2 + Math.round(d - 0.01)) };
+    }));
+    F.phase = 'bet';
+  }
+  function ccSettle(F) {
+    let win = 0;
+    F.slots.forEach((sl, i) => { if (!sl.low && sl.value <= F.q.a) win = i; });
+    const gains = {};
+    F.players.forEach(p => { gains[p.id] = 0; });
+    Object.keys(F.bets).forEach(id => F.bets[id].forEach(i => { if (i === win && gains[id] != null) gains[id] += F.slots[win].odds; }));
+    if (win > 0) F.slots[win].ids.forEach(id => { if (gains[id] != null) gains[id] += 3; });
+    Object.keys(gains).forEach(id => { F.scores[id] = (F.scores[id] || 0) + gains[id]; });
+    F.result = { win, gains };
+    F.phase = 'reveal';
+  }
+  function ccPicks(v) {
+    if (!v.local.cc || v.local.cc.n !== v.pub.n) v.local.cc = { n: v.pub.n, s: [] };
+    return v.local.cc.s;
+  }
+  const ONLINE = {
+    game: 'close-call', title: 'Close Call', min: 3, max: 8,
+    options() { return `<p class="label">Questions</p>${P.seg('o-count', [[5, '5'], [7, '7'], [10, '10']], S.settings.count)}`; },
+    readOptions() { return { count: S.settings.count }; },
+    start(players, o) {
+      const F = { players, all: players.slice(), count: o.count, scores: {}, qn: 0, q: null, n: 0, game: 1 };
+      ccQuestion(F);
+      return F;
+    },
+    view(F) {
+      const v = { players: F.players, all: F.all, count: F.count, qn: F.qn, n: F.n, game: F.game, phase: F.phase, scores: F.scores, q: F.q.q,
+        guessed: Object.keys(F.guesses), slots: F.slots, betted: Object.keys(F.bets) };
+      // Bets and the answer stay hidden until everyone has bet.
+      if (F.phase === 'reveal' || F.phase === 'final') { v.answer = F.q.a; v.unit = F.q.u || ''; v.bets = F.bets; v.result = F.result; }
+      return v;
+    },
+    secrets(F) {
+      const out = {};
+      F.players.forEach(p => { out[p.id] = { n: F.n, guess: F.guesses[p.id] == null ? null : F.guesses[p.id], bets: F.bets[p.id] || null }; });
+      return out;
+    },
+    act(F, from, a, ctx) {
+      if (!F.players.some(p => p.id === from)) return false;
+      const host = from === ctx.host;
+      if (a.t === 'again') {
+        if (F.phase !== 'final' || a.g !== F.game) return false;
+        F.scores = {};
+        F.qn = 0;
+        F.game++;
+        ccQuestion(F);
+        return true;
+      }
+      if (a.n !== F.n) return false;
+      switch (a.t) {
+        case 'guess': {
+          const val = typeof a.v === 'number' ? a.v : parse(a.v == null ? '' : a.v);
+          if (F.phase !== 'guess' || F.guesses[from] != null || val === null || !isFinite(val) || Math.abs(val) >= 1e12) return false;
+          F.guesses[from] = val;
+          if (F.players.every(p => F.guesses[p.id] != null)) ccSlots(F);
+          return true;
+        }
+        case 'skip':
+          if (!host || F.phase !== 'guess') return false;
+          ccQuestion(F, true);
+          return true;
+        case 'bets':
+          if (!host || F.phase !== 'guess' || !Object.keys(F.guesses).length) return false;
+          ccSlots(F);
+          return true;
+        case 'bet': {
+          const pick = Array.isArray(a.s) ? a.s.map(Number) : [];
+          if (F.phase !== 'bet' || F.bets[from] || pick.length !== 2 || !pick.every(i => Number.isInteger(i) && i >= 0 && i < F.slots.length)) return false;
+          F.bets[from] = pick;
+          if (F.players.every(p => F.bets[p.id])) ccSettle(F);
+          return true;
+        }
+        case 'show':
+          if (!host || F.phase !== 'bet' || !Object.keys(F.bets).length) return false;
+          ccSettle(F);
+          return true;
+        case 'next':
+          if (F.phase !== 'reveal') return false;
+          if (F.qn >= F.count) { F.n++; F.phase = 'final'; return true; }
+          ccQuestion(F);
+          return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      F.players = F.players.filter(p => ids.includes(p.id));
+      gone.forEach(id => { delete F.bets[id]; delete F.scores[id]; if (F.phase === 'guess') delete F.guesses[id]; });
+      if (F.players.length < 3) return 'open';
+      if (F.phase === 'guess' && Object.keys(F.guesses).length && F.players.every(p => F.guesses[p.id] != null)) ccSlots(F);
+      if (F.phase === 'bet' && F.players.every(p => F.bets[p.id])) ccSettle(F);
+    },
+    render(v) {
+      const F = v.pub, me = v.me;
+      const m = v.mine && v.mine.n === F.n ? v.mine : null;
+      const who = id => F.all.find(x => x.id === id) || { name: 'Someone' };
+      const nm = id => (id === me ? 'you' : who(id).name);
+      const list = ids => P.listNames(ids.filter(id => id !== me).concat(ids.filter(id => id === me)).map(nm));
+      const cap = t => t.charAt(0).toUpperCase() + t.slice(1);
+      const col = id => CHIPS[Math.max(0, F.all.findIndex(x => x.id === id)) % CHIPS.length];
+      const chip = id => `<span class="chip" style="--c:${col(id)}" aria-hidden="true">${esc(initial(who(id).name))}</span>`;
+      const send = a => Online.sendAttr(Object.assign({ n: F.n }, a));
+      const slots = o => '<div class="slots">' + F.slots.map((sl, i) => {
+        const on = o.chips.filter(c => c.slot === i).map(c => chip(c.id)).join('');
+        const label = sl.low ? 'Smaller than every guess' : fmt(sl.value);
+        const by = sl.low ? 'Pick this if every guess is too high' : cap(list(sl.ids));
+        const win = o.result && F.result.win === i;
+        return `<button type="button" class="slot${sl.low ? ' low' : ''}${win ? ' win' : ''}" ${o.pick ? `data-ui="chip" data-i="${i}"` : 'disabled'} aria-label="${esc(label)}, pays ${sl.odds} to 1. ${esc(by)}"><span class="odds">${sl.odds} to 1</span><span><b>${esc(label)}</b><small>${esc(by)}</small></span><span class="chips">${on}</span></button>`;
+      }).join('') + '</div>';
+      const scores = gains => {
+        const rows = F.players.map(p => [p.id, F.scores[p.id] || 0]).sort((a, b) => b[1] - a[1]);
+        const top = rows.length ? rows[0][1] : 0;
+        return '<ol class="gains">' + rows.map(r => `<li class="${top > 0 && r[1] === top ? 'top' : ''}">${chip(r[0])}<span>${esc(who(r[0]).name)}${r[0] === me ? ' (you)' : ''}</span>${gains && gains[r[0]] ? `<small>+${gains[r[0]]}</small>` : ''}<b>${r[1]}</b></li>`).join('') + '</ol>';
+      };
+      const q = `<p class="q">${esc(F.q)}</p>`;
+      if (F.phase === 'guess') {
+        const waiting = F.players.filter(p => !F.guessed.includes(p.id)).map(p => p.id);
+        const mine = m && m.guess != null ? m.guess : null;
+        return `<section class="center">
+          <p class="eyebrow">Question ${F.qn} of ${F.count}</p>
+          ${q}
+          ${mine != null ? `<p class="lead">You guessed <b>${esc(fmt(mine))}</b>. Keep it to yourself.</p>`
+            : `<div class="field"><label for="ccnum-${F.n}">Your guess</label><input id="ccnum-${F.n}" data-keep data-enter="guess" type="text" inputmode="decimal" autocomplete="off" maxlength="12" enterkeyhint="done" placeholder="0"></div>
+               <p class="err" role="alert">${v.local.ccErr === F.n ? 'Type a number first.' : ''}</p>
+               <div class="actions center"><button class="btn btn-main btn-big" type="button" data-ui="guess"${v.pending ? ' disabled' : ''}>Lock it in</button></div>`}
+          <p class="note">${waiting.length ? 'Still guessing: ' + esc(list(waiting)) + '.' : 'Every guess is in.'}</p>
+          ${v.host ? `<div class="actions center"><button class="textbtn" type="button" ${send({ t: 'skip' })}>Another question</button>${F.guessed.length && waiting.length ? `<button class="textbtn" type="button" ${send({ t: 'bets' })}>Start betting without them</button>` : ''}</div>` : ''}
+        </section>`;
+      }
+      if (F.phase === 'bet') {
+        const waiting = F.players.filter(p => !F.betted.includes(p.id)).map(p => p.id);
+        const locked = m && m.bets ? m.bets : null;
+        const picks = locked || ccPicks(v), left = 2 - picks.length;
+        return `<section class="center">
+          <p class="eyebrow">Place your bets</p>
+          ${q}
+          <p class="who">${chip(me)}${locked ? 'Your chips are down' : left === 2 ? 'Place 2 chips' : left === 1 ? 'Place 1 more chip' : 'Both chips placed'}</p>
+          ${slots({ chips: picks.map(i => ({ id: me, slot: i })), pick: !locked && left > 0 })}
+          ${locked ? '' : `<div class="actions center"><button class="btn btn-alt" type="button" data-ui="undo"${left < 2 ? '' : ' disabled'}>Take a chip back</button><button class="btn btn-main btn-big" type="button" data-ui="lockbets"${left === 0 && !v.pending ? '' : ' disabled'}>Lock in my chips</button></div>`}
+          <p class="note">${locked ? '' : 'Nobody sees your chips until the answer. '}${waiting.length ? 'Still betting: ' + esc(list(waiting)) + '.' : ''}</p>
+          ${v.host && F.betted.length && waiting.length ? `<div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'show' })}>Show the answer now</button></div>` : ''}
+        </section>`;
+      }
+      if (F.phase === 'reveal') {
+        const sl = F.slots[F.result.win], chips = [];
+        F.all.forEach(p => (F.bets[p.id] || []).forEach(i => chips.push({ id: p.id, slot: i })));
+        return `<section class="center">
+          <p class="eyebrow">The answer is</p>
+          <span class="answer">${esc(fmt(F.answer))}${F.unit ? ' ' + esc(F.unit) : ''}</span>
+          <p class="lead">${sl.low ? 'Every guess was too high, so Smaller than every guess wins.' : 'Closest without going over: ' + esc(fmt(sl.value)) + ' from ' + esc(list(sl.ids)) + '.'}</p>
+          ${slots({ chips, result: true })}
+          ${scores(F.result.gains)}
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" ${send({ t: 'next' })}>${F.qn >= F.count ? 'See who won' : 'Next question'}</button></div>
+        </section>`;
+      }
+      const rows = F.players.map(p => [p.id, F.scores[p.id] || 0]).sort((a, b) => b[1] - a[1]);
+      const best = rows.length ? rows[0][1] : 0, won = rows.filter(r => r[1] === best).map(r => r[0]);
+      return `<section class="center">
+        <p class="eyebrow">Game over</p>
+        <h2 class="big">${won.length === 1 && won[0] === me ? 'You win' : esc(cap(list(won))) + (won.length > 1 ? ' win' : ' wins')}</h2>
+        <p class="lead">With ${P.plural(best, 'point')}.</p>
+        ${scores(null)}
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div>
+      </section>`;
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'guess') {
+        const i = document.getElementById('ccnum-' + F.n);
+        const val = parse(i ? i.value : '');
+        if (val === null) { v.local.ccErr = F.n; v.redraw(); return; }
+        v.local.ccErr = null;
+        sfx.pop();
+        v.send({ t: 'guess', n: F.n, v: val });
+        return;
+      }
+      const picks = ccPicks(v);
+      if (name === 'chip') {
+        if (picks.length >= 2) return;
+        picks.push(Number(el.getAttribute('data-i')));
+        sfx.tone(700, { type: 'triangle', dur: 0.08, gain: 0.12 });
+        v.redraw();
+      } else if (name === 'undo') { picks.pop(); v.redraw(); }
+      else if (name === 'lockbets' && picks.length === 2) v.send({ t: 'bet', n: F.n, s: picks.slice() });
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game) return;
+      if (F.phase === 'bet' && B.phase !== 'bet') sfx.whoosh();
+      if (F.phase === 'reveal' && B.phase !== 'reveal') sfx.ding();
+      if (F.phase === 'final' && B.phase !== 'final') { sfx.win(); P.confetti({ colors: ['#d6283b', '#2457c5', '#f5b700', '#1a1a2e'] }); }
+    }
+  };
+  document.addEventListener('change', e => { if (e.target.name === 'o-count') { S.settings.count = Number(e.target.value); persist(); } });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>

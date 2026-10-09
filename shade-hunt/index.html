@@ -63,6 +63,9 @@
 .reveal-front small{font-size:16px;color:var(--muted)}
 .reveal-back{padding:10px;background:#fff}
 .rules{margin:10px auto 0;max-width:30em;font-size:16px;color:var(--muted)}
+.cluebox{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:flex-end;max-width:460px;margin:14px auto 0}
+.cluebox .field{margin:0;flex:1 1 200px}
+.said{display:inline-block;margin-top:6px;padding:4px 14px;border-radius:999px;background:#fff;color:#17171c;font-weight:800;font-size:18px}
 .res{list-style:none;margin:16px auto 0;padding:0;display:grid;gap:6px;max-width:440px;text-align:left}
 .res li{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--panel);font-weight:700}
 .res li span{flex:1;min-width:0;overflow-wrap:anywhere}
@@ -74,6 +77,7 @@
 <body>
 <div class="wrap" id="app"></div>
 <script src="../shared/party.js?v=ab12cd68"></script>
+<script src="../shared/online.js?v=f82a3556"></script>
 <script>
 (function () {
   'use strict';
@@ -192,6 +196,11 @@
       <div class="sec"><span class="label">Players</span><div id="players"></div></div>
       <div class="sec"><span class="label">Clue givers</span>${P.seg('laps', [[1, 'Everyone once'], [2, 'Everyone twice']], S.settings.laps)}</div>
       <div class="actions"><button class="btn btn-main btn-big" type="button" data-act="start">Start the hunt</button></div>
+    </div>
+    <div class="panel">
+      <span class="label">Play online</span>
+      <p class="hint">The clue giver sees the colour on their own phone, and everyone taps their guesses at the same time on theirs. Make a game, then send the code.</p>
+      <div class="actions"><a class="btn btn-alt" href="?lobby=new">Make an online game</a><a class="btn btn-alt" href="../online/">Join with a code</a></div>
     </div>
     <details class="howto">
       <summary>How to play</summary>
@@ -329,7 +338,254 @@
     if (e.target.name === 'laps') { S.settings.laps = Number(e.target.value); persist(); }
   });
 
-  render();
+  /* ---------- Online: everyone taps their guesses on their own phone ---------- */
+  const huntGiver = F => F.order[F.turn];
+  const huntGuessers = F => F.players.map(p => p.id).filter(id => id !== huntGiver(F));
+  function huntTurn(F) {
+    F.n++;
+    F.target = { r: Math.floor(Math.random() * ROWS), c: Math.floor(Math.random() * COLS) };
+    F.marks = {};
+    F.clue1 = '';
+    F.clue2 = '';
+    F.last = null;
+    F.err = {};
+    F.phase = 'peek';
+  }
+  function huntScore(F) {
+    const t = F.target, pts = {};
+    let g = 0;
+    huntGuessers(F).forEach(id => {
+      let p = 0;
+      (F.marks[id] || []).forEach(m => { const d = dist(m, t); p += d === 0 ? 3 : d === 1 ? 2 : d === 2 ? 1 : 0; if (d <= 1) g++; });
+      pts[id] = p;
+    });
+    pts[huntGiver(F)] = g;
+    Object.keys(pts).forEach(id => { F.scores[id] = (F.scores[id] || 0) + pts[id]; });
+    F.last = pts;
+    F.n++;
+    F.phase = 'reveal';
+  }
+  const huntRound = F => (F.phase === 'guess2' ? 2 : 1);
+  const ONLINE = {
+    game: 'shade-hunt', title: 'Shade Hunt', min: 3, max: 10,
+    options() { return `<p class="label">Clue givers</p>${P.seg('o-laps', [[1, 'Everyone once'], [2, 'Everyone twice']], S.settings.laps)}`; },
+    readOptions() { return { laps: S.settings.laps }; },
+    start(players, o) {
+      const ids = players.map(p => p.id), names = players.map(p => p.name), tagsByName = makeTags(names);
+      const F = { players, tags: {}, scores: {}, order: [], turn: 0, n: 0, game: 1 };
+      players.forEach(p => { F.tags[p.id] = tagsByName[p.name]; });
+      for (let k = 0; k < o.laps; k++) F.order.push(...ids);
+      huntTurn(F);
+      return F;
+    },
+    view(F) {
+      const v = { players: F.players, tags: F.tags, scores: F.scores, turnNo: F.turn, turns: F.order.length, giver: huntGiver(F), n: F.n, game: F.game, phase: F.phase,
+        marks: F.marks, clue1: F.clue1, clue2: F.clue2, last: F.last };
+      if (F.phase === 'reveal' || F.phase === 'final') v.target = F.target;
+      return v;
+    },
+    secrets(F) {
+      const out = {}, giver = huntGiver(F);
+      F.players.forEach(p => { out[p.id] = p.id === giver ? { n: F.n, target: F.target } : { n: F.n, err: F.err[p.id] === F.n }; });
+      return out;
+    },
+    act(F, from, a) {
+      if (!F.players.some(p => p.id === from)) return false;
+      if (a.t === 'again') {
+        if (F.phase !== 'final' || a.g !== F.game) return false;
+        F.scores = {};
+        F.turn = 0;
+        F.game++;
+        huntTurn(F);
+        return true;
+      }
+      if (a.n !== F.n) return false;
+      const giver = huntGiver(F), clean = (t, k) => String(t == null ? '' : t).trim().split(/\s+/).slice(0, k).join(' ').slice(0, 30);
+      switch (a.t) {
+        case 'clue1':
+          if (F.phase !== 'peek' || from !== giver) return false;
+          F.clue1 = clean(a.text, 1);
+          F.n++;
+          F.phase = 'guess1';
+          return true;
+        case 'clue2':
+          if (F.phase !== 'between' || from !== giver) return false;
+          F.clue2 = clean(a.text, 2);
+          F.n++;
+          F.phase = 'guess2';
+          return true;
+        case 'skip':
+          if (F.phase !== 'between' || from !== giver) return false;
+          huntScore(F);
+          return true;
+        case 'mark': {
+          const r = Number(a.r), c = Number(a.c), round = huntRound(F);
+          if ((F.phase !== 'guess1' && F.phase !== 'guess2') || from === giver || !(r >= 0 && r < ROWS && c >= 0 && c < COLS)) return false;
+          const mine = F.marks[from] || [];
+          if (mine.length >= round) return false;
+          // Two people cannot share a square. Whoever was second gets told.
+          const taken = Object.keys(F.marks).some(id => F.marks[id].some(m => m.r === r && m.c === c));
+          if (taken) { F.err[from] = F.n; return true; }
+          delete F.err[from];
+          F.marks[from] = mine.concat([{ r, c }]);
+          if (huntGuessers(F).every(id => (F.marks[id] || []).length >= round)) {
+            if (round === 1) { F.n++; F.phase = 'between'; } else huntScore(F);
+          }
+          return true;
+        }
+        case 'next':
+          if (F.phase !== 'reveal') return false;
+          if (F.turn >= F.order.length - 1) { F.n++; F.phase = 'final'; return true; }
+          F.turn++;
+          huntTurn(F);
+          return true;
+      }
+      return false;
+    },
+    leave(F, ids) {
+      const gone = F.players.filter(p => !ids.includes(p.id)).map(p => p.id);
+      if (!gone.length) return;
+      const giver = huntGiver(F);
+      F.players = F.players.filter(p => ids.includes(p.id));
+      if (F.players.length < 3) return 'open';
+      const before = F.order.slice(0, F.turn).filter(id => !gone.includes(id)).length;
+      F.order = F.order.filter(id => !gone.includes(id));
+      gone.forEach(id => { delete F.marks[id]; delete F.scores[id]; });
+      if (F.phase === 'final') return;
+      if (gone.includes(giver)) {
+        F.turn = before;
+        if (F.turn >= F.order.length) { F.n++; F.phase = 'final'; return; }
+        huntTurn(F);
+        return;
+      }
+      F.turn = F.order.indexOf(giver, before);
+      const round = huntRound(F);
+      if ((F.phase === 'guess1' || F.phase === 'guess2') && huntGuessers(F).every(id => (F.marks[id] || []).length >= round)) {
+        if (round === 1) { F.n++; F.phase = 'between'; } else huntScore(F);
+      }
+    },
+    render(v) {
+      const F = v.pub, me = v.me, giver = F.giver;
+      const m = v.mine && v.mine.n === F.n ? v.mine : null;
+      const nm = id => (id === me ? 'You' : esc(((F.players.find(x => x.id === id) || {}).name) || 'Someone'));
+      const send = a => Online.sendAttr(Object.assign({ n: F.n }, a));
+      const taken = {};
+      Object.keys(F.marks).forEach(id => F.marks[id].forEach((mk, k) => { taken[mk.r + ',' + mk.c] = { id, k }; }));
+      const round = F.phase === 'guess2' ? 2 : 1;
+      const myMarks = F.marks[me] || [];
+      const picking = (F.phase === 'guess1' || F.phase === 'guess2') && giver !== me && myMarks.length < round;
+      // A square someone else just took cannot stay picked.
+      const pend = v.local.hunt && v.local.hunt.n === F.n && !taken[v.local.hunt.r + ',' + v.local.hunt.c] ? v.local.hunt : null;
+      const grid = o => {
+        let h = '<div class="grid" aria-label="Colour grid, 12 columns from A to L and 20 rows"><span></span>' + [...LET].map(l => '<span class="cl">' + l + '</span>').join('');
+        for (let r = 0; r < ROWS; r++) {
+          h += '<span class="rl">' + (r + 1) + '</span>';
+          for (let c = 0; c < COLS; c++) {
+            const key = r + ',' + c, here = taken[key];
+            let cls = '', inner = '', label = code(r, c);
+            if (o.target) {
+              const d = dist({ r, c }, o.target);
+              if (d <= 2) cls = ' d' + d;
+              if (d === 0) { inner = '<span class="mk star" aria-hidden="true">&#9733;</span>'; label += ', the target'; }
+            }
+            if (here) { inner = '<span class="mk' + (here.k ? ' two' : '') + '" aria-hidden="true">' + esc(F.tags[here.id] || '') + '</span>'; label += ', ' + ((F.players.find(x => x.id === here.id) || {}).name || ''); }
+            if (pend && pend.r === r && pend.c === c) { inner = '<span class="mk now' + (round === 2 ? ' two' : '') + '" aria-hidden="true">' + esc(F.tags[me] || '') + '</span>'; label += ', your pick'; }
+            const can = o.pick && !here;
+            h += '<button type="button" class="cell' + cls + '" style="background:' + colour(r, c) + '" ' + (can ? 'data-ui="cell" data-r="' + r + '" data-c="' + c + '"' : 'disabled') + ' aria-label="' + esc(label) + '">' + inner + '</button>';
+          }
+        }
+        return h + '</div>';
+      };
+      const scores = () => P.scoreList(F.players.map(p => [p.name + (p.id === me ? ' (you)' : ''), F.scores[p.id] || 0]));
+      const head = `<p class="eyebrow">Turn ${F.turnNo + 1} of ${F.turns}. ${nm(giver)} ${giver === me ? 'give' : 'gives'} the clues</p>`;
+      const clues = () => (F.clue1 || F.clue2 ? `<p>${F.clue1 ? `<span class="said">${esc(F.clue1)}</span>` : ''} ${F.clue2 ? `<span class="said">${esc(F.clue2)}</span>` : ''}</p>` : '');
+      if (F.phase === 'peek' || F.phase === 'between') {
+        if (giver === me) {
+          const t = m && m.target, dark = t && light(t.c) > 56;
+          const field = F.phase === 'peek'
+            ? `<div class="cluebox"><div class="field"><label for="ohunt-${F.n}">Your one-word clue</label><input id="ohunt-${F.n}" data-keep data-enter="give" type="text" maxlength="30" autocomplete="off" placeholder="Say it or type it"></div><button class="btn btn-main" type="button" data-ui="give">Give the clue</button></div>`
+            : `<div class="cluebox"><div class="field"><label for="ohunt-${F.n}">Up to two more words</label><input id="ohunt-${F.n}" data-keep data-enter="give" type="text" maxlength="30" autocomplete="off" placeholder="Say it or type it"></div><button class="btn btn-main" type="button" data-ui="give">Give the clue</button></div>
+               <div class="actions center"><button class="btn btn-alt" type="button" ${send({ t: 'skip' })}>Skip to the answer</button></div>`;
+          return `<section class="center">${head}
+            <div class="reveal" id="ocard" tabindex="0" role="button" aria-label="Press and hold to see the colour">
+              <div class="reveal-in">
+                <div class="reveal-face reveal-front"><b>Hold to see it</b><small>Keep the screen to yourself.</small></div>
+                <div class="reveal-face reveal-back">${t ? `<div class="swatch" style="background:${colour(t.r, t.c)};color:${dark ? '#17171c' : '#ffffff'}"><b>${code(t.r, t.c)}</b><small>Column ${LET[t.c]}, row ${t.r + 1}</small></div>` : ''}</div>
+              </div>
+            </div>
+            <p class="rules">No colour names, and no pointing. Leave the box empty if you said it out loud.</p>
+            ${clues()}${field}
+            ${F.phase === 'between' ? grid({}) : ''}
+          </section>`;
+        }
+        return `<section class="center">${head}
+          <h2 class="big">${F.phase === 'peek' ? 'Listen for the clue' : 'Second clue coming'}</h2>
+          <p class="lead">${F.phase === 'peek' ? nm(giver) + ' is looking at the secret colour.' : nm(giver) + ' can add up to two more words.'}</p>
+          ${clues()}
+          ${grid({})}
+        </section>`;
+      }
+      if (F.phase === 'guess1' || F.phase === 'guess2') {
+        const waiting = F.players.map(p => p.id).filter(id => id !== giver && (F.marks[id] || []).length < round);
+        const sub = giver === me ? 'Everyone is guessing.' : picking ? (pend ? 'You picked ' + code(pend.r, pend.c) + '. Tap another square to change it.' : 'Tap a square.') : 'Locked in.';
+        return `<section class="center">
+          <div class="prompt">
+            <p class="eyebrow" style="margin:0">Clue ${round} from ${giver === me ? 'you' : nm(giver)}</p>
+            ${clues()}
+            <p class="who">${giver === me ? 'They are guessing' : picking ? 'Tap your guess' : 'Waiting for the others'}</p>
+            <p class="sub">${sub} ${waiting.length ? 'Still guessing: ' + esc(P.listNames(waiting.map(id => (id === me ? 'you' : ((F.players.find(x => x.id === id) || {}).name || ''))))) + '.' : ''}</p>
+            ${m && m.err && picking ? '<p class="sub">Someone just took that square. Pick another.</p>' : ''}
+            ${picking ? `<div class="actions center"><button class="btn btn-main" type="button" ${pend && !v.pending ? send({ t: 'mark', r: pend.r, c: pend.c }) : 'disabled'}>${pend ? 'Lock in ' + code(pend.r, pend.c) : 'Pick a square'}</button></div>` : ''}
+          </div>
+          ${grid({ pick: picking })}
+        </section>`;
+      }
+      if (F.phase === 'reveal') {
+        const t = F.target, last = F.turnNo >= F.turns - 1;
+        const rows = [giver].concat(F.players.map(p => p.id).filter(id => id !== giver)).map(id => `<li><span class="mk${id === giver ? ' star' : ''}" aria-hidden="true">${id === giver ? '&#9733;' : esc(F.tags[id] || '')}</span><span>${nm(id)}${id === giver ? ' gave the clues' : ''}</span><b>+${(F.last && F.last[id]) || 0}</b></li>`).join('');
+        return `<section class="center">
+          <p class="eyebrow">The colour was</p>
+          <h2 class="big">${code(t.r, t.c)}</h2>
+          <ol class="res">${rows}</ol>
+          ${grid({ target: t })}
+          <div class="actions center"><button class="btn btn-main btn-big" type="button" ${send({ t: 'next' })}>${last ? 'See who won' : 'Next clue giver'}</button></div>
+          ${scores()}
+        </section>`;
+      }
+      const rows = F.players.map(p => [p, F.scores[p.id] || 0]).sort((a, b) => b[1] - a[1]);
+      const best = rows.length ? rows[0][1] : 0, won = rows.filter(r => r[1] === best).map(r => r[0].id);
+      return `<section class="center">
+        <p class="eyebrow">Game over</p>
+        <h2 class="big">${won.length === 1 && won[0] === me ? 'You win' : esc(P.listNames(won.map(id => (id === me ? 'you' : (F.players.find(x => x.id === id) || {}).name)))) + (won.length > 1 ? ' win' : ' wins')}</h2>
+        ${scores()}
+        <div class="actions center"><button class="btn btn-main btn-big" type="button" ${Online.sendAttr({ t: 'again', g: F.game })}>Play again</button></div>
+      </section>`;
+    },
+    bind(v) {
+      const c = document.getElementById('ocard');
+      if (c) P.holdToReveal(c, () => sfx.pop());
+    },
+    click(name, el, v) {
+      const F = v.pub;
+      if (name === 'cell') { const r = Number(el.getAttribute('data-r')), c = Number(el.getAttribute('data-c')); v.local.hunt = { n: F.n, r, c }; sfx.tick(1200 + r * 20); v.redraw(); }
+      if (name === 'give') {
+        const f = document.getElementById('ohunt-' + F.n);
+        v.send({ t: F.phase === 'peek' ? 'clue1' : 'clue2', n: F.n, text: f ? f.value : '' });
+        sfx.pop();
+      }
+    },
+    fx(v, prev) {
+      const F = v.pub, B = prev && prev.pub;
+      if (!B || B.game !== F.game || B.phase === F.phase) return;
+      if (F.phase === 'guess1' || F.phase === 'guess2') sfx.beep(true);
+      if (F.phase === 'reveal') { sfx.whoosh(); setTimeout(() => (F.last && Object.keys(F.last).some(id => F.last[id] >= 3) ? sfx.ding() : sfx.pop()), 250); }
+      if (F.phase === 'final') { sfx.win(); P.confetti({ colors: ['#ff5d73', '#ffb347', '#ffe066', '#5ee08a', '#5cc8ff', '#a78bfa'] }); }
+    }
+  };
+  document.addEventListener('change', e => { if (e.target.name === 'o-laps') { S.settings.laps = Number(e.target.value); persist(); } });
+
+  if (window.Online && Online.wanted()) Online.room(ONLINE);
+  else render();
 })();
 </script>
 </body>
